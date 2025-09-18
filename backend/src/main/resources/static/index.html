@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>PWA + Spring Boot + Electron</title>
+  <link rel="manifest" href="/static/manifest.json">
+</head>
+<body>
+  <h1>Hello from PWA!</h1>
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").then(() => {
+        console.log("Service Worker registered.");
+      });
+    }
+  </script>
+</body>
+</html>

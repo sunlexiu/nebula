@@ -1,0 +1,230 @@
+import React, { useState } from 'react';
+import MoreActionsMenu from './MoreActionsMenu';
+import { 
+  getExpandIcon, 
+  getNodeIcon,
+  loadNodeChildren 
+} from './utils';
+import { 
+  getPrimaryAction,
+  getAllActions,
+  findNode,
+  showProperties,
+  connectDatabase,
+  previewTable
+  // 导入其他需要的action函数
+} from './actions';
+import { 
+  getThemeColors, 
+  nodeBaseStyles, 
+  nodeHoverStyles, 
+  expandIconStyles, 
+  nodeIconStyles, 
+  nodeNameStyles, 
+  typeLabelStyles, 
+  actionButtonStyles, 
+  indicatorBarStyles, 
+  childIndicatorStyles, 
+  actionContainerStyles 
+} from './styles';
+
+const TreeNode = ({
+  node,
+  level = 0,
+  hoveredNode,
+  setHoveredNode,
+  treeData,
+  setTreeData,
+  onMoreMenu,
+  moreMenuPosition,
+  showMoreMenu,
+  setShowMoreMenu
+}) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const isHovered = hoveredNode === node.id;
+  const hasChildren = node.children && node.children.length > 0;
+  const isExpandable = hasChildren || node.type === 'connection' || node.type === 'schema';
+  const primaryAction = getPrimaryAction(node.type);
+  const theme = getThemeColors(node.type);
+
+  const handleClick = async (e) => {
+    e.stopPropagation();
+    if (isExpandable) {
+      if (!hasChildren) {
+        setIsLoading(true);
+        try {
+          await loadNodeChildren(node);
+          // 触发重新渲染
+          setTreeData(prev => [...prev]);
+        } catch (error) {
+          console.error('加载失败:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        // 已经有子节点，直接切换展开状态
+        setTreeData((prev) => {
+          const copy = JSON.parse(JSON.stringify(prev));
+          const targetNode = findNode(copy, node.id);
+          if (targetNode) {
+            targetNode.expanded = !targetNode.expanded;
+          }
+          return copy;
+        });
+      }
+    }
+  };
+
+  const handlePrimaryAction = (e) => {
+    e.stopPropagation();
+    if (primaryAction) {
+      switch (node.type) {
+        case 'connection':
+          connectDatabase(node);
+          break;
+        case 'table':
+          previewTable(node);
+          break;
+        case 'folder':
+          // 文件夹的主要操作可以是新建，这里只是示例
+          console.log('文件夹操作:', node.name);
+          break;
+        default:
+          console.log(`执行主要操作: ${primaryAction.label} for ${node.name}`);
+      }
+    }
+  };
+
+  const handleMoreMenu = (e) => {
+    e.stopPropagation();
+    onMoreMenu(e, node);
+  };
+
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleMoreMenu(e);
+  };
+
+  return (
+    <>
+      <div
+        className={`tree-node ${node.type} ${node.expanded ? 'expanded' : ''} ${isHovered ? 'hovered' : ''}`}
+        style={{
+          ...nodeBaseStyles,
+          paddingLeft: `${12 + level * 12}px`,
+          cursor: isExpandable ? 'pointer' : (isLoading ? 'wait' : 'default'),
+          background: isHovered ? theme.hoverBg : 'transparent',
+          border: isHovered ? `1px solid ${theme.accentColor}20` : '1px solid transparent',
+          transform: isHovered ? 'translateX(1px)' : 'translateX(0)',
+          boxShadow: isHovered ? `0 1px 4px ${theme.accentColor}10` : 'none',
+          paddingRight: isHovered ? '4px' : '8px'
+        }}
+        onMouseEnter={() => setHoveredNode(node.id)}
+        onMouseLeave={() => setHoveredNode(null)}
+        onClick={handleClick}
+        onContextMenu={handleContextMenu}
+      >
+        {/* 左侧指示条 */}
+        {isHovered && <div style={indicatorBarStyles(theme)} />}
+
+        {/* 展开图标 */}
+        <div style={expandIconStyles(isHovered, theme)}>
+          {isLoading ? (
+            <span style={{ fontSize: 9 }}>⏳</span>
+          ) : getExpandIcon(node) ? (
+            <span style={{ fontSize: 9, fontWeight: 'bold' }}>
+              {getExpandIcon(node)}
+            </span>
+          ) : (
+            <div style={{ width: 10, height: 10 }} />
+          )}
+        </div>
+
+        {/* 节点图标 */}
+        <img 
+          src={getNodeIcon(node)} 
+          alt={node.type} 
+          style={nodeIconStyles(isHovered, theme)}
+        />
+
+        {/* 节点名称 */}
+        <span style={{...nodeNameStyles(isHovered), color: isHovered ? theme.textColor : '#333' }}>
+          {node.name}
+        </span>
+
+        {/* 类型标签 */}
+        {node.type !== 'folder' && (
+          <span style={typeLabelStyles(isHovered, theme)}>
+            {node.type}
+          </span>
+        )}
+
+        {/* 功能按钮区域 */}
+        {isHovered && !isLoading && (
+          <div style={actionContainerStyles}>
+            {primaryAction && (
+              <button
+                onClick={handlePrimaryAction}
+                style={actionButtonStyles(theme)}
+                onMouseEnter={(e) => {
+                  e.target.style.background = 'white';
+                  e.target.style.transform = 'scale(1.05)';
+                  e.target.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = 'rgba(255, 255, 255, 0.8)';
+                  e.target.style.transform = 'scale(1)';
+                  e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                }}
+              >
+                {primaryAction.icon}
+              </button>
+            )}
+            
+            <button
+              onClick={handleMoreMenu}
+              style={{
+                ...actionButtonStyles(theme),
+                color: '#666',
+                fontSize: '14px'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = 'white';
+                e.target.style.transform = 'scale(1.05)';
+                e.target.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.15)';
+                e.target.style.color = theme.accentColor;
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = 'rgba(255, 255, 255, 0.8)';
+                e.target.style.transform = 'scale(1)';
+                e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                e.target.style.color = '#666';
+              }}
+            >
+              ⋯
+            </button>
+          </div>
+        )}
+
+        {/* 子项指示器 */}
+        {isHovered && hasChildren && !primaryAction && !isLoading && (
+          <div style={childIndicatorStyles(theme)} />
+        )}
+      </div>
+
+      {/* 更多操作菜单 */}
+      {showMoreMenu === node.id && (
+        <MoreActionsMenu
+          node={node}
+          position={moreMenuPosition}
+          onClose={() => setShowMoreMenu(null)}
+          treeData={treeData}
+          setTreeData={setTreeData}
+        />
+      )}
+    </>
+  );
+};
+
+export default TreeNode;
