@@ -1,0 +1,86 @@
+/* Monaco Editor 容器 */
+.sql-editor {
+  flex: 1;
+  padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: #fdfdfd;
+  border: 1px solid #e1e5e9;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.editor-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #999;
+  font-size: 14px;
+}
+
+/* Monaco 编辑器 */
+.monaco-editor {
+  height: 100% !important;
+  width: 100% !important;
+  border-radius: 4px;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
+
+/* 拖拽状态 */
+.editor-area.dragging .monaco-editor,
+.editor-area.dragging .monaco-editor * {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+body.dragging .sql-editor {
+  border-color: transparent;
+}
+
+/* 语法高亮 */
+.monaco-editor .mtk1 { color: #d73a49 !important; font-weight: 600; } /* 关键字 */
+.monaco-editor .mtk7 { color: #005cc5 !important; } /* 函数 */
+.monaco-editor .mtk11 { color: #032f62 !important; } /* 字符串 */
+.monaco-editor .mtk14 { color: #6a737d !important; font-style: italic; } /* 注释 */
+.monaco-editor .mtk8 { color: #e36209 !important; } /* 数字 */
+
+/* 光标和选择 */
+.monaco-editor .cursor { background-color: #0b69ff !important; }
+.monaco-editor .selection { background-color: rgba(11, 105, 255, 0.15) !important; }
+
+/* 滚动条 */
+.monaco-editor .scrollbar .slider { background: rgba(0, 0, 0, 0.12) !important; }
+.monaco-editor .scrollbar .slider:hover { background: rgba(0, 0, 0, 0.2) !important; }
+
+/* 补全和悬停 */
+.monaco-editor .suggest-widget {
+  border: 1px solid #e1e5e9 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.monaco-editor .monaco-hover {
+  border: 1px solid #e1e5e9 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 行号 */
+.monaco-editor .margin-view-overlays .line-numbers {
+  color: #6a737d !important;
+  font-size: 12px !important;
+}
+
+.monaco-editor .glyph-margin {
+  background-color: #fdfdfd !important;
+  border-right: 1px solid #e1e5e9 !important;
+}
+
+/* 当前行 */
+.monaco-editor .current-line {
+  background: rgba(11, 105, 255, 0.03) !important;
+}

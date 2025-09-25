@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import Sidebar from "./components/sidebar/Sidebar.jsx";
+import ToolbarTop from "./components/toptoolbar/ToolbarTop.jsx";
 import "./css/index.css";
 
 export default function App() {
@@ -208,40 +209,9 @@ export default function App() {
     }
   };
 
-  const ToolbarTop = () => {
-    return (
-      <div className="toolbar-top">
-        <div className="toolbar-top-left">
-          <button className="btn btn-icon" title="新建文件">
-            📄
-          </button>
-          <button className="btn btn-icon" title="连接">
-            🔗
-          </button>
-          <button className="btn btn-icon" title="设置">
-            ⚙️
-          </button>
-          <select className="toolbar-dropdown" title="操作菜单">
-            <option>操作</option>
-            <option>连接</option>
-            <option>导出</option>
-          </select>
-        </div>
-        <div className="toolbar-top-right">
-          <button className="btn btn-icon" title="搜索">
-            🔍
-          </button>
-          <button className="btn btn-icon" title="执行">
-            ⚡
-          </button>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="app-container">
-      <ToolbarTop /> {/* 全局顶部工具栏 */}
+     <ToolbarTop /> {/* Use the new component */}
       <div
         ref={sidebarRef}
         className={`sidebar ${isSidebarDragging ? 'dragging-parent' : ''}`}

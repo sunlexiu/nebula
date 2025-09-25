@@ -1,15 +1,16 @@
+/* ToolbarTop.css */
 .toolbar-top {
-  width: 100%;
+  grid-column: 1 / -1;
+  grid-row: 1;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 16px;
-  background: #f5f5f7;
-  border-bottom: 1px solid #e6e6e6;
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   position: relative;
   z-index: 6;
-  height: 40px; /* 固定高度 */
 }
 
 .toolbar-top-left,
@@ -38,7 +39,14 @@
 .btn-icon:hover {
   background: #f8f9fa;
   border-color: #ccc;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Add styles for the icon images */
+.btn-icon .icon {
+  width: 20px; /* Adjust size as needed */
+  height: 20px;
+  object-fit: contain; /* Ensure icons scale properly */
 }
 
 .toolbar-dropdown {
@@ -57,7 +65,7 @@
   border-color: #ccc;
 }
 
-/* 响应式 */
+/* Responsive */
 @media (max-width: 768px) {
   .toolbar-top {
     padding: 0 12px;
@@ -68,5 +76,10 @@
     width: 28px;
     height: 28px;
     font-size: 14px;
+  }
+
+  .toolbar-top .btn-icon .icon {
+    width: 18px; /* Adjust size for smaller screens */
+    height: 18px;
   }
 }
