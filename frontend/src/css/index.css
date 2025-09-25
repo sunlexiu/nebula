@@ -10,7 +10,7 @@
 
   /* 尺寸变量 - 通过 JS 动态设置 */
   --sidebar-width: 260px;
-  --editor-height: 200px;
+  --editor-height: 300px; /* 增加默认高度 */
 
   /* 统一的拖拽器样式 */
   --resizer-default-bg: #f8f9fa;
@@ -49,7 +49,7 @@ body, html {
 .app-container {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
-  grid-template-rows: 56px 42px 1fr;
+  grid-template-rows: 40px 1fr; /* 全局顶部工具栏高度 */
   height: 100vh;
   width: 100vw;
   overflow: hidden;
@@ -61,7 +61,7 @@ body, html {
 /* Sidebar */
 .sidebar {
   grid-column: 1;
-  grid-row: 1 / -1;
+  grid-row: 2;
   background: var(--sidebar-bg);
   padding: 12px;
   position: relative;
@@ -70,7 +70,6 @@ body, html {
   flex-shrink: 0;
   z-index: 10;
   overflow: hidden;
-  /* 拖拽时的平滑过渡 */
   transition: width 0.2s ease;
   min-width: 180px;
   max-width: 500px;
@@ -157,7 +156,7 @@ body, html {
 /* Main Panel */
 .main-panel {
   grid-column: 2;
-  grid-row: 1 / -1;
+  grid-row: 2;
   display: grid;
   grid-template-rows: 56px 42px 1fr;
   background: white;
@@ -166,9 +165,68 @@ body, html {
   overflow: hidden;
 }
 
+/* Top Toolbar */
+.toolbar-top {
+  grid-column: 1 / -1; /* 跨越整个宽度 */
+  grid-row: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 16px;
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 6;
+}
+
+.toolbar-top-left,
+.toolbar-top-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-icon {
+  padding: 6px;
+  border-radius: 4px;
+  background: white;
+  border: 1px solid #e9e9e9;
+  cursor: pointer;
+  font-size: 16px;
+  color: #333;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+}
+
+.btn-icon:hover {
+  background: #f8f9fa;
+  border-color: #ccc;
+  box-shadow: var(--shadow-sm);
+}
+
+.toolbar-dropdown {
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid #e9e9e9;
+  background: white;
+  cursor: pointer;
+  font-size: 13px;
+  color: #333;
+  transition: all 0.2s ease;
+}
+
+.toolbar-dropdown:hover {
+  background: #f8f9fa;
+  border-color: #ccc;
+}
+
 /* Toolbar */
 .toolbar {
-  grid-column: 1;
   grid-row: 1;
   display: flex;
   justify-content: space-between;
@@ -230,7 +288,6 @@ body, html {
 
 /* Tabs Container */
 .tabs-container {
-  grid-column: 1;
   grid-row: 2;
   display: flex;
   align-items: center;
@@ -295,7 +352,6 @@ body, html {
 
 .tab-scroll-right {
   margin-right: 8px;
-
 }
 
 .tab-item {
@@ -397,7 +453,6 @@ body, html {
 
 /* Editor and Result Area */
 .editor-and-result {
-  grid-column: 1;
   grid-row: 3;
   display: flex;
   flex-direction: column;
@@ -409,11 +464,10 @@ body, html {
 }
 
 /* Editor Area */
-/* Editor Area - 修复布局 */
 .editor-area {
-  height: var(--editor-height, 200px);
-  min-height: 120px;
-  max-height: 70vh;
+  height: var(--editor-height, 300px);
+  min-height: 150px; /* 增加最小高度 */
+  max-height: 80vh; /* 增加最大高度 */
   border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -422,10 +476,10 @@ body, html {
   background: white;
   transition: height 0.2s ease;
   flex-shrink: 0;
-  overflow: hidden; /* 关键：防止内容溢出 */
+  overflow: hidden;
 }
 
-/* SQL Editor - 优化布局 */
+/* SQL Editor */
 .sql-editor {
   flex: 1;
   padding: 12px;
@@ -433,15 +487,15 @@ body, html {
   flex-direction: column;
   position: relative;
   z-index: 6;
-  min-height: 0; /* 关键：允许flex子元素收缩 */
-  overflow: hidden; /* 防止溢出 */
+  min-height: 0;
+  overflow: hidden;
 }
 
 .sql-editor textarea {
   flex: 1;
   width: 100%;
   min-height: 80px;
-  max-height: 100%; /* 关键：限制最大高度 */
+  max-height: 100%;
   resize: none;
   border: 1px solid #e1e5e9;
   border-radius: 6px;
@@ -456,20 +510,21 @@ body, html {
   position: relative;
   z-index: 7;
   box-shadow: none;
-  overflow-y: auto; /* 允许垂直滚动 */
-  overflow-x: auto; /* 允许水平滚动 */
-  box-sizing: border-box; /* 关键：确保padding不影响布局 */
+  overflow-y: auto;
+  overflow-x: auto;
+  box-sizing: border-box;
 }
 
-/* 拖拽时禁用过渡 - 增强版本 */
+/* 拖拽时禁用过渡 */
 .editor-area.dragging,
 .editor-area.dragging * {
   transition: none !important;
 }
 
 .sql-editor textarea.dragging {
-  pointer-events: none; /* 拖拽时禁用textarea交互 */
+  pointer-events: none;
 }
+
 .sql-editor textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(11, 105, 255, 0.1);
@@ -703,6 +758,17 @@ body, html {
     min-width: 150px;
   }
 
+  .toolbar-top {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .toolbar-top .btn-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+
   .toolbar {
     padding: 0 12px;
     gap: 8px;
@@ -733,7 +799,6 @@ body, html {
     width: 16px;
   }
 
-  /* Tab响应式调整 */
   .tab-item {
     min-width: 100px;
     max-width: 140px;

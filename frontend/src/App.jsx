@@ -8,7 +8,7 @@ export default function App() {
   const isResizingSidebar = useRef(false);
 
   // Editor 高度
-  const [editorHeight, setEditorHeight] = useState(200);
+  const [editorHeight, setEditorHeight] = useState(300); // 增加默认高度
   const isResizingEditor = useRef(false);
 
   // Tabs
@@ -29,7 +29,7 @@ export default function App() {
   // DOM 引用
   const sidebarRef = useRef(null);
   const editorAreaRef = useRef(null);
-  const editorDividerRef = useRef(null); // 新增：分隔器引用
+  const editorDividerRef = useRef(null);
 
   // 检查tab是否需要滚动
   const checkTabOverflow = () => {
@@ -74,16 +74,12 @@ export default function App() {
     isResizingEditor.current = true;
     setIsEditorDragging(true);
 
-    // 记录初始鼠标位置和编辑器高度
     const initialMouseY = e.clientY;
     const initialEditorHeight = editorHeight;
 
-    // 计算鼠标相对于分隔器的偏移量
     const dividerRect = editorDividerRef.current?.getBoundingClientRect();
-    const editorRect = editorAreaRef.current?.getBoundingClientRect();
     const initialOffset = dividerRect ? initialMouseY - dividerRect.top : 0;
 
-    // 存储初始状态
     isResizingEditor.current = {
       initialMouseY,
       initialEditorHeight,
@@ -95,12 +91,9 @@ export default function App() {
     document.body.classList.add('dragging');
   };
 
-  // 优化的鼠标移动处理
   const handleMouseMoveOptimized = useRef((e) => {
     if (isResizingSidebar.current) {
       const newWidth = Math.min(Math.max(e.clientX, 180), 500);
-
-      // 直接更新 DOM + CSS 变量
       if (sidebarRef.current) {
         sidebarRef.current.style.width = `${newWidth}px`;
         document.documentElement.style.setProperty('--sidebar-width', `${newWidth}px`);
@@ -110,18 +103,13 @@ export default function App() {
 
     if (isResizingEditor.current) {
       const resizeState = isResizingEditor.current;
-
-      // 使用偏移量计算新的编辑器高度
       const currentMouseY = e.clientY;
-      const newHeight = resizeState.initialEditorHeight +
-                       (currentMouseY - resizeState.initialMouseY);
+      const newHeight = resizeState.initialEditorHeight + (currentMouseY - resizeState.initialMouseY);
 
-      // 限制范围
-      const minHeight = 120;
-      const maxHeight = window.innerHeight * 0.7;
+      const minHeight = 150; // 增加最小高度
+      const maxHeight = window.innerHeight * 0.8; // 增加最大高度
       const clampedHeight = Math.min(Math.max(newHeight, minHeight), maxHeight);
 
-      // 直接更新 DOM + CSS 变量
       if (editorAreaRef.current) {
         editorAreaRef.current.style.height = `${clampedHeight}px`;
         document.documentElement.style.setProperty('--editor-height', `${clampedHeight}px`);
@@ -142,22 +130,12 @@ export default function App() {
     }
   };
 
-  // 使用 requestAnimationFrame 的全局事件监听
   useEffect(() => {
     let rafId;
-
     const handleGlobalMouseMove = (e) => {
-      // 取消之前的 frame
-      if (rafId) {
-        cancelAnimationFrame(rafId);
-      }
-
-      // 调度新的 frame
-      rafId = requestAnimationFrame(() => {
-        handleMouseMoveOptimized(e);
-      });
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => handleMouseMoveOptimized(e));
     };
-
     const handleGlobalMouseUp = () => handleMouseUp();
 
     window.addEventListener("mousemove", handleGlobalMouseMove, { passive: true });
@@ -166,26 +144,21 @@ export default function App() {
     return () => {
       window.removeEventListener("mousemove", handleGlobalMouseMove);
       window.removeEventListener("mouseup", handleGlobalMouseUp);
-      if (rafId) {
-        cancelAnimationFrame(rafId);
-      }
+      if (rafId) cancelAnimationFrame(rafId);
     };
   }, [handleMouseMoveOptimized]);
 
-  // Tab变化时检查是否需要滚动
   useEffect(() => {
     const timeoutId = setTimeout(checkTabOverflow, 100);
     return () => clearTimeout(timeoutId);
   }, [tabs]);
 
-  // 窗口大小变化时检查
   useEffect(() => {
     const handleResize = () => checkTabOverflow();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 初始化 CSS 变量
   useEffect(() => {
     document.documentElement.style.setProperty('--sidebar-width', `${sidebarWidth}px`);
     document.documentElement.style.setProperty('--editor-height', `${editorHeight}px`);
@@ -195,18 +168,14 @@ export default function App() {
 
   const updateQuery = (newQuery) => {
     setTabs((prev) =>
-      prev.map((t) =>
-        t.id === activeTabId ? { ...t, query: newQuery } : t
-      )
+      prev.map((t) => (t.id === activeTabId ? { ...t, query: newQuery } : t))
     );
   };
 
   const executeQuery = () => {
     setTabs((prev) =>
       prev.map((t) =>
-        t.id === activeTabId
-          ? { ...t, results: mockExecute(t.query) }
-          : t
+        t.id === activeTabId ? { ...t, results: mockExecute(t.query) } : t
       )
     );
   };
@@ -239,9 +208,40 @@ export default function App() {
     }
   };
 
+  const ToolbarTop = () => {
+    return (
+      <div className="toolbar-top">
+        <div className="toolbar-top-left">
+          <button className="btn btn-icon" title="新建文件">
+            📄
+          </button>
+          <button className="btn btn-icon" title="连接">
+            🔗
+          </button>
+          <button className="btn btn-icon" title="设置">
+            ⚙️
+          </button>
+          <select className="toolbar-dropdown" title="操作菜单">
+            <option>操作</option>
+            <option>连接</option>
+            <option>导出</option>
+          </select>
+        </div>
+        <div className="toolbar-top-right">
+          <button className="btn btn-icon" title="搜索">
+            🔍
+          </button>
+          <button className="btn btn-icon" title="执行">
+            ⚡
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="app-container">
-      {/* Sidebar */}
+      <ToolbarTop /> {/* 全局顶部工具栏 */}
       <div
         ref={sidebarRef}
         className={`sidebar ${isSidebarDragging ? 'dragging-parent' : ''}`}
@@ -255,7 +255,6 @@ export default function App() {
 
       {/* Main Panel */}
       <div className="main-panel">
-        {/* Toolbar */}
         <div className="toolbar">
           <div className="toolbar-left">
             <button className="btn btn-primary" onClick={addTab}>
@@ -269,10 +268,8 @@ export default function App() {
           </div>
         </div>
 
-        {/* Tabs */}
         {tabs.length > 0 && (
           <div className="tabs-container">
-            {/* Tab滚动按钮 */}
             {showTabScroll && (
               <button
                 className="tab-scroll-btn tab-scroll-left"
@@ -316,7 +313,6 @@ export default function App() {
               </button>
             )}
 
-            {/* Tab计数器 */}
             {tabs.length > 1 && (
               <div className="tab-counter">
                 Tab {tabs.findIndex(t => t.id === activeTabId) + 1} of {tabs.length}
@@ -325,7 +321,6 @@ export default function App() {
           </div>
         )}
 
-        {/* SQL Editor + Result */}
         <div className="editor-and-result">
           <div
             ref={editorAreaRef}
@@ -342,7 +337,7 @@ export default function App() {
           </div>
 
           <div
-            ref={editorDividerRef} // 添加引用
+            ref={editorDividerRef}
             className={`resizer editor-divider ${isEditorDragging ? 'dragging' : ''}`}
             onMouseDown={handleEditorMouseDown}
           />
