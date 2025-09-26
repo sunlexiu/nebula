@@ -1,41 +1,74 @@
 package com.slx.nebula.controller;
 
-import com.slx.nebula.model.Group;
-import com.slx.nebula.service.ConfigService;
+import com.slx.nebula.model.ConnectionConfig;
+import com.slx.nebula.model.Folder;
+import com.slx.nebula.repository.ConfigRepository;
+import com.slx.nebula.connection.DatabaseProviderRegistry;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
-/**
- * @author sunlexiu
- */
 @RestController
 @RequestMapping("/api/config")
 public class ConfigController {
 
-    private final ConfigService configService;
+    private final ConfigRepository repo;
+    private final DatabaseProviderRegistry registry;
 
-    public ConfigController(ConfigService configService) {
-        this.configService = configService;
+    public ConfigController(ConfigRepository repo, DatabaseProviderRegistry registry) {
+        this.repo = repo;
+        this.registry = registry;
     }
 
-    @GetMapping
-    public List<Group> getConfig() {
-        return configService.loadConfig();
+    @PostMapping("/folders")
+    public ResponseEntity<Folder> createFolder(@RequestBody Folder folder) {
+        repo.saveFolder(folder);
+        return ResponseEntity.ok(folder);
     }
 
-    @PostMapping("/group")
-    public void addGroup(@RequestBody Group group, @RequestParam(required = false) String parentGroupId) {
-        configService.addGroup(group, parentGroupId);
+    @GetMapping("/folders")
+    public ResponseEntity<List<Folder>> listFolders() {
+        return ResponseEntity.ok(repo.findAllFolders());
     }
 
-    @PutMapping("/group")
-    public void updateGroup(@RequestBody Group group) {
-        configService.updateGroup(group);
+    @DeleteMapping("/folders/{id}")
+    public ResponseEntity<?> deleteFolder(@PathVariable String id) {
+        repo.deleteFolder(id);
+        return ResponseEntity.ok(Map.of("ok", true));
     }
 
-    @DeleteMapping("/group/{groupId}")
-    public void deleteGroup(@PathVariable String groupId) {
-        configService.deleteGroup(groupId);
+    @PostMapping("/connections")
+    public ResponseEntity<ConnectionConfig> createConnection(@RequestBody ConnectionConfig cfg) {
+        repo.saveConnection(cfg);
+        return ResponseEntity.ok(cfg);
+    }
+
+    @GetMapping("/connections")
+    public ResponseEntity<List<ConnectionConfig>> listConnections() {
+        return ResponseEntity.ok(repo.findAllConnections());
+    }
+
+    @GetMapping("/connections/{id}")
+    public ResponseEntity<ConnectionConfig> getConnection(@PathVariable String id) {
+        return repo.findConnectionById(id).map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/connections/{id}")
+    public ResponseEntity<?> deleteConnection(@PathVariable String id) {
+        repo.deleteConnection(id);
+        return ResponseEntity.ok(Map.of("ok", true));
+    }
+
+    @GetMapping("/connections/{id}/test")
+    public ResponseEntity<?> testConnection(@PathVariable String id) {
+        var opt = repo.findConnectionById(id);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
+        ConnectionConfig cfg = opt.get();
+        var provider = registry.getProvider(cfg.getType());
+        if (provider == null) return ResponseEntity.badRequest().body(Map.of("ok", false, "msg", "no provider: " + cfg.getType()));
+        boolean ok = provider.testConnection(cfg);
+        return ResponseEntity.ok(Map.of("ok", ok));
     }
 }

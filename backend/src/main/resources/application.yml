@@ -1,0 +1,9 @@
+server:
+  port: 8080
+logging:
+  level:
+    root: INFO
+
+# storage: file (current implementation uses JSON file under user.home/.nebula/config.json)
+nebula:
+  storage: file
