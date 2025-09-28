@@ -20,7 +20,7 @@ export default function SqlEditor({ query, setQuery }) {
           bracketMatching: true,
         }}
         className="codemirror-custom"
-        style={{ fontSize: '16px', fontFamily: "'Fira Code', 'SF Mono', Monaco, Consolas, monospace" , fontWeight: 590 }} // 调整字体和大小
+        style={{ fontSize: '14px', fontFamily: "'Fira Code', 'SF Mono', Monaco, Consolas, monospace" , fontWeight: 590 }} // 调整字体和大小
       />
     </div>
   );

@@ -5,6 +5,10 @@ import SqlEditor from './components/SqlEditor.jsx';
 import { format } from 'sql-formatter';
 import './css/index.css';
 
+import FormatIcon from './public/icons/toptoolbar/format_1.svg';
+import RunIcon from './public/icons/toptoolbar/run_3.svg';
+import StopIcon from './public/icons/toptoolbar/stop_1.svg';
+
 export default function App() {
   // Sidebar 宽度
   const [sidebarWidth, setSidebarWidth] = useState(260);
@@ -259,14 +263,34 @@ export default function App() {
       <div className="main-panel">
         <div className="toolbar">
           <div className="toolbar-left">
-            <button className="btn btn-format" onClick={formatQuery}>
-              Format SQL
-            </button>
+             <button
+                className="btn btn-icon"
+                title="美化sql"
+                onClick={formatQuery}
+              >
+                <img src={FormatIcon} alt="美化sql" className="icon" />
+              </button>
+              
+              <button
+                className="btn btn-icon"
+                title="运行"
+                onClick={executeQuery}
+              >
+                <img src={RunIcon} alt="运行" className="icon" />
+              </button>
+
+              <button
+                className="btn btn-icon"
+                title="停止"
+                onClick={executeQuery}
+              >
+                <img src={StopIcon} alt="停止" className="icon" />
+              </button>
           </div>
           <div className="toolbar-right">
-            <button className="btn btn-execute" onClick={executeQuery}>
+            {/* <button className="btn btn-execute" onClick={executeQuery}>
               Run
-            </button>
+            </button> */}
           </div>
         </div>
 
