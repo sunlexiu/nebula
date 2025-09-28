@@ -1,6 +1,7 @@
 package com.slx.nebula.repository;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.yitter.idgen.YitIdHelper;
 import com.slx.nebula.model.ConfigData;
 import com.slx.nebula.model.ConnectionConfig;
 import com.slx.nebula.model.Folder;
@@ -20,7 +21,7 @@ public class FileConfigRepository implements ConfigRepository {
     private ConfigData cache;
 
     public FileConfigRepository() {
-        String userHome = System.getProperty("user.home");
+        String userHome = System.getProperty("user.dir");
         this.configFile = Paths.get(userHome, ".nebula", "config.json");
         load();
     }
@@ -49,7 +50,7 @@ public class FileConfigRepository implements ConfigRepository {
 
     @Override
     public synchronized void saveFolder(Folder folder) {
-        if (folder.getId() == null) folder.setId(UUID.randomUUID().toString());
+        if (folder.getId() == null) folder.setId(String.valueOf(YitIdHelper.nextId()));
         cache.getFolders().removeIf(f -> f.getId().equals(folder.getId()));
         cache.getFolders().add(folder);
         persist();
@@ -69,7 +70,7 @@ public class FileConfigRepository implements ConfigRepository {
 
     @Override
     public synchronized void saveConnection(ConnectionConfig connection) {
-        if (connection.getId() == null) connection.setId(UUID.randomUUID().toString());
+        if (connection.getId() == null) connection.setId(String.valueOf(YitIdHelper.nextId()));
         cache.getConnections().removeIf(c -> c.getId().equals(connection.getId()));
         cache.getConnections().add(connection);
         persist();

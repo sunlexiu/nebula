@@ -491,7 +491,13 @@ body, html {
   overflow: hidden;
 }
 
-.sql-editor textarea {
+/* 拖拽时禁用过渡 */
+.editor-area.dragging,
+.editor-area.dragging * {
+  transition: none !important;
+}
+
+/* .sql-editor textarea {
   flex: 1;
   width: 100%;
   min-height: 80px;
@@ -515,12 +521,6 @@ body, html {
   box-sizing: border-box;
 }
 
-/* 拖拽时禁用过渡 */
-.editor-area.dragging,
-.editor-area.dragging * {
-  transition: none !important;
-}
-
 .sql-editor textarea.dragging {
   pointer-events: none;
 }
@@ -533,7 +533,7 @@ body, html {
 .sql-editor textarea::placeholder {
   color: var(--muted);
   font-style: italic;
-}
+} */
 
 /* 统一的拖拽器样式 - 水平分隔器（编辑器）*/
 .resizer.editor-divider {

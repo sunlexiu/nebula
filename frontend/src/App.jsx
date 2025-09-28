@@ -1,7 +1,9 @@
-import React, { useState, useRef, useEffect } from "react";
-import Sidebar from "./components/sidebar/Sidebar.jsx";
-import ToolbarTop from "./components/toptoolbar/ToolbarTop.jsx";
-import "./css/index.css";
+import React, { useState, useRef, useEffect } from 'react';
+import Sidebar from './components/sidebar/Sidebar.jsx';
+import ToolbarTop from './components/toptoolbar/ToolbarTop.jsx';
+import SqlEditor from './components/SqlEditor.jsx'; // 引入 SqlEditor 组件
+import './css/index.css';
+
 
 export default function App() {
   // Sidebar 宽度
@@ -9,18 +11,17 @@ export default function App() {
   const isResizingSidebar = useRef(false);
 
   // Editor 高度
-  const [editorHeight, setEditorHeight] = useState(300); // 增加默认高度
+  const [editorHeight, setEditorHeight] = useState(300);
   const isResizingEditor = useRef(false);
 
   // Tabs
   const [tabs, setTabs] = useState([
-    { id: 1, title: "SQL Query 1", query: "", results: [] },
+    { id: 1, title: 'SQL Query 1', query: '', results: [] },
   ]);
   const [activeTabId, setActiveTabId] = useState(1);
 
-  // Tab滚动状态
+  // Tab 滚动状态
   const [showTabScroll, setShowTabScroll] = useState(false);
-  const [tabScrollLeft, setTabScrollLeft] = useState(0);
   const tabsContainerRef = useRef(null);
 
   // 拖拽状态
@@ -32,7 +33,7 @@ export default function App() {
   const editorAreaRef = useRef(null);
   const editorDividerRef = useRef(null);
 
-  // 检查tab是否需要滚动
+  // 检查 Tab 是否需要滚动
   const checkTabOverflow = () => {
     if (tabsContainerRef.current) {
       const container = tabsContainerRef.current;
@@ -42,7 +43,7 @@ export default function App() {
     }
   };
 
-  // 处理tab滚动
+  // 处理 Tab 滚动
   const handleTabScroll = (direction) => {
     if (tabsContainerRef.current) {
       const container = tabsContainerRef.current;
@@ -58,17 +59,18 @@ export default function App() {
     }
   };
 
-  // 拖拽鼠标事件
+  // 拖拽鼠标事件 - 侧边栏
   const handleSidebarMouseDown = (e) => {
     e.preventDefault();
     e.stopPropagation();
     isResizingSidebar.current = true;
     setIsSidebarDragging(true);
-    document.body.style.cursor = "ew-resize";
-    document.body.style.userSelect = "none";
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
     document.body.classList.add('dragging');
   };
 
+  // 拖拽鼠标事件 - 编辑器高度
   const handleEditorMouseDown = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -84,14 +86,15 @@ export default function App() {
     isResizingEditor.current = {
       initialMouseY,
       initialEditorHeight,
-      initialOffset
+      initialOffset,
     };
 
-    document.body.style.cursor = "row-resize";
-    document.body.style.userSelect = "none";
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
     document.body.classList.add('dragging');
   };
 
+  // 鼠标移动处理（优化性能）
   const handleMouseMoveOptimized = useRef((e) => {
     if (isResizingSidebar.current) {
       const newWidth = Math.min(Math.max(e.clientX, 180), 500);
@@ -107,8 +110,8 @@ export default function App() {
       const currentMouseY = e.clientY;
       const newHeight = resizeState.initialEditorHeight + (currentMouseY - resizeState.initialMouseY);
 
-      const minHeight = 150; // 增加最小高度
-      const maxHeight = window.innerHeight * 0.8; // 增加最大高度
+      const minHeight = 150;
+      const maxHeight = window.innerHeight * 0.8;
       const clampedHeight = Math.min(Math.max(newHeight, minHeight), maxHeight);
 
       if (editorAreaRef.current) {
@@ -119,18 +122,20 @@ export default function App() {
     }
   }).current;
 
+  // 鼠标松开处理
   const handleMouseUp = () => {
     if (isResizingSidebar.current || isResizingEditor.current) {
       isResizingSidebar.current = false;
       isResizingEditor.current = false;
       setIsSidebarDragging(false);
       setIsEditorDragging(false);
-      document.body.style.cursor = "default";
-      document.body.style.userSelect = "auto";
+      document.body.style.cursor = 'default';
+      document.body.style.userSelect = 'auto';
       document.body.classList.remove('dragging');
     }
   };
 
+  // 全局鼠标事件监听
   useEffect(() => {
     let rafId;
     const handleGlobalMouseMove = (e) => {
@@ -139,40 +144,46 @@ export default function App() {
     };
     const handleGlobalMouseUp = () => handleMouseUp();
 
-    window.addEventListener("mousemove", handleGlobalMouseMove, { passive: true });
-    window.addEventListener("mouseup", handleGlobalMouseUp);
+    window.addEventListener('mousemove', handleGlobalMouseMove, { passive: true });
+    window.addEventListener('mouseup', handleGlobalMouseUp);
 
     return () => {
-      window.removeEventListener("mousemove", handleGlobalMouseMove);
-      window.removeEventListener("mouseup", handleGlobalMouseUp);
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
       if (rafId) cancelAnimationFrame(rafId);
     };
   }, [handleMouseMoveOptimized]);
 
+  // 检查 Tab 溢出
   useEffect(() => {
     const timeoutId = setTimeout(checkTabOverflow, 100);
     return () => clearTimeout(timeoutId);
   }, [tabs]);
 
+  // 窗口大小变化时检查 Tab 溢出
   useEffect(() => {
     const handleResize = () => checkTabOverflow();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // 更新 CSS 变量
   useEffect(() => {
     document.documentElement.style.setProperty('--sidebar-width', `${sidebarWidth}px`);
     document.documentElement.style.setProperty('--editor-height', `${editorHeight}px`);
   }, [sidebarWidth, editorHeight]);
 
-  const activeTab = tabs.find((t) => t.id === activeTabId) || { query: "", results: [] };
+  // 获取当前激活的 Tab
+  const activeTab = tabs.find((t) => t.id === activeTabId) || { query: '', results: [] };
 
+  // 更新查询
   const updateQuery = (newQuery) => {
     setTabs((prev) =>
       prev.map((t) => (t.id === activeTabId ? { ...t, query: newQuery } : t))
     );
   };
 
+  // 执行查询
   const executeQuery = () => {
     setTabs((prev) =>
       prev.map((t) =>
@@ -181,24 +192,27 @@ export default function App() {
     );
   };
 
+  // 模拟查询执行
   const mockExecute = (query) => {
     if (!query.trim()) return [];
     return [
-      { id: 1, name: "Alice", age: 20, email: "alice@example.com" },
-      { id: 2, name: "Bob", age: 25, email: "bob@example.com" },
-      { id: 3, name: "Charlie", age: 30, email: "charlie@example.com" },
+      { id: 1, name: 'Alice', age: 20, email: 'alice@example.com' },
+      { id: 2, name: 'Bob', age: 25, email: 'bob@example.com' },
+      { id: 3, name: 'Charlie', age: 30, email: 'charlie@example.com' },
     ];
   };
 
+  // 添加新 Tab
   const addTab = () => {
     const newId = Date.now();
     setTabs((prev) => [
       ...prev,
-      { id: newId, title: `SQL Query ${prev.length + 1}`, query: "", results: [] },
+      { id: newId, title: `SQL Query ${prev.length + 1}`, query: '', results: [] },
     ]);
     setActiveTabId(newId);
   };
 
+  // 关闭 Tab
   const closeTab = (id) => {
     setTabs((prev) => prev.filter((t) => t.id !== id));
     if (activeTabId === id && tabs.length > 1) {
@@ -211,7 +225,7 @@ export default function App() {
 
   return (
     <div className="app-container">
-     <ToolbarTop /> {/* Use the new component */}
+      <ToolbarTop />
       <div
         ref={sidebarRef}
         className={`sidebar ${isSidebarDragging ? 'dragging-parent' : ''}`}
@@ -223,7 +237,7 @@ export default function App() {
         />
       </div>
 
-      {/* Main Panel */}
+      {/* 主面板 */}
       <div className="main-panel">
         <div className="toolbar">
           <div className="toolbar-left">
@@ -253,7 +267,7 @@ export default function App() {
               {tabs.map((tab) => (
                 <div
                   key={tab.id}
-                  className={`tab-item ${tab.id === activeTabId ? "active" : ""}`}
+                  className={`tab-item ${tab.id === activeTabId ? 'active' : ''}`}
                   onClick={() => setActiveTabId(tab.id)}
                 >
                   <span className="tab-title" title={tab.title}>
@@ -285,7 +299,7 @@ export default function App() {
 
             {tabs.length > 1 && (
               <div className="tab-counter">
-                Tab {tabs.findIndex(t => t.id === activeTabId) + 1} of {tabs.length}
+                Tab {tabs.findIndex((t) => t.id === activeTabId) + 1} of {tabs.length}
               </div>
             )}
           </div>
@@ -296,14 +310,7 @@ export default function App() {
             ref={editorAreaRef}
             className={`editor-area ${isEditorDragging ? 'dragging' : ''}`}
           >
-            <div className="sql-editor">
-              <textarea
-                value={activeTab.query}
-                onChange={(e) => updateQuery(e.target.value)}
-                placeholder="Write your SQL here..."
-                rows="5"
-              />
-            </div>
+            <SqlEditor query={activeTab.query} setQuery={updateQuery} />
           </div>
 
           <div

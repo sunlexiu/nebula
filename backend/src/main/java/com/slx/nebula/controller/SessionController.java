@@ -10,7 +10,7 @@ import java.sql.ResultSetMetaData;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/session")
+@RequestMapping("/session")
 public class SessionController {
     private final SessionManager sessionManager;
 
