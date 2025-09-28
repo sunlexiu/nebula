@@ -40,7 +40,8 @@ html,
 }
 
 /* 防止右键菜单和系统UI凸出 */
-body, html {
+body,
+html {
   position: relative;
   z-index: 1;
 }
@@ -49,7 +50,7 @@ body, html {
 .app-container {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
-  grid-template-rows: 40px 1fr; /* 全局顶部工具栏高度 */
+  grid-template-rows: 50px 1fr; /* 全局顶部工具栏高度 */
   height: 100vh;
   width: 100vw;
   overflow: hidden;
@@ -158,7 +159,7 @@ body, html {
   grid-column: 2;
   grid-row: 2;
   display: grid;
-  grid-template-rows: 56px 42px 1fr;
+  grid-template-rows: 40px 42px 1fr;
   background: white;
   position: relative;
   z-index: 5;
@@ -247,23 +248,25 @@ body, html {
 }
 
 .toolbar .btn {
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 4px 8px; /* Reduced padding */
+  border-radius: 6px; /* Slightly smaller radius */
   background: white;
-  border: 1px solid #e9e9e9;
+  border: none;
   cursor: pointer;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 12px; /* Smaller font size */
   color: #333;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px; /* Reduced gap */
   text-decoration: none;
   outline: none;
   position: relative;
   z-index: 7;
   box-shadow: none;
+  width: 25px; /* Reduced width */
+  height: 25px; /* Reduced height */
 }
 
 .toolbar .btn:hover {
@@ -375,6 +378,13 @@ body, html {
   font-size: 13px;
 }
 
+.tab-item:not(:first-child) {
+  border-left: 1px dashed #e6e6e6; /* 虚线替代实线，颜色与 var(--border) 一致 */
+}
+
+.tab-item:not(:last-child) {
+  border-right: 1px dashed #e6e6e6; /* 虚线替代实线 */
+}
 .tab-item:hover {
   background: #f8f9fa;
 }
@@ -392,6 +402,7 @@ body, html {
   white-space: nowrap;
   font-weight: 500;
   font-size: 13px;
+  text-align: center;
 }
 
 .tab-close {
@@ -482,7 +493,7 @@ body, html {
 /* SQL Editor */
 .sql-editor {
   flex: 1;
-  padding: 3px;
+  padding: 2px;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -496,44 +507,6 @@ body, html {
 .editor-area.dragging * {
   transition: none !important;
 }
-
-/* .sql-editor textarea {
-  flex: 1;
-  width: 100%;
-  min-height: 80px;
-  max-height: 100%;
-  resize: none;
-  border: 1px solid #e1e5e9;
-  border-radius: 6px;
-  padding: 12px;
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-  font-size: 13px;
-  line-height: 1.5;
-  color: #1a1a1a;
-  background: #fdfdfd;
-  outline: none;
-  transition: border-color 0.2s ease;
-  position: relative;
-  z-index: 7;
-  box-shadow: none;
-  overflow-y: auto;
-  overflow-x: auto;
-  box-sizing: border-box;
-}
-
-.sql-editor textarea.dragging {
-  pointer-events: none;
-}
-
-.sql-editor textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(11, 105, 255, 0.1);
-}
-
-.sql-editor textarea::placeholder {
-  color: var(--muted);
-  font-style: italic;
-} */
 
 /* 统一的拖拽器样式 - 水平分隔器（编辑器）*/
 .resizer.editor-divider {
@@ -775,20 +748,9 @@ body, html {
   }
 
   .toolbar .btn {
-    padding: 6px 12px;
+    padding: 4px 8px;
     font-size: 12px;
   }
-  
-  /* 现有 .toolbar .btn 样式保持不变 */
-.toolbar .btn-format {
-  color: #2ecc71; /* 绿色，代表格式化 */
-  border-color: #2ecc71;
-  background: rgba(46, 204, 113, 0.05);
-}
-
-.toolbar .btn-format:hover {
-  background: rgba(46, 204, 113, 0.1);
-}
 
   .result-header {
     padding: 8px 12px;

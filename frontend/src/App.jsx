@@ -6,7 +6,7 @@ import { format } from 'sql-formatter';
 import './css/index.css';
 
 import FormatIcon from './public/icons/toptoolbar/format_1.svg';
-import RunIcon from './public/icons/toptoolbar/run_3.svg';
+import RunIcon from './public/icons/toptoolbar/run_1.svg';
 import StopIcon from './public/icons/toptoolbar/stop_1.svg';
 
 export default function App() {
@@ -20,7 +20,7 @@ export default function App() {
 
   // Tabs
   const [tabs, setTabs] = useState([
-    { id: 1, title: 'SQL Query 1', query: '', results: [] },
+    { id: 1, title: 'Query 1', query: '', results: [] },
   ]);
   const [activeTabId, setActiveTabId] = useState(1);
 
@@ -211,7 +211,7 @@ export default function App() {
     const newId = Date.now();
     setTabs((prev) => [
       ...prev,
-      { id: newId, title: `SQL Query ${prev.length + 1}`, query: '', results: [] },
+      { id: newId, title: `Query ${prev.length + 1}`, query: '', results: [] },
     ]);
     setActiveTabId(newId);
   };
