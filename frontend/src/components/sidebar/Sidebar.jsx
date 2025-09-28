@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import TreeNode from './TreeNode';
 import { initialTreeData } from './utils';
 import { findNode } from './actions';
-import pgsqlIcon from '../../public/icons/db/postgresql_icon_3.svg'; // 注意路径调整
+import deegoLogo from '../../public/icons/deego.svg'; 
 
 const Sidebar = () => {
   const [treeData, setTreeData] = useState(initialTreeData);
@@ -90,25 +90,25 @@ const Sidebar = () => {
         onClick={() => console.log('打开数据库设置')}
         >
           <img 
-            src={pgsqlIcon} 
-            alt="PostgreSQL" 
+            src={deegoLogo} 
+            alt="Deego" 
             style={{ 
-              width: 18, 
-              height: 18,
+              width: 25, 
+              height: 25,
               filter: 'brightness(0) invert(1)'
             }} 
           />
           <div>
             <div style={{ fontSize: '14px', fontWeight: '600' }}>
-              nebula-db-demo
+              Deego
             </div>
             <div style={{ fontSize: '11px', opacity: 0.9, marginTop: '2px' }}>
-              PostgreSQL 15.3
+              Your Data Buddy
             </div>
           </div>
         </div>
         
-        <div style={{ 
+        {/* <div style={{ 
           display: 'flex', 
           alignItems: 'center', 
           gap: '8px',
@@ -139,7 +139,7 @@ const Sidebar = () => {
           <span style={{ marginLeft: 'auto', color: '#666', fontSize: '11px' }}>
             localhost:5432
           </span>
-        </div>
+        </div> */}
       </div>
       
       <div className="tree-container">
