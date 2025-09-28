@@ -1,0 +1,20 @@
+{
+  "folders" : [ {
+    "id" : "724537268383813",
+    "name" : "验证环境",
+    "parentId" : null
+  }, {
+    "id" : "724537356709957",
+    "name" : "测试环境",
+    "parentId" : null
+  }, {
+    "id" : "724548828983365",
+    "name" : "开发环境",
+    "parentId" : null
+  }, {
+    "id" : "724548883615813",
+    "name" : "生产环境",
+    "parentId" : null
+  } ],
+  "connections" : [ ]
+}

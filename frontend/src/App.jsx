@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Sidebar from './components/sidebar/Sidebar.jsx';
 import ToolbarTop from './components/toptoolbar/ToolbarTop.jsx';
-import SqlEditor from './components/SqlEditor.jsx'; // 引入 SqlEditor 组件
+import SqlEditor from './components/SqlEditor.jsx';
+import { format } from 'sql-formatter';
 import './css/index.css';
-
 
 export default function App() {
   // Sidebar 宽度
@@ -223,9 +223,27 @@ export default function App() {
     }
   };
 
+  // 格式化 SQL 查询
+  const formatQuery = () => {
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === activeTabId
+          ? {
+              ...t,
+              query: format(t.query, {
+                language: 'sql',
+                tabWidth: 2,
+                linesBetweenQueries: 2,
+              }),
+            }
+          : t
+      )
+    );
+  };
+
   return (
     <div className="app-container">
-      <ToolbarTop />
+      <ToolbarTop addTab={addTab} setActiveTabId={setActiveTabId} />
       <div
         ref={sidebarRef}
         className={`sidebar ${isSidebarDragging ? 'dragging-parent' : ''}`}
@@ -241,8 +259,8 @@ export default function App() {
       <div className="main-panel">
         <div className="toolbar">
           <div className="toolbar-left">
-            <button className="btn btn-primary" onClick={addTab}>
-              New Query
+            <button className="btn btn-format" onClick={formatQuery}>
+              Format SQL
             </button>
           </div>
           <div className="toolbar-right">

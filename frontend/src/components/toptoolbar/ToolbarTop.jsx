@@ -1,27 +1,27 @@
-// src/components/ToolbarTop.jsx
-import React, { useState } from "react";
-import "../../css/ToolbarTop.css";
-import NewGroupModal from "./NewGroupModal";
-import NewConnectionModal from "./NewConnectionModal";
+import React, { useState } from 'react';
+import '../../css/ToolbarTop.css';
+import NewGroupModal from './NewGroupModal';
+import NewConnectionModal from './NewConnectionModal';
 
 // Import your static icon assets
-import NewFileIcon from "../../public/icons/toptoolbar/new_folder_2_color.svg";
-import ConnectIcon from "../../public/icons/toptoolbar/new_connection_3_color.svg";
-import SettingsIcon from "../../public/icons/toptoolbar/setting_2_color.svg";
-import SearchIcon from "../../public/icons/toptoolbar/new_folder_1.svg";
-import ExecuteIcon from "../../public/icons/toptoolbar/new_folder_1.svg";
+import NewFileIcon from '../../public/icons/toptoolbar/new_folder_2_color.svg';
+import ConnectIcon from '../../public/icons/toptoolbar/new_connection_3_color.svg';
+import QueryIcon from '../../public/icons/toptoolbar/query_3.svg';
+import SettingsIcon from '../../public/icons/toptoolbar/setting_2_color.svg';
+import SearchIcon from '../../public/icons/toptoolbar/new_folder_1.svg';
+import ExecuteIcon from '../../public/icons/toptoolbar/new_folder_1.svg';
 
-const ToolbarTop = () => {
+const ToolbarTop = ({ addTab }) => {
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
 
   const handleNewGroupSubmit = (groupName) => {
-    console.log("New Group:", groupName);
+    console.log('New Group:', groupName);
     // 在这里实现分组创建逻辑，例如调用 API 或更新状态
   };
 
   const handleNewConnectionSubmit = (connectionData) => {
-    console.log("New Connection:", connectionData);
+    console.log('New Connection:', connectionData);
     // 在这里实现连接创建逻辑，例如调用 API 或更新状态
   };
 
@@ -42,8 +42,8 @@ const ToolbarTop = () => {
         >
           <img src={ConnectIcon} alt="新建连接" className="icon" />
         </button>
-        <button className="btn btn-icon" title="设置">
-          <img src={SettingsIcon} alt="设置" className="icon" />
+        <button className="btn btn-icon" title="新建查询" onClick={addTab}>
+          <img src={QueryIcon} alt="新建查询" className="icon" />
         </button>
         <select className="toolbar-dropdown" title="操作菜单">
           <option>操作</option>
