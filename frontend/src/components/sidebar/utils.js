@@ -1,5 +1,4 @@
 // utils.js
-
 // 工具函数和配置
 
 import fileGroupIcon from '../../public/icons/left_tree/file_group_1.svg';

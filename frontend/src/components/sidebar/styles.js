@@ -1,3 +1,4 @@
+// styles.js
 // 样式和主题配置
 
 const ACCENT_COLOR = '#0b69ff';

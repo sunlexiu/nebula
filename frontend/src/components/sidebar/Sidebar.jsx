@@ -1,13 +1,13 @@
 // sidebar.jsx
-
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import TreeNode from './TreeNode';
 import { initialTreeData } from './utils';
 import { findNode } from './actions';
-import deegoLogo from '../../public/icons/deego_1.svg'; 
+import deegoLogo from '../../public/icons/deego_1.svg';
 
 const Sidebar = () => {
   const [treeData, setTreeData] = useState(initialTreeData);
+  const [expandedKeys, setExpandedKeys] = useState(new Map());
   const [hoveredNode, setHoveredNode] = useState(null);
   const [showMoreMenu, setShowMoreMenu] = useState(null);
   const [moreMenuPosition, setMoreMenuPosition] = useState({ x: 0, y: 0 });
@@ -20,17 +20,20 @@ const Sidebar = () => {
   };
 
   // 渲染树节点
-  const renderTreeNodes = (nodes, level = 0) => {
+  const renderTreeNodes = useMemo(() => (nodes, level = 0) => {
     return nodes.map((node) => {
+      const isExpanded = expandedKeys.get(node.id) || false;
       const renderedNode = (
         <TreeNode
           key={node.id}
-          node={node}
+          node={{ ...node, expanded: isExpanded }}
           level={level}
           hoveredNode={hoveredNode}
           setHoveredNode={setHoveredNode}
           treeData={treeData}
           setTreeData={setTreeData}
+          expandedKeys={expandedKeys}
+          setExpandedKeys={setExpandedKeys}
           onMoreMenu={handleMoreMenu}
           moreMenuPosition={moreMenuPosition}
           showMoreMenu={showMoreMenu}
@@ -38,11 +41,11 @@ const Sidebar = () => {
         />
       );
 
-      if (node.expanded && node.children && node.children.length > 0) {
+      if (isExpanded && node.children && node.children.length > 0) {
         return (
           <React.Fragment key={node.id}>
             {renderedNode}
-            <div style={{ 
+            <div style={{
               marginLeft: '2px',
               paddingLeft: '1px',
               borderLeft: '1px solid #e0e7ff',
@@ -56,7 +59,7 @@ const Sidebar = () => {
 
       return renderedNode;
     });
-  };
+  }, [treeData, expandedKeys, hoveredNode, moreMenuPosition, showMoreMenu]);
 
   return (
     <div className="sidebar-tree" style={{ 

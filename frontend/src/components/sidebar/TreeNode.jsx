@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// TreeNode.jsx
+import React, { useState, memo } from 'react';
 import MoreActionsMenu from './MoreActionsMenu';
 import {
   getExpandIcon,
@@ -11,7 +12,8 @@ import {
   findNode,
   showProperties,
   connectDatabase,
-  previewTable
+  previewTable,
+  updateTreePath
   // 导入其他需要的action函数
 } from './actions';
 import {
@@ -28,13 +30,15 @@ import {
   actionContainerStyles
 } from './styles';
 
-const TreeNode = ({
+const TreeNode = memo(({
   node,
   level = 0,
   hoveredNode,
   setHoveredNode,
   treeData,
   setTreeData,
+  expandedKeys,
+  setExpandedKeys,
   onMoreMenu,
   moreMenuPosition,
   showMoreMenu,
@@ -46,6 +50,7 @@ const TreeNode = ({
   const isExpandable = hasChildren || node.type === 'connection' || node.type === 'schema' || node.type === 'database';
   const primaryAction = getPrimaryAction(node.type);
   const theme = getThemeColors(node.type);
+  const isExpanded = node.expanded;
 
   const handleClick = async (e) => {
     e.stopPropagation();
@@ -54,32 +59,16 @@ const TreeNode = ({
         setIsLoading(true);
         try {
             const updatedNode = await loadNodeChildren(node);
-            // 修复：使用深拷贝更新 treeData，确保嵌套变化生效
-            setTreeData((prev) => {
-             const copy = JSON.parse(JSON.stringify(prev));
-             const targetNode = findNode(copy, node.id);
-             if (targetNode && updatedNode) {
-               // 合并更新（假设 loadNodeChildren 返回更新后的节点）
-               Object.assign(targetNode, updatedNode);
-               targetNode.expanded = true; // 确保展开
-             }
-             return copy;
-            });
+            setTreeData((prev) => updateTreePath(prev, node.id, () => updatedNode));
+            setExpandedKeys((prev) => new Map(prev).set(node.id, true));
         } catch (error) {
           console.error('加载失败:', error);
         } finally {
           setIsLoading(false);
         }
       } else {
-        // 已经有子节点，直接切换展开状态
-        setTreeData((prev) => {
-          const copy = JSON.parse(JSON.stringify(prev));
-          const targetNode = findNode(copy, node.id);
-          if (targetNode) {
-            targetNode.expanded = !targetNode.expanded;
-          }
-          return copy;
-        });
+        // 只更新 expandedKeys
+        setExpandedKeys((prev) => new Map(prev).set(node.id, !prev.get(node.id)));
       }
     }
   };
@@ -118,7 +107,7 @@ const TreeNode = ({
   return (
     <>
       <div
-        className={`tree-node ${node.type} ${node.expanded ? 'expanded' : ''} ${isHovered ? 'hovered' : ''}`}
+        className={`tree-node ${node.type} ${isExpanded ? 'expanded' : ''} ${isHovered ? 'hovered' : ''}`}
         style={{
           ...nodeBaseStyles,
           paddingLeft: `${12 + level * 12}px`,
@@ -163,7 +152,7 @@ const TreeNode = ({
         </span>
 
         {/* 类型标签 */}
-        {node.type !== 'folder' && (
+        {isHovered && (
           <span style={typeLabelStyles(isHovered, theme)}>
             {node.type}
           </span>
@@ -234,6 +223,8 @@ const TreeNode = ({
       )}
     </>
   );
-};
+});
+
+TreeNode.displayName = 'TreeNode';
 
 export default TreeNode;

@@ -1,3 +1,4 @@
+// action.js
 // 所有操作函数的统一管理
 
 // 获取主要操作
@@ -16,12 +17,12 @@ export const getPrimaryAction = (nodeType) => {
 };
 
 // 获取所有操作菜单
-export const getAllActions = (nodeType, node) => {
+export const getAllActions = (nodeType, node, treeData, setTreeData) => {
   // 注意：这里传入完整的node对象，而不是nodeId
   const actions = {
     folder: [
-      { label: '新建文件夹', action: () => addFolder(node), icon: '📁' },
-      { label: '新建连接', action: () => addConnection(node), icon: '🔌' },
+      { label: '新建文件夹', action: () => addFolder(treeData, setTreeData, node), icon: '📁' },
+      { label: '新建连接', action: () => addConnection(treeData, setTreeData, node), icon: '🔌' },
       { type: 'separator' },
       { label: '刷新', action: () => refreshFolder(node), icon: '🔄' },
       { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
@@ -36,11 +37,11 @@ export const getAllActions = (nodeType, node) => {
       { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
     ],
     database: [
-      { label: '刷新', action: () => refreshDatabase(nodeId), icon: '🔄' },
-      { label: '新建Schema', action: () => createNewSchema(nodeId), icon: '📁' },
-      { label: '导出结构', action: () => exportDatabase(nodeId), icon: '📤' },
+      { label: '刷新', action: () => refreshDatabase(node), icon: '🔄' },
+      { label: '新建Schema', action: () => createNewSchema(node), icon: '📁' },
+      { label: '导出结构', action: () => exportDatabase(node), icon: '📤' },
       { type: 'separator' },
-      { label: '属性', action: () => showProperties({ id: nodeId, type: 'db' }), icon: 'ℹ️' }
+      { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
     ],
     schema: [
       { label: '刷新', action: () => refreshSchema(node), icon: '🔄' },
@@ -83,61 +84,56 @@ export const getAllActions = (nodeType, node) => {
   ];
 };
 
+// 不可变更新树特定路径
+export const updateTreePath = (treeData, targetId, updaterFn) => {
+  const newTree = JSON.parse(JSON.stringify(treeData));
+  const targetNode = findNode(newTree, targetId);
+  if (targetNode) {
+    const updated = updaterFn({ ...targetNode }); // 传入拷贝，避免直接修改
+    Object.assign(targetNode, updated);
+  }
+  return newTree;
+};
+
 // 树数据操作
 export const addFolder = (treeData, setTreeData, parentNode) => {
   const newFolderName = window.prompt('文件夹名称:', '新建文件夹');
   if (!newFolderName) return;
 
-  setTreeData((prev) => {
-    const copy = JSON.parse(JSON.stringify(prev));
-    const parent = findNode(copy, parentNode.id);
-    if (parent) {
-      parent.children.push({
-        id: 'f' + Date.now(),
-        name: newFolderName,
-        type: 'folder',
-        expanded: false,
-        children: []
-      });
-    }
-    return copy;
-  });
+  setTreeData((prev) => updateTreePath(prev, parentNode.id, (parent) => {
+    parent.children = [...(parent.children || []), {
+      id: 'f' + Date.now(),
+      name: newFolderName,
+      type: 'folder',
+      expanded: false,
+      children: []
+    }];
+    return parent;
+  }));
 };
 
 export const addConnection = (treeData, setTreeData, parentNode) => {
   const connectionName = window.prompt('连接名称:', '新建连接');
   if (!connectionName) return;
 
-  setTreeData((prev) => {
-    const copy = JSON.parse(JSON.stringify(prev));
-    const parent = findNode(copy, parentNode.id);
-    if (parent) {
-      parent.children.push({
-        id: 'c' + Date.now(),
-        name: connectionName,
-        type: 'connection',
-        dbType: 'pgsql',
-        expanded: false,
-        children: []
-      });
-    }
-    return copy;
-  });
+  setTreeData((prev) => updateTreePath(prev, parentNode.id, (parent) => {
+    parent.children = [...(parent.children || []), {
+      id: 'c' + Date.now(),
+      name: connectionName,
+      type: 'connection',
+      dbType: 'pgsql',
+      expanded: false,
+      children: []
+    }];
+    return parent;
+  }));
 };
 
-export const toggleExpand = (treeData, setTreeData, nodeId, loadChildren = true) => {
-  setTreeData((prev) => {
-    const copy = JSON.parse(JSON.stringify(prev));
-    const node = findNode(copy, nodeId);
-    if (node) {
-      if (loadChildren && (!node.children || node.children.length === 0)) {
-        // 这里只是标记为需要加载，实际加载在TreeNode中处理
-        node.expanded = true;
-      } else {
-        node.expanded = !node.expanded;
-      }
-    }
-    return copy;
+export const toggleExpand = (setExpandedKeys, nodeId, loadChildren = true) => {
+  setExpandedKeys((prev) => {
+    const newMap = new Map(prev);
+    newMap.set(nodeId, !newMap.get(nodeId));
+    return newMap;
   });
 };
 
@@ -243,6 +239,7 @@ export const refreshFolder = (node) => {
 
 // 工具函数
 export const findNode = (nodes, id) => {
+  if (!Array.isArray(nodes)) return null;
   for (let node of nodes) {
     if (node.id === id) return node;
     if (node.children) {
