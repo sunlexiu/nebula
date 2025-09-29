@@ -1,3 +1,5 @@
+// utils.js
+
 // 工具函数和配置
 
 import fileGroupIcon from '../../public/icons/left_tree/file_group_1.svg';
@@ -48,7 +50,7 @@ export const getNodeIcon = (node) => {
   if (node.type === 'folder') {
     return node.expanded ? folderOpenIcon : folderIcon;
   }
-  if (node.type === 'db') return dbIcon;
+  if (node.type === 'database') return dbIcon;
   if (node.type === 'schema') return schemaIcon;
   if (node.type === 'table') return tableIcon;
   if (node.type === 'view') return viewIcon;
@@ -59,7 +61,7 @@ export const getNodeIcon = (node) => {
 // 获取展开图标
 export const getExpandIcon = (node) => {
   if (node.children && node.children.length > 0) {
-    if (node.type === 'folder' || node.type === 'connection' || node.type === 'schema') {
+    if (node.type === 'folder' || node.type === 'connection' || node.type === 'database' || node.type === 'schema' ) {
       return node.expanded ? '▼' : '▶';
     }
   }
@@ -71,18 +73,34 @@ export const loadNodeChildren = async (node) => {
   return new Promise((resolve) => {
     setTimeout(() => {
       try {
+        let updatedNode = { ...node }; // 创建副本
+
         if (node.type === 'connection' && (!node.children || node.children.length === 0)) {
-          const schemas = [
-            { 
-              id: `${node.id}-s1`, 
-              name: 'public', 
-              type: 'schema', 
+          const databases = [
+            {
+              id: `${node.id}-database1`,
+              name: 'postgres',
+              type: 'database',
               expanded: false,
               children: []
             }
           ];
-          node.children = schemas;
-          node.expanded = true;
+          updatedNode.children = databases;
+          updatedNode.expanded = true;
+        }
+
+        if (node.type === 'database' && (!node.children || node.children.length === 0)) {
+          const schemas = [
+            {
+              id: `${node.id}-s1`,
+              name: 'public',
+              type: 'schema',
+              expanded: false,
+              children: []
+            }
+          ];
+          updatedNode.children = schemas;
+          updatedNode.expanded = true;
         }
 
         if (node.type === 'schema' && (!node.children || node.children.length === 0)) {
@@ -91,10 +109,10 @@ export const loadNodeChildren = async (node) => {
             { id: `${node.id}-t2`, name: 'orders', type: 'table', expanded: false },
             { id: `${node.id}-t3`, name: 'products', type: 'table', expanded: false }
           ];
-          node.children = tables;
-          node.expanded = true;
+          updatedNode.children = tables;
+          updatedNode.expanded = true;
         }
-        resolve(node);
+        resolve(updatedNode);
       } catch (error) {
         console.error('加载节点失败:', error);
         resolve(null);

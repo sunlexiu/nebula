@@ -19,6 +19,13 @@ export const getThemeColors = (nodeType) => {
         iconColor: '#4caf50',
         accentColor: ACCENT_COLOR
       };
+    case 'database': // 新增：database 专属主题（蓝色调）
+        return {
+          hoverBg: 'linear-gradient(90deg, #e3f2fd 0%, #bbdefb 100%)',
+          textColor: '#1976d2',
+          iconColor: '#2196f3',
+          accentColor: ACCENT_COLOR
+        };
     case 'schema':
       return {
         hoverBg: 'linear-gradient(90deg, #fff3e0 0%, #ffecb3 100%)',

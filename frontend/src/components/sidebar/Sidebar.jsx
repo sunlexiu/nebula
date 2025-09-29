@@ -1,8 +1,10 @@
+// sidebar.jsx
+
 import React, { useState } from 'react';
 import TreeNode from './TreeNode';
 import { initialTreeData } from './utils';
 import { findNode } from './actions';
-import deegoLogo from '../../public/icons/deego.svg'; 
+import deegoLogo from '../../public/icons/deego_1.svg'; 
 
 const Sidebar = () => {
   const [treeData, setTreeData] = useState(initialTreeData);
@@ -107,39 +109,6 @@ const Sidebar = () => {
             </div>
           </div>
         </div>
-        
-        {/* <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '8px',
-          padding: '10px 14px',
-          background: 'linear-gradient(90deg, #e8f5e8 0%, #f0f8f0 100%)',
-          borderRadius: '8px',
-          fontSize: '12px',
-          color: '#2e7d32',
-          border: '1px solid #c8e6c9',
-          transition: 'all 0.2s ease'
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'linear-gradient(90deg, #e3f2e3 0%, #eafaf1 100%)';
-          e.currentTarget.style.transform = 'scale(1.02)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'linear-gradient(90deg, #e8f5e8 0%, #f0f8f0 100%)';
-          e.currentTarget.style.transform = 'scale(1)';
-        }}
-        >
-          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <div style={{
-              width: 8, height: 8, background: '#4caf50', 
-              borderRadius: '50%', boxShadow: '0 0 8px #4caf5020'
-            }} />
-            <span>已连接</span>
-          </span>
-          <span style={{ marginLeft: 'auto', color: '#666', fontSize: '11px' }}>
-            localhost:5432
-          </span>
-        </div> */}
       </div>
       
       <div className="tree-container">

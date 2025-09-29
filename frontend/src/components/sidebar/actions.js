@@ -5,6 +5,8 @@ export const getPrimaryAction = (nodeType) => {
   const actions = {
     folder: { icon: '📁', label: '新建' },
     connection: { icon: '⚡', label: '连接' },
+    // old: 🔄
+    database: { icon: '🔄', label: '刷新' },
     schema: { icon: '🔄', label: '刷新' },
     table: { icon: '📊', label: '预览' },
     view: { icon: '👁️', label: '查看' },
@@ -32,6 +34,13 @@ export const getAllActions = (nodeType, node) => {
       { label: '连接设置', action: () => showConnectionSettings(node), icon: '⚙️' },
       { type: 'separator' },
       { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
+    ],
+    database: [
+      { label: '刷新', action: () => refreshDatabase(nodeId), icon: '🔄' },
+      { label: '新建Schema', action: () => createNewSchema(nodeId), icon: '📁' },
+      { label: '导出结构', action: () => exportDatabase(nodeId), icon: '📤' },
+      { type: 'separator' },
+      { label: '属性', action: () => showProperties({ id: nodeId, type: 'db' }), icon: 'ℹ️' }
     ],
     schema: [
       { label: '刷新', action: () => refreshSchema(node), icon: '🔄' },
@@ -78,7 +87,7 @@ export const getAllActions = (nodeType, node) => {
 export const addFolder = (treeData, setTreeData, parentNode) => {
   const newFolderName = window.prompt('文件夹名称:', '新建文件夹');
   if (!newFolderName) return;
-  
+
   setTreeData((prev) => {
     const copy = JSON.parse(JSON.stringify(prev));
     const parent = findNode(copy, parentNode.id);
@@ -98,7 +107,7 @@ export const addFolder = (treeData, setTreeData, parentNode) => {
 export const addConnection = (treeData, setTreeData, parentNode) => {
   const connectionName = window.prompt('连接名称:', '新建连接');
   if (!connectionName) return;
-  
+
   setTreeData((prev) => {
     const copy = JSON.parse(JSON.stringify(prev));
     const parent = findNode(copy, parentNode.id);

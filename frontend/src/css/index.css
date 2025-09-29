@@ -378,21 +378,16 @@ html {
   font-size: 13px;
 }
 
-.tab-item:not(:first-child) {
-  border-left: 1px dashed #e6e6e6; /* 虚线替代实线，颜色与 var(--border) 一致 */
-}
-
-.tab-item:not(:last-child) {
-  border-right: 1px dashed #e6e6e6; /* 虚线替代实线 */
-}
 .tab-item:hover {
   background: #f8f9fa;
 }
 
+
 .tab-item.active {
-  background: white;
-  border-bottom-color: var(--accent);
-  color: var(--accent);
+  background: #f5f7fa;            /* 柔和的浅色背景 */
+  color: #0078d7;                 /* 主色调文字 */
+  font-weight: 500;               /* 字体稍加粗 */
+  border-bottom: 2px solid #0078d7; /* 用底边线来突出 */
 }
 
 .tab-title {

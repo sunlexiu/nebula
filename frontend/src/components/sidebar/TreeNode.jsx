@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import MoreActionsMenu from './MoreActionsMenu';
-import { 
-  getExpandIcon, 
+import {
+  getExpandIcon,
   getNodeIcon,
-  loadNodeChildren 
+  loadNodeChildren
 } from './utils';
-import { 
+import {
   getPrimaryAction,
   getAllActions,
   findNode,
@@ -14,18 +14,18 @@ import {
   previewTable
   // 导入其他需要的action函数
 } from './actions';
-import { 
-  getThemeColors, 
-  nodeBaseStyles, 
-  nodeHoverStyles, 
-  expandIconStyles, 
-  nodeIconStyles, 
-  nodeNameStyles, 
-  typeLabelStyles, 
-  actionButtonStyles, 
-  indicatorBarStyles, 
-  childIndicatorStyles, 
-  actionContainerStyles 
+import {
+  getThemeColors,
+  nodeBaseStyles,
+  nodeHoverStyles,
+  expandIconStyles,
+  nodeIconStyles,
+  nodeNameStyles,
+  typeLabelStyles,
+  actionButtonStyles,
+  indicatorBarStyles,
+  childIndicatorStyles,
+  actionContainerStyles
 } from './styles';
 
 const TreeNode = ({
@@ -43,7 +43,7 @@ const TreeNode = ({
   const [isLoading, setIsLoading] = useState(false);
   const isHovered = hoveredNode === node.id;
   const hasChildren = node.children && node.children.length > 0;
-  const isExpandable = hasChildren || node.type === 'connection' || node.type === 'schema';
+  const isExpandable = hasChildren || node.type === 'connection' || node.type === 'schema' || node.type === 'database';
   const primaryAction = getPrimaryAction(node.type);
   const theme = getThemeColors(node.type);
 
@@ -53,9 +53,18 @@ const TreeNode = ({
       if (!hasChildren) {
         setIsLoading(true);
         try {
-          await loadNodeChildren(node);
-          // 触发重新渲染
-          setTreeData(prev => [...prev]);
+            const updatedNode = await loadNodeChildren(node);
+            // 修复：使用深拷贝更新 treeData，确保嵌套变化生效
+            setTreeData((prev) => {
+             const copy = JSON.parse(JSON.stringify(prev));
+             const targetNode = findNode(copy, node.id);
+             if (targetNode && updatedNode) {
+               // 合并更新（假设 loadNodeChildren 返回更新后的节点）
+               Object.assign(targetNode, updatedNode);
+               targetNode.expanded = true; // 确保展开
+             }
+             return copy;
+            });
         } catch (error) {
           console.error('加载失败:', error);
         } finally {
@@ -142,9 +151,9 @@ const TreeNode = ({
         </div>
 
         {/* 节点图标 */}
-        <img 
-          src={getNodeIcon(node)} 
-          alt={node.type} 
+        <img
+          src={getNodeIcon(node)}
+          alt={node.type}
           style={nodeIconStyles(isHovered, theme)}
         />
 
@@ -181,7 +190,7 @@ const TreeNode = ({
                 {primaryAction.icon}
               </button>
             )}
-            
+
             <button
               onClick={handleMoreMenu}
               style={{
