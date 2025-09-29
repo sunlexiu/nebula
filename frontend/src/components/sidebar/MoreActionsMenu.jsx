@@ -20,7 +20,7 @@ const MoreActionsMenu = ({ node, position, onClose, treeData, setTreeData }) => 
         border: '1px solid #e0e0e0',
         borderRadius: '8px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-        zIndex: 1001,
+        zIndex: 10,
         minWidth: '180px',
         fontSize: '13px',
         fontFamily: 'var(--font)',
