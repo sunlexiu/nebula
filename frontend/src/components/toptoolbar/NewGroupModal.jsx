@@ -1,7 +1,8 @@
+// NewGroupModal.jsx
 import React, { useState } from "react";
 import "../../css/NewGroupModal.css";
 
-const NewGroupModal = ({ isOpen, onClose, onSubmit }) => {
+const NewGroupModal = ({ isOpen, onClose, onSubmit, refreshTree }) => {
   const [groupName, setGroupName] = useState("");
   const [error, setError] = useState(null);
 
@@ -17,7 +18,7 @@ const NewGroupModal = ({ isOpen, onClose, onSubmit }) => {
        {
          method: "POST",
          headers: { "Content-Type": "application/json" },
-         body: JSON.stringify({ name: groupName }),
+         body: JSON.stringify({ name: groupName , type: 'folder' }),
        }
      );
 
@@ -29,6 +30,10 @@ const NewGroupModal = ({ isOpen, onClose, onSubmit }) => {
       onSubmit(groupName, data);
       setGroupName("");
       onClose();
+      // 成功后自动刷新树
+      if (refreshTree) {
+        refreshTree();
+      }
     } catch (err) {
       console.error("Error creating group:", err);
       setError("创建分组失败，请重试。");

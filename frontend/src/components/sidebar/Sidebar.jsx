@@ -1,12 +1,10 @@
-// sidebar.jsx
+// components/sidebar/Sidebar.jsx
 import React, { useState, useMemo } from 'react';
 import TreeNode from './TreeNode';
-import { initialTreeData } from './utils';
 import { findNode } from './actions';
 import deegoLogo from '../../public/icons/deego_1.svg';
 
-const Sidebar = () => {
-  const [treeData, setTreeData] = useState(initialTreeData);
+const Sidebar = ({ treeData, setTreeData }) => {
   const [expandedKeys, setExpandedKeys] = useState(new Map());
   const [hoveredNode, setHoveredNode] = useState(null);
   const [showMoreMenu, setShowMoreMenu] = useState(null);
@@ -19,8 +17,15 @@ const Sidebar = () => {
     setShowMoreMenu(node.id);
   };
 
-  // 渲染树节点
+  // 渲染树节点 - 优化 useMemo 依赖
   const renderTreeNodes = useMemo(() => (nodes, level = 0) => {
+    if (!nodes || nodes.length === 0) {
+      return (
+        <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '14px' }}>
+          无数据
+        </div>
+      );
+    }
     return nodes.map((node) => {
       const isExpanded = expandedKeys.get(node.id) || false;
       const renderedNode = (
@@ -49,7 +54,9 @@ const Sidebar = () => {
               marginLeft: '2px',
               paddingLeft: '1px',
               borderLeft: '1px solid #e0e7ff',
-              marginTop: '1px'
+              marginTop: '1px',
+              transition: 'max-height 0.3s ease', // 添加展开动画
+              overflow: 'hidden'
             }}>
               {renderTreeNodes(node.children, level + 1)}
             </div>
@@ -59,7 +66,7 @@ const Sidebar = () => {
 
       return renderedNode;
     });
-  }, [treeData, expandedKeys, hoveredNode, moreMenuPosition, showMoreMenu]);
+  }, [expandedKeys, hoveredNode, treeData, moreMenuPosition, showMoreMenu]); // 精简依赖
 
   return (
     <div className="sidebar-tree" style={{ 

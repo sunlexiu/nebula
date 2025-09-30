@@ -1,4 +1,4 @@
-// action.js
+// actions.js
 // 所有操作函数的统一管理
 
 // 获取主要操作
@@ -6,7 +6,6 @@ export const getPrimaryAction = (nodeType) => {
   const actions = {
     folder: { icon: '📁', label: '新建' },
     connection: { icon: '⚡', label: '连接' },
-    // old: 🔄
     database: { icon: '🔄', label: '刷新' },
     schema: { icon: '🔄', label: '刷新' },
     table: { icon: '📊', label: '预览' },
@@ -17,8 +16,7 @@ export const getPrimaryAction = (nodeType) => {
 };
 
 // 获取所有操作菜单
-export const getAllActions = (nodeType, node, treeData, setTreeData) => {
-  // 注意：这里传入完整的node对象，而不是nodeId
+export const getAllActions = (nodeType, node, treeData, setTreeData, setExpandedKeys) => {
   const actions = {
     folder: [
       { label: '新建文件夹', action: () => addFolder(treeData, setTreeData, node), icon: '📁' },
@@ -28,23 +26,23 @@ export const getAllActions = (nodeType, node, treeData, setTreeData) => {
       { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
     ],
     connection: [
-      { label: '连接', action: () => connectDatabase(node), icon: '⚡' },
-      { label: '断开连接', action: () => disconnectDatabase(node), icon: '🔌' },
+      { label: '连接', action: () => connectDatabase(node, setTreeData), icon: '⚡' },
+      { label: '断开连接', action: () => disconnectDatabase(node, setTreeData), icon: '🔌' },
       { type: 'separator' },
-      { label: '刷新', action: () => refreshConnection(node), icon: '🔄' },
+      { label: '刷新', action: () => refreshConnection(node, setTreeData, setExpandedKeys), icon: '🔄' },
       { label: '连接设置', action: () => showConnectionSettings(node), icon: '⚙️' },
       { type: 'separator' },
       { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
     ],
     database: [
-      { label: '刷新', action: () => refreshDatabase(node), icon: '🔄' },
+      { label: '刷新', action: () => refreshDatabase(node, setTreeData, setExpandedKeys), icon: '🔄' },
       { label: '新建Schema', action: () => createNewSchema(node), icon: '📁' },
       { label: '导出结构', action: () => exportDatabase(node), icon: '📤' },
       { type: 'separator' },
       { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
     ],
     schema: [
-      { label: '刷新', action: () => refreshSchema(node), icon: '🔄' },
+      { label: '刷新', action: () => refreshSchema(node, setTreeData, setExpandedKeys), icon: '🔄' },
       { label: '新建表', action: () => createNewTable(node), icon: '📊' },
       { label: '导出结构', action: () => exportSchema(node), icon: '📤' },
       { type: 'separator' },
@@ -100,15 +98,15 @@ export const addFolder = (treeData, setTreeData, parentNode) => {
   const newFolderName = window.prompt('文件夹名称:', '新建文件夹');
   if (!newFolderName) return;
 
-  setTreeData((prev) => updateTreePath(prev, parentNode.id, (parent) => {
-    parent.children = [...(parent.children || []), {
+  setTreeData((prev) => updateTreePath(prev, parentNode.id, (current) => {
+    current.children = [...(current.children || []), {
       id: 'f' + Date.now(),
       name: newFolderName,
       type: 'folder',
       expanded: false,
       children: []
     }];
-    return parent;
+    return current;
   }));
 };
 
@@ -116,16 +114,17 @@ export const addConnection = (treeData, setTreeData, parentNode) => {
   const connectionName = window.prompt('连接名称:', '新建连接');
   if (!connectionName) return;
 
-  setTreeData((prev) => updateTreePath(prev, parentNode.id, (parent) => {
-    parent.children = [...(parent.children || []), {
+  setTreeData((prev) => updateTreePath(prev, parentNode.id, (current) => {
+    current.children = [...(current.children || []), {
       id: 'c' + Date.now(),
       name: connectionName,
       type: 'connection',
       dbType: 'pgsql',
       expanded: false,
+      connected: false,
       children: []
     }];
-    return parent;
+    return current;
   }));
 };
 
@@ -137,20 +136,101 @@ export const toggleExpand = (setExpandedKeys, nodeId, loadChildren = true) => {
   });
 };
 
-export const refreshConnection = (node) => {
-  alert(`刷新连接: ${node.name}`);
+export const refreshConnection = (node, setTreeData, setExpandedKeys) => {
+  if (!node.connected) {
+    alert('请先连接');
+    return;
+  }
+  // 模拟加载 databases
+  setTimeout(() => {
+    const databases = [
+      {
+        id: `${node.id}-db1`,
+        name: 'postgres',
+        type: 'database',
+        expanded: false,
+        connected: node.connected,
+        children: []
+      }
+    ];
+    setTreeData((prev) => updateTreePath(prev, node.id, (current) => ({
+      ...current,
+      children: databases,
+      expanded: true
+    })));
+    setExpandedKeys((prev) => new Map(prev).set(node.id, true));
+    alert(`刷新成功: ${node.name}`);
+  }, 300);
 };
 
-export const refreshSchema = (node) => {
-  alert(`刷新架构: ${node.name}`);
+export const refreshDatabase = (node, setTreeData, setExpandedKeys) => {
+  if (!node.connected) return;
+  setTimeout(() => {
+    const schemas = [
+      {
+        id: `${node.id}-s1`,
+        name: 'public',
+        type: 'schema',
+        expanded: false,
+        connected: node.connected,
+        children: []
+      }
+    ];
+    setTreeData((prev) => updateTreePath(prev, node.id, (current) => ({
+      ...current,
+      children: schemas,
+      expanded: true
+    })));
+    setExpandedKeys((prev) => new Map(prev).set(node.id, true));
+  }, 300);
+};
+
+export const refreshSchema = (node, setTreeData, setExpandedKeys) => {
+  if (!node.connected) return;
+  setTimeout(() => {
+    const items = [
+      { id: `${node.id}-t1`, name: 'users', type: 'table', expanded: false },
+      { id: `${node.id}-t2`, name: 'orders', type: 'table', expanded: false },
+      { id: `${node.id}-v1`, name: 'user_view', type: 'view', expanded: false },
+      { id: `${node.id}-f1`, name: 'calc_total', type: 'function', expanded: false }
+    ];
+    setTreeData((prev) => updateTreePath(prev, node.id, (current) => ({
+      ...current,
+      children: items,
+      expanded: true
+    })));
+    setExpandedKeys((prev) => new Map(prev).set(node.id, true));
+  }, 300);
 };
 
 // 数据库操作
-export const connectDatabase = (node) => {
-  alert(`正在连接数据库: ${node.name}`);
+export const connectDatabase = (node, setTreeData) => {
+  if (node.connected) {
+    alert(`已连接: ${node.name}`);
+    return;
+  }
+  // 模拟延迟
+  setTimeout(() => {
+    setTreeData((prev) => updateTreePath(prev, node.id, (current) => ({
+      ...current,
+      connected: true,
+      status: 'connected'
+    })));
+    alert(`连接成功: ${node.name}`);
+  }, 500);
 };
 
-export const disconnectDatabase = (node) => {
+export const disconnectDatabase = (node, setTreeData) => {
+  if (!node.connected) {
+    alert(`未连接: ${node.name}`);
+    return;
+  }
+  setTreeData((prev) => updateTreePath(prev, node.id, (current) => ({
+    ...current,
+    connected: false,
+    status: 'disconnected',
+    children: []
+  })));
   alert(`断开连接: ${node.name}`);
 };
 
@@ -159,6 +239,14 @@ export const showConnectionSettings = (node) => {
 };
 
 // 架构操作
+export const createNewSchema = (node) => {
+  alert(`新建Schema在数据库: ${node.name}`);
+};
+
+export const exportDatabase = (node) => {
+  alert(`导出数据库: ${node.name}`);
+};
+
 export const createNewTable = (node) => {
   alert(`新建表在架构: ${node.name}`);
 };
@@ -230,7 +318,7 @@ export const deleteFunction = (node) => {
 
 // 通用操作
 export const showProperties = (node) => {
-  alert(`节点属性:\nID: ${node.id}\n类型: ${node.type}\n名称: ${node.name}`);
+  alert(`节点属性:\nID: ${node.id}\n类型: ${node.type}\n名称: ${node.name}\n连接状态: ${node.connected ? '已连接' : '未连接'}`);
 };
 
 export const refreshFolder = (node) => {

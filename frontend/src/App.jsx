@@ -1,3 +1,4 @@
+// App.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import Sidebar from './components/sidebar/Sidebar.jsx';
 import ToolbarTop from './components/toptoolbar/ToolbarTop.jsx';
@@ -32,10 +33,38 @@ export default function App() {
   const [isSidebarDragging, setIsSidebarDragging] = useState(false);
   const [isEditorDragging, setIsEditorDragging] = useState(false);
 
+  // 树数据状态
+  const [treeData, setTreeData] = useState([]);
+
   // DOM 引用
   const sidebarRef = useRef(null);
   const editorAreaRef = useRef(null);
   const editorDividerRef = useRef(null);
+
+  // 自动拉取树数据
+  const fetchTreeData = async () => {
+    try {
+      const response = await fetch('/api/config/tree');
+      if (!response.ok) {
+        throw new Error('Failed to fetch tree data');
+      }
+      const data = await response.json();
+      setTreeData(data || []);
+    } catch (error) {
+      console.error('Error fetching tree data:', error);
+      setTreeData([]);
+    }
+  };
+
+  // 刷新树数据
+  const refreshTree = () => {
+    fetchTreeData();
+  };
+
+  // 进入软件自动拉取树
+  useEffect(() => {
+    fetchTreeData();
+  }, []);
 
   // 检查 Tab 是否需要滚动
   const checkTabOverflow = () => {
@@ -247,12 +276,12 @@ export default function App() {
 
   return (
     <div className="app-container">
-      <ToolbarTop addTab={addTab} setActiveTabId={setActiveTabId} />
+      <ToolbarTop addTab={addTab} setActiveTabId={setActiveTabId} refreshTree={refreshTree} />
       <div
         ref={sidebarRef}
         className={`sidebar ${isSidebarDragging ? 'dragging-parent' : ''}`}
       >
-        <Sidebar />
+        <Sidebar treeData={treeData} setTreeData={setTreeData} />
         <div
           className={`resizer sidebar-resizer ${isSidebarDragging ? 'dragging' : ''}`}
           onMouseDown={handleSidebarMouseDown}

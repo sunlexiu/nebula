@@ -8,13 +8,9 @@ import {
 } from './utils';
 import {
   getPrimaryAction,
-  getAllActions,
-  findNode,
-  showProperties,
   connectDatabase,
   previewTable,
   updateTreePath
-  // 导入其他需要的action函数
 } from './actions';
 import {
   getThemeColors,
@@ -51,6 +47,8 @@ const TreeNode = memo(({
   const primaryAction = getPrimaryAction(node.type);
   const theme = getThemeColors(node.type);
   const isExpanded = node.expanded;
+  const isConnected = node.connected; // 新增 connected 检查
+  if (isConnected) theme.accentColor = '#10b981'; // 绿色主题
 
   const handleClick = async (e) => {
     e.stopPropagation();
@@ -58,16 +56,21 @@ const TreeNode = memo(({
       if (!hasChildren) {
         setIsLoading(true);
         try {
-            const updatedNode = await loadNodeChildren(node);
-            setTreeData((prev) => updateTreePath(prev, node.id, () => updatedNode));
-            setExpandedKeys((prev) => new Map(prev).set(node.id, true));
+          const updatedNode = await loadNodeChildren(node, setTreeData, setExpandedKeys);
+          if (updatedNode) {
+            setTreeData((prev) => updateTreePath(prev, node.id, (current) => ({
+              ...current,
+              ...updatedNode // 合并属性
+            })));
+          }
+          setExpandedKeys((prev) => new Map(prev).set(node.id, true));
         } catch (error) {
           console.error('加载失败:', error);
+          alert('加载出错，请重试');
         } finally {
           setIsLoading(false);
         }
       } else {
-        // 只更新 expandedKeys
         setExpandedKeys((prev) => new Map(prev).set(node.id, !prev.get(node.id)));
       }
     }
@@ -78,13 +81,12 @@ const TreeNode = memo(({
     if (primaryAction) {
       switch (node.type) {
         case 'connection':
-          connectDatabase(node);
+          connectDatabase(node, setTreeData);
           break;
         case 'table':
           previewTable(node);
           break;
         case 'folder':
-          // 文件夹的主要操作可以是新建，这里只是示例
           console.log('文件夹操作:', node.name);
           break;
         default:
@@ -113,7 +115,7 @@ const TreeNode = memo(({
           paddingLeft: `${12 + level * 12}px`,
           cursor: isExpandable ? 'pointer' : (isLoading ? 'wait' : 'default'),
           background: isHovered ? theme.hoverBg : 'transparent',
-          border: isHovered ? `1px solid ${theme.accentColor}20` : '1px solid transparent',
+          border: isHovered ? `1px solid ${theme.accentColor}20` : (isConnected ? `1px solid ${theme.accentColor}10` : '1px solid transparent'),
           transform: isHovered ? 'translateX(1px)' : 'translateX(0)',
           boxShadow: isHovered ? `0 1px 4px ${theme.accentColor}10` : 'none',
           paddingRight: isHovered ? '4px' : '8px'
@@ -122,6 +124,8 @@ const TreeNode = memo(({
         onMouseLeave={() => setHoveredNode(null)}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
+        onKeyDown={(e) => { if (e.key === 'Enter') handleClick(e); }}
+        tabIndex={0}
       >
         {/* 左侧指示条 */}
         {isHovered && <div style={indicatorBarStyles(theme)} />}
@@ -129,7 +133,7 @@ const TreeNode = memo(({
         {/* 展开图标 */}
         <div style={expandIconStyles(isHovered, theme)}>
           {isLoading ? (
-            <span style={{ fontSize: 9 }}>⏳</span>
+            <span style={{ fontSize: 9 }}>⟳</span>
           ) : getExpandIcon(node) ? (
             <span style={{ fontSize: 9, fontWeight: 'bold' }}>
               {getExpandIcon(node)}
@@ -142,7 +146,7 @@ const TreeNode = memo(({
         {/* 节点图标 */}
         <img
           src={getNodeIcon(node)}
-          alt={node.type}
+          alt={node.type + (isConnected ? ' (connected)' : '')}
           style={nodeIconStyles(isHovered, theme)}
         />
 
@@ -154,7 +158,7 @@ const TreeNode = memo(({
         {/* 类型标签 */}
         {isHovered && (
           <span style={typeLabelStyles(isHovered, theme)}>
-            {node.type}
+            {node.type} {isConnected && '(已连接)'}
           </span>
         )}
 
@@ -219,6 +223,7 @@ const TreeNode = memo(({
           onClose={() => setShowMoreMenu(null)}
           treeData={treeData}
           setTreeData={setTreeData}
+          setExpandedKeys={setExpandedKeys}
         />
       )}
     </>

@@ -1,4 +1,4 @@
-// utils.js
+// components/sidebar/utils.js
 // 工具函数和配置
 
 import fileGroupIcon from '../../public/icons/left_tree/file_group_1.svg';
@@ -15,28 +15,12 @@ import mysqlIcon from '../../public/icons/db/mysql_icon_2.svg';
 import oracleIcon from '../../public/icons/db/oracle_icon_3.svg';
 import sqlserverIcon from '../../public/icons/db/sqlserver_icon_1.svg';
 
-// 初始树数据
-export const initialTreeData = [
-  {
-    id: 'f1',
-    name: '开发环境',
-    type: 'folder',
-    expanded: false,
-    children: [
-      {
-        id: 'c1',
-        name: '本地Postgres',
-        type: 'connection',
-        dbType: 'pgsql',
-        expanded: false,
-        children: []
-      }
-    ]
-  }
-];
-
-// 获取节点图标
+// 获取节点图标 - 加 connected 变体（这里模拟，实际可换 SVG）
 export const getNodeIcon = (node) => {
+  if (node.type === 'connection' && node.connected) {
+    // 模拟 connected 图标：实际用不同文件
+    return pgsqlIcon; // 或 pgsqlIconConnected
+  }
   if (node.type === 'connection') {
     switch (node.dbType) {
       case 'pgsql': return pgsqlIcon;
@@ -67,54 +51,24 @@ export const getExpandIcon = (node) => {
   return '';
 };
 
-// 懒加载节点子项 - 修改为返回Promise
-export const loadNodeChildren = async (node) => {
-  return new Promise((resolve) => {
+// 懒加载节点子项
+export const loadNodeChildren = async (node, setTreeData, setExpandedKeys) => {
+  return new Promise((resolve, reject) => {
     setTimeout(() => {
       try {
-        let updatedNode = { ...node }; // 创建副本
-
-        if (node.type === 'connection' && (!node.children || node.children.length === 0)) {
-          const databases = [
-            {
-              id: `${node.id}-database1`,
-              name: 'postgres',
-              type: 'database',
-              expanded: false,
-              children: []
-            }
-          ];
-          updatedNode.children = databases;
-          updatedNode.expanded = true;
+        if (!node.connected && (node.type === 'connection' || node.type === 'database' || node.type === 'schema')) {
+          alert('请先连接数据库');
+          return resolve({ ...node });
         }
 
-        if (node.type === 'database' && (!node.children || node.children.length === 0)) {
-          const schemas = [
-            {
-              id: `${node.id}-s1`,
-              name: 'public',
-              type: 'schema',
-              expanded: false,
-              children: []
-            }
-          ];
-          updatedNode.children = schemas;
-          updatedNode.expanded = true;
-        }
+        let updatedNode = { ...node, expanded: true };
 
-        if (node.type === 'schema' && (!node.children || node.children.length === 0)) {
-          const tables = [
-            { id: `${node.id}-t1`, name: 'users', type: 'table', expanded: false },
-            { id: `${node.id}-t2`, name: 'orders', type: 'table', expanded: false },
-            { id: `${node.id}-t3`, name: 'products', type: 'table', expanded: false }
-          ];
-          updatedNode.children = tables;
-          updatedNode.expanded = true;
-        }
+        // 根据类型调用刷新（已传入 setTreeData/setExpandedKeys）
+        // refresh 函数已在 actions 中处理更新
         resolve(updatedNode);
       } catch (error) {
         console.error('加载节点失败:', error);
-        resolve(null);
+        reject(error);
       }
     }, 300);
   });

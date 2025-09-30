@@ -1,3 +1,4 @@
+// ToolbarTop.jsx
 import React, { useState } from 'react';
 import '../../css/ToolbarTop.css';
 import NewGroupModal from './NewGroupModal';
@@ -11,13 +12,14 @@ import SettingsIcon from '../../public/icons/toptoolbar/setting_2_color.svg';
 import SearchIcon from '../../public/icons/toptoolbar/new_folder_1.svg';
 import ExecuteIcon from '../../public/icons/toptoolbar/new_folder_1.svg';
 
-const ToolbarTop = ({ addTab }) => {
+const ToolbarTop = ({ addTab, refreshTree }) => {
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
 
-  const handleNewGroupSubmit = (groupName) => {
-    console.log('New Group:', groupName);
-    // 在这里实现分组创建逻辑，例如调用 API 或更新状态
+  const handleNewGroupSubmit = (groupName, data) => {
+    console.log('New Group:', groupName, data);
+    // 提交成功后刷新树
+    refreshTree();
   };
 
   const handleNewConnectionSubmit = (connectionData) => {
@@ -63,6 +65,7 @@ const ToolbarTop = ({ addTab }) => {
         isOpen={isGroupModalOpen}
         onClose={() => setIsGroupModalOpen(false)}
         onSubmit={handleNewGroupSubmit}
+        refreshTree={refreshTree}
       />
       <NewConnectionModal
         isOpen={isConnectionModalOpen}
