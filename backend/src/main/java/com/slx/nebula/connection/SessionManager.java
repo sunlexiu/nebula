@@ -25,9 +25,9 @@ public class SessionManager {
         }
         ConnectionConfig cfg = configRepository.findConnectionById(connectionId)
                 .orElseThrow(() -> new RuntimeException("connection not found: " + connectionId));
-        DatabaseProvider provider = registry.getProvider(cfg.getType());
+        DatabaseProvider provider = registry.getProvider(cfg.getDbType());
         if (provider == null) {
-            throw new RuntimeException("no provider: " + cfg.getType());
+            throw new RuntimeException("no provider: " + cfg.getDbType());
         }
         DataSource ds = provider.createDataSource(cfg);
         Session s = new Session(editorId, cfg, ds);

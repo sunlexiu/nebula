@@ -1,5 +1,7 @@
 package com.slx.nebula.controller;
 
+import com.slx.nebula.model.ConfigData;
+import com.slx.nebula.model.ConfigItem;
 import com.slx.nebula.model.ConnectionConfig;
 import com.slx.nebula.model.Folder;
 import com.slx.nebula.repository.ConfigRepository;
@@ -31,6 +33,12 @@ public class ConfigController {
     @GetMapping("/folders")
     public ResponseEntity<List<Folder>> listFolders() {
         return ResponseEntity.ok(repo.findAllFolders());
+    }
+
+
+    @GetMapping("/tree")
+    public ResponseEntity<List<ConfigItem>> loadAll() {
+        return ResponseEntity.ok(repo.loadAll().getRoots());
     }
 
     @DeleteMapping("/folders/{id}")
@@ -66,8 +74,8 @@ public class ConfigController {
         var opt = repo.findConnectionById(id);
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
         ConnectionConfig cfg = opt.get();
-        var provider = registry.getProvider(cfg.getType());
-        if (provider == null) return ResponseEntity.badRequest().body(Map.of("ok", false, "msg", "no provider: " + cfg.getType()));
+        var provider = registry.getProvider(cfg.getDbType());
+        if (provider == null) return ResponseEntity.badRequest().body(Map.of("ok", false, "msg", "no provider: " + cfg.getDbType()));
         boolean ok = provider.testConnection(cfg);
         return ResponseEntity.ok(Map.of("ok", ok));
     }

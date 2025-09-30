@@ -9,6 +9,5 @@ import java.util.List;
 @Setter
 @Getter
 public class ConfigData {
-    private List<Folder> folders = new ArrayList<>();
-    private List<ConnectionConfig> connections = new ArrayList<>();
+    private List<ConfigItem> roots = new ArrayList<>();
 }
