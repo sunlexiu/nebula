@@ -89,7 +89,7 @@ const TreeNode = memo(({
           previewTable(node);
           break;
         case 'folder':
-          console.log('文件夹操作:', node.name);
+          openNewConnection(node.id);
           break;
         default:
           console.log(`执行主要操作: ${primaryAction.label} for ${node.name}`);

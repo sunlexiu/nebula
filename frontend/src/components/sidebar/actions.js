@@ -4,7 +4,7 @@
 // 获取主要操作
 export const getPrimaryAction = (nodeType) => {
   const actions = {
-    folder: { icon: '📁', label: '新建' },
+    folder: { icon: '🔌', label: '新建连接' },
     connection: { icon: '⚡', label: '连接' },
     database: { icon: '🔄', label: '刷新' },
     schema: { icon: '🔄', label: '刷新' },
