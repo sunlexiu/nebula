@@ -2,38 +2,20 @@
 import React, { useState } from "react";
 import "../../css/NewGroupModal.css";
 
-const NewGroupModal = ({ isOpen, onClose, onSubmit, refreshTree }) => {
+const NewGroupModal = ({ isOpen, onClose, onSubmit, parentId }) => {
   const [groupName, setGroupName] = useState("");
   const [error, setError] = useState(null);
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     if (!groupName.trim()) return;
 
     try {
-     const response = await fetch(
-       `/api/config/folders`, // 这里直接使用 /api
-       {
-         method: "POST",
-         headers: { "Content-Type": "application/json" },
-         body: JSON.stringify({ name: groupName , type: 'folder' }),
-       }
-     );
-
-      if (!response.ok) {
-        throw new Error("Failed to create group");
-      }
-
-      const data = await response.json();
-      onSubmit(groupName, data);
+      onSubmit(groupName, parentId);
       setGroupName("");
       onClose();
-      // 成功后自动刷新树
-      if (refreshTree) {
-        refreshTree();
-      }
     } catch (err) {
       console.error("Error creating group:", err);
       setError("创建分组失败，请重试。");

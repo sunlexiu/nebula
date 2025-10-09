@@ -27,6 +27,8 @@ import {
 } from './styles';
 
 const TreeNode = memo(({
+  openNewGroup,
+  openNewConnection,
   node,
   level = 0,
   hoveredNode,
@@ -224,6 +226,8 @@ const TreeNode = memo(({
           treeData={treeData}
           setTreeData={setTreeData}
           setExpandedKeys={setExpandedKeys}
+          openNewGroup={openNewGroup}
+          openNewConnection={openNewConnection}
         />
       )}
     </>

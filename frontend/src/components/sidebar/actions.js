@@ -16,11 +16,11 @@ export const getPrimaryAction = (nodeType) => {
 };
 
 // 获取所有操作菜单
-export const getAllActions = (nodeType, node, treeData, setTreeData, setExpandedKeys) => {
+export const getAllActions = (nodeType, node, treeData, setTreeData, setExpandedKeys, openNewGroup, openNewConnection) => {
   const actions = {
     folder: [
-      { label: '新建文件夹', action: () => addFolder(treeData, setTreeData, node), icon: '📁' },
-      { label: '新建连接', action: () => addConnection(treeData, setTreeData, node), icon: '🔌' },
+      { label: '新建文件夹', action: () => openNewGroup(node.id), icon: '📁' },
+      { label: '新建连接', action: () => openNewConnection(node.id), icon: '🔌' },
       { type: 'separator' },
       { label: '刷新', action: () => refreshFolder(node), icon: '🔄' },
       { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
@@ -94,40 +94,6 @@ export const updateTreePath = (treeData, targetId, updaterFn) => {
 };
 
 // 树数据操作
-export const addFolder = (treeData, setTreeData, parentNode) => {
-  const newFolderName = window.prompt('文件夹名称:', '新建文件夹');
-  if (!newFolderName) return;
-
-  setTreeData((prev) => updateTreePath(prev, parentNode.id, (current) => {
-    current.children = [...(current.children || []), {
-      id: 'f' + Date.now(),
-      name: newFolderName,
-      type: 'folder',
-      expanded: false,
-      children: []
-    }];
-    return current;
-  }));
-};
-
-export const addConnection = (treeData, setTreeData, parentNode) => {
-  const connectionName = window.prompt('连接名称:', '新建连接');
-  if (!connectionName) return;
-
-  setTreeData((prev) => updateTreePath(prev, parentNode.id, (current) => {
-    current.children = [...(current.children || []), {
-      id: 'c' + Date.now(),
-      name: connectionName,
-      type: 'connection',
-      dbType: 'pgsql',
-      expanded: false,
-      connected: false,
-      children: []
-    }];
-    return current;
-  }));
-};
-
 export const toggleExpand = (setExpandedKeys, nodeId, loadChildren = true) => {
   setExpandedKeys((prev) => {
     const newMap = new Map(prev);

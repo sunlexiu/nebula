@@ -1,6 +1,8 @@
 // App.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import Sidebar from './components/sidebar/Sidebar.jsx';
+import NewGroupModal from './components/toptoolbar/NewGroupModal';
+import NewConnectionModal from './components/toptoolbar/NewConnectionModal';
 import ToolbarTop from './components/toptoolbar/ToolbarTop.jsx';
 import SqlEditor from './components/SqlEditor.jsx';
 import { format } from 'sql-formatter';
@@ -35,6 +37,9 @@ export default function App() {
 
   // 树数据状态
   const [treeData, setTreeData] = useState([]);
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+  const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
+  const [currentParentId, setCurrentParentId] = useState(null);
 
   // DOM 引用
   const sidebarRef = useRef(null);
@@ -59,6 +64,46 @@ export default function App() {
   // 刷新树数据
   const refreshTree = () => {
     fetchTreeData();
+  };
+
+  const openNewGroup = (parentId = null) => {
+    setCurrentParentId(parentId);
+    setIsGroupModalOpen(true);
+  };
+
+  const openNewConnection = (parentId = null) => {
+    setCurrentParentId(parentId);
+    setIsConnectionModalOpen(true);
+  };
+
+  const handleNewGroupSubmit = async (groupName, parentId) => {
+    try {
+      const response = await fetch('/api/config/folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: groupName, type: 'folder', parentId }),
+      });
+      if (!response.ok) throw new Error('Failed to create group');
+      await response.json();
+      refreshTree();
+    } catch (err) {
+      console.error('Error creating group:', err);
+    }
+  };
+
+  const handleNewConnectionSubmit = async (connectionData, parentId) => {
+    try {
+      const response = await fetch('/api/config/connections', {  // Assuming endpoint for connections
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...connectionData, type: 'connection', parentId }),
+      });
+      if (!response.ok) throw new Error('Failed to create connection');
+      await response.json();
+      refreshTree();
+    } catch (err) {
+      console.error('Error creating connection:', err);
+    }
   };
 
   // 进入软件自动拉取树
@@ -276,12 +321,25 @@ export default function App() {
 
   return (
     <div className="app-container">
-      <ToolbarTop addTab={addTab} setActiveTabId={setActiveTabId} refreshTree={refreshTree} />
+      <NewGroupModal
+        isOpen={isGroupModalOpen}
+        onClose={() => setIsGroupModalOpen(false)}
+        onSubmit={handleNewGroupSubmit}
+        refreshTree={refreshTree}
+        parentId={currentParentId}
+      />
+      <NewConnectionModal
+        isOpen={isConnectionModalOpen}
+        onClose={() => setIsConnectionModalOpen(false)}
+        onSubmit={handleNewConnectionSubmit}
+        parentId={currentParentId}
+      />
+      <ToolbarTop addTab={addTab} setActiveTabId={setActiveTabId} refreshTree={refreshTree} openNewGroup={openNewGroup} openNewConnection={openNewConnection} />
       <div
         ref={sidebarRef}
         className={`sidebar ${isSidebarDragging ? 'dragging-parent' : ''}`}
       >
-        <Sidebar treeData={treeData} setTreeData={setTreeData} />
+        <Sidebar treeData={treeData} setTreeData={setTreeData} openNewGroup={openNewGroup} openNewConnection={openNewConnection} />
         <div
           className={`resizer sidebar-resizer ${isSidebarDragging ? 'dragging' : ''}`}
           onMouseDown={handleSidebarMouseDown}

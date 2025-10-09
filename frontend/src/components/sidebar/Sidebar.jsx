@@ -4,7 +4,7 @@ import TreeNode from './TreeNode';
 import { findNode } from './actions';
 import deegoLogo from '../../public/icons/deego_1.svg';
 
-const Sidebar = ({ treeData, setTreeData }) => {
+const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection }) => {
   const [expandedKeys, setExpandedKeys] = useState(new Map());
   const [hoveredNode, setHoveredNode] = useState(null);
   const [showMoreMenu, setShowMoreMenu] = useState(null);
@@ -43,6 +43,8 @@ const Sidebar = ({ treeData, setTreeData }) => {
           moreMenuPosition={moreMenuPosition}
           showMoreMenu={showMoreMenu}
           setShowMoreMenu={setShowMoreMenu}
+          openNewGroup={openNewGroup}
+          openNewConnection={openNewConnection}
         />
       );
 

@@ -1,7 +1,8 @@
+// NewConnectionModal.jsx
 import React, { useState } from "react";
 import "../../css/NewConnectionModal.css";
 
-const NewConnectionModal = ({ isOpen, onClose, onSubmit }) => {
+const NewConnectionModal = ({ isOpen, onClose, onSubmit, parentId }) => {
   const [connectionData, setConnectionData] = useState({
     host: "localhost",
     port: "5432",
@@ -38,7 +39,7 @@ const NewConnectionModal = ({ isOpen, onClose, onSubmit }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (connectionData.host && connectionData.username) {
-      onSubmit(connectionData);
+      onSubmit(connectionData, parentId);
       if (connectionData.savePassword) {
         // 安全存储密码（建议加密）
         localStorage.setItem("savedPassword", connectionData.password);

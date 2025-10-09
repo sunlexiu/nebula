@@ -2,9 +2,9 @@
 import React, { useState } from 'react';
 import { getAllActions } from './actions';
 
-const MoreActionsMenu = ({ node, position, onClose, treeData, setTreeData }) => {
+const MoreActionsMenu = ({ node, position, onClose, treeData, setTreeData, setExpandedKeys, openNewGroup, openNewConnection }) => {
   const [hoveredItem, setHoveredItem] = useState(null);
-  const actions = getAllActions(node.type, node, treeData, setTreeData);
+  const actions = getAllActions(node.type, node, treeData, setTreeData, setExpandedKeys, openNewGroup, openNewConnection);
 
   const handleAction = (action) => {
     action();
