@@ -27,5 +27,4 @@ public abstract class ConfigItem {
     protected String id;
     protected String name;
     protected String parentId;
-    protected String type;
 }

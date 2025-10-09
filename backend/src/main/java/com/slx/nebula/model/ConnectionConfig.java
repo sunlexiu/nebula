@@ -1,6 +1,7 @@
 package com.slx.nebula.model;
 
 import com.fasterxml.jackson.annotation.JsonTypeName;
+import com.slx.nebula.enums.DbTypeEnum;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -12,7 +13,7 @@ import lombok.Setter;
 @JsonTypeName("connection")
 public class ConnectionConfig extends ConfigItem {
     // DB 相关字段
-    private String dbType;
+    private DbTypeEnum dbType;
     private String host;
     private Integer port;
     private String database;

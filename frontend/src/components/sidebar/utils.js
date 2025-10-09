@@ -23,10 +23,10 @@ export const getNodeIcon = (node) => {
   }
   if (node.type === 'connection') {
     switch (node.dbType) {
-      case 'pgsql': return pgsqlIcon;
-      case 'mysql': return mysqlIcon;
-      case 'oracle': return oracleIcon;
-      case 'sqlserver': return sqlserverIcon;
+      case 'POSTGRESQL': return pgsqlIcon;
+      case 'MYSQL': return mysqlIcon;
+      case 'ORACLE': return oracleIcon;
+      case 'SQLSERVER': return sqlserverIcon;
       default: return dbIcon;
     }
   }

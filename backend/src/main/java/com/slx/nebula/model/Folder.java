@@ -21,7 +21,6 @@ public class Folder extends ConfigItem {
     private List<ConfigItem> children = new ArrayList<>();
 
     public Folder() {
-        type = "folder";
     }
 
     @Override

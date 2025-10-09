@@ -1,5 +1,6 @@
 package com.slx.nebula.connection;
 
+import com.slx.nebula.enums.DbTypeEnum;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
@@ -11,10 +12,10 @@ public class DatabaseProviderRegistry {
         this.ctx = ctx;
     }
 
-    public DatabaseProvider getProvider(String type) {
+    public DatabaseProvider getProvider(DbTypeEnum type) {
         if (type == null) return null;
         try {
-            return ctx.getBean(type.toUpperCase(), DatabaseProvider.class);
+            return ctx.getBean(type.name().toUpperCase(), DatabaseProvider.class);
         } catch (Exception e) {
             return null;
         }

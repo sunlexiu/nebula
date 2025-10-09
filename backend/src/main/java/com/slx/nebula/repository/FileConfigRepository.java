@@ -1,5 +1,6 @@
 package com.slx.nebula.repository;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slx.nebula.model.*;
 import com.github.yitter.idgen.YitIdHelper;
@@ -20,6 +21,7 @@ public class FileConfigRepository implements ConfigRepository {
     private ConfigData cache;
 
     public FileConfigRepository() {
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         String userHome = System.getProperty("user.dir");
         this.configFile = Paths.get(userHome, ".nebula", "config.json");
         log.info("Config file path-----> {}", configFile);

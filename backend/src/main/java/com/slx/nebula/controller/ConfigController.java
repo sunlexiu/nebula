@@ -79,4 +79,12 @@ public class ConfigController {
         boolean ok = provider.testConnection(cfg);
         return ResponseEntity.ok(Map.of("ok", ok));
     }
+
+    @PostMapping("/connections/test")
+    public ResponseEntity<?> testConnection(@RequestBody ConnectionConfig cfg) {
+        var provider = registry.getProvider(cfg.getDbType());
+        if (provider == null) return ResponseEntity.badRequest().body(Map.of("ok", false, "msg", "no provider: " + cfg.getDbType()));
+        boolean ok = provider.testConnection(cfg);
+        return ResponseEntity.ok(Map.of("ok", ok));
+    }
 }

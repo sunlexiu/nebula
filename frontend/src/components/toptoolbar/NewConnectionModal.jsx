@@ -4,6 +4,8 @@ import "../../css/NewConnectionModal.css";
 
 const NewConnectionModal = ({ isOpen, onClose, onSubmit, parentId }) => {
   const [connectionData, setConnectionData] = useState({
+    name: "",
+    dbType: "POSTGRESQL",
     host: "localhost",
     port: "5432",
     database: "postgres",
@@ -25,31 +27,59 @@ const NewConnectionModal = ({ isOpen, onClose, onSubmit, parentId }) => {
   };
 
   const handleTestConnection = async () => {
-    // 模拟测试连接逻辑（实际应替换为数据库连接代码）
+    // 实际测试连接逻辑：调用后端测试接口
     setConnectionStatus("Testing...");
     try {
-      // 示例：假设使用 fetch 或数据库客户端测试连接
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // 模拟延迟
+      const testPayload = {
+        dbType: connectionData.dbType,
+        host: connectionData.host,
+        port: parseInt(connectionData.port),
+        database: connectionData.database,
+        username: connectionData.username,
+        password: connectionData.password,
+      };
+      const response = await fetch('/config/connections/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(testPayload),
+      });
+      if (!response.ok) {
+        throw new Error('Connection test failed');
+      }
+      const result = await response.json();
       setConnectionStatus("Connected successfully!");
     } catch (error) {
       setConnectionStatus("Connection failed: " + error.message);
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (connectionData.host && connectionData.username) {
-      onSubmit(connectionData, parentId);
-      if (connectionData.savePassword) {
-        // 安全存储密码（建议加密）
-        localStorage.setItem("savedPassword", connectionData.password);
+    if (connectionData.name && connectionData.host && connectionData.port && connectionData.username) {
+      try {
+        // 构建完整 payload
+        const payload = {
+          ...connectionData,
+          port: parseInt(connectionData.port),
+          type: 'connection',
+          parentId: parentId || null, // 如果是根目录，parentId 为 null
+        };
+        onSubmit(payload);
+        if (connectionData.savePassword) {
+          // 安全存储密码（建议加密）
+          localStorage.setItem("savedPassword", connectionData.password);
+        }
+        onClose();
+      } catch (error) {
+        console.error('Error submitting connection:', error);
       }
-      onClose();
     }
   };
 
   const handleCancel = () => {
     setConnectionData({
+      name: "",
+      dbType: "POSTGRESQL",
       host: "localhost",
       port: "5432",
       database: "postgres",
@@ -68,6 +98,34 @@ const NewConnectionModal = ({ isOpen, onClose, onSubmit, parentId }) => {
         <form onSubmit={handleSubmit}>
           <div className="form-section">
             <div className="form-group">
+              <label htmlFor="name">连接名称</label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={connectionData.name}
+                onChange={handleChange}
+                placeholder="e.g., 开发环境-deego"
+                className="modal-input"
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="dbType">数据库类型</label>
+              <select
+                id="dbType"
+                name="dbType"
+                value={connectionData.dbType}
+                onChange={handleChange}
+                className="modal-input"
+              >
+                <option value="POSTGRESQL">PostgreSQL</option>
+                <option value="MYSQL">MySQL</option>
+                <option value="SQLSERVER">SQL Server</option>
+                <option value="ORACLE">Oracle</option>
+              </select>
+            </div>
+            <div className="form-group">
               <label htmlFor="host">主机</label>
               <input
                 type="text"
@@ -77,7 +135,6 @@ const NewConnectionModal = ({ isOpen, onClose, onSubmit, parentId }) => {
                 onChange={handleChange}
                 placeholder="e.g., localhost"
                 className="modal-input"
-                autoFocus
               />
             </div>
             <div className="form-group">
@@ -163,7 +220,9 @@ const NewConnectionModal = ({ isOpen, onClose, onSubmit, parentId }) => {
             <button type="button" className="btn btn-cancel" onClick={handleCancel}>
               取消
             </button>
-            <button type="submit" className="btn btn-primary" disabled={!connectionData.username}>
+            <button type="submit" className="btn btn-primary" disabled={
+              !connectionData.name || !connectionData.host || !connectionData.port || !connectionData.username
+            }>
               确认
             </button>
           </div>
