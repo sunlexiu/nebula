@@ -1,4 +1,4 @@
-// styles.js
+// components/sidebar/styles.js
 // 样式和主题配置
 
 const ACCENT_COLOR = '#0b69ff';
@@ -59,7 +59,7 @@ export const nodeBaseStyles = {
   alignItems: 'center',
   borderRadius: '6px',
   cursor: 'pointer',
-  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, transform 0.3s ease',
   fontFamily: 'var(--font)',
   fontSize: '13px'
 };

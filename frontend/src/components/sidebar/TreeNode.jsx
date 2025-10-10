@@ -1,4 +1,4 @@
-// TreeNode.jsx
+// components/sidebar/TreeNode.jsx
 import React, { useState, memo } from 'react';
 import MoreActionsMenu from './MoreActionsMenu';
 import {
