@@ -3,6 +3,7 @@ package com.slx.nebula.model;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.util.ArrayList;
@@ -16,11 +17,14 @@ import java.util.Objects;
 @Setter
 @Getter
 @AllArgsConstructor
+@NoArgsConstructor
 public class Folder extends ConfigItem {
 
     private List<ConfigItem> children = new ArrayList<>();
 
-    public Folder() {
+    @Override
+    public String getType() {
+        return "folder";
     }
 
     @Override

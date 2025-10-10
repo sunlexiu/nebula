@@ -1,5 +1,6 @@
 package com.slx.nebula.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.slx.nebula.enums.DbTypeEnum;
 import lombok.Getter;
@@ -19,4 +20,18 @@ public class ConnectionConfig extends ConfigItem {
     private String database;
     private String username;
     private String password;
+
+
+    public String getType() {
+        return "connection";
+    }
+
+    public String getPassword() {
+        return "";
+    }
+
+    @JsonIgnore
+    public String getRealPwd() {
+        return password;
+    }
 }

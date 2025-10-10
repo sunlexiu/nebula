@@ -30,16 +30,17 @@
 }
 
 .form-section {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 5px;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  margin-bottom: 2px;
 }
 
 .checkbox-group {

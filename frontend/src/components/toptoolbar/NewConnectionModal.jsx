@@ -37,16 +37,18 @@ const NewConnectionModal = ({ isOpen, onClose, onSubmit, parentId }) => {
         database: connectionData.database,
         username: connectionData.username,
         password: connectionData.password,
+        type: "connection",
       };
-      const response = await fetch('/config/connections/test', {
+      const response = await fetch('/api/config/connections/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(testPayload),
       });
-      if (!response.ok) {
-        throw new Error('Connection test failed');
-      }
       const result = await response.json();
+      if (!response.ok) {
+        setConnectionStatus("Connection failed: " + result.message);
+        return ;
+      }
       setConnectionStatus("Connected successfully!");
     } catch (error) {
       setConnectionStatus("Connection failed: " + error.message);

@@ -1,5 +1,6 @@
 package com.slx.nebula.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.AllArgsConstructor;
@@ -13,7 +14,8 @@ import lombok.Setter;
 @JsonTypeInfo(
         use = JsonTypeInfo.Id.NAME,
         include = JsonTypeInfo.As.PROPERTY,
-        property = "type"
+        property = "type",
+        visible = true
 )
 @JsonSubTypes({
         @JsonSubTypes.Type(value = Folder.class, name = "folder"),
@@ -27,4 +29,6 @@ public abstract class ConfigItem {
     protected String id;
     protected String name;
     protected String parentId;
+    @JsonProperty("type")
+    public abstract String getType();
 }

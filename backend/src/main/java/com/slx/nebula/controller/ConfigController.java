@@ -1,16 +1,16 @@
 package com.slx.nebula.controller;
 
-import com.slx.nebula.model.ConfigData;
+import com.slx.nebula.common.ApiResponse;
+import com.slx.nebula.common.ErrorCode;
+import com.slx.nebula.connection.DatabaseProviderRegistry;
+import com.slx.nebula.exception.BizException;
 import com.slx.nebula.model.ConfigItem;
 import com.slx.nebula.model.ConnectionConfig;
 import com.slx.nebula.model.Folder;
 import com.slx.nebula.repository.ConfigRepository;
-import com.slx.nebula.connection.DatabaseProviderRegistry;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/config")
@@ -25,66 +25,70 @@ public class ConfigController {
     }
 
     @PostMapping("/folders")
-    public ResponseEntity<Folder> createFolder(@RequestBody Folder folder) {
+    public ApiResponse<Folder> createFolder(@RequestBody Folder folder) {
         repo.saveFolder(folder);
-        return ResponseEntity.ok(folder);
+        return ApiResponse.success(folder);
     }
 
     @GetMapping("/folders")
-    public ResponseEntity<List<Folder>> listFolders() {
-        return ResponseEntity.ok(repo.findAllFolders());
+    public ApiResponse<List<Folder>> listFolders() {
+        return ApiResponse.success(repo.findAllFolders());
     }
 
 
     @GetMapping("/tree")
-    public ResponseEntity<List<ConfigItem>> loadAll() {
-        return ResponseEntity.ok(repo.loadAll().getRoots());
+    public ApiResponse<List<ConfigItem>> loadAll() {
+        return ApiResponse.success(repo.loadAll().getRoots());
     }
 
     @DeleteMapping("/folders/{id}")
-    public ResponseEntity<?> deleteFolder(@PathVariable String id) {
+    public ApiResponse<Boolean> deleteFolder(@PathVariable String id) {
         repo.deleteFolder(id);
-        return ResponseEntity.ok(Map.of("ok", true));
+        return ApiResponse.success(true);
     }
 
     @PostMapping("/connections")
-    public ResponseEntity<ConnectionConfig> createConnection(@RequestBody ConnectionConfig cfg) {
+    public ApiResponse<ConnectionConfig> createConnection(@RequestBody ConnectionConfig cfg) {
         repo.saveConnection(cfg);
-        return ResponseEntity.ok(cfg);
+        return ApiResponse.success(cfg);
     }
 
     @GetMapping("/connections")
-    public ResponseEntity<List<ConnectionConfig>> listConnections() {
-        return ResponseEntity.ok(repo.findAllConnections());
+    public ApiResponse<List<ConnectionConfig>> listConnections() {
+        return ApiResponse.success(repo.findAllConnections());
     }
 
     @GetMapping("/connections/{id}")
-    public ResponseEntity<ConnectionConfig> getConnection(@PathVariable String id) {
-        return repo.findConnectionById(id).map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    public ApiResponse<ConnectionConfig> getConnection(@PathVariable String id) {
+        return ApiResponse.success(repo.findConnectionById(id).orElse(null));
     }
 
     @DeleteMapping("/connections/{id}")
-    public ResponseEntity<?> deleteConnection(@PathVariable String id) {
+    public ApiResponse<Boolean> deleteConnection(@PathVariable String id) {
         repo.deleteConnection(id);
-        return ResponseEntity.ok(Map.of("ok", true));
+        return ApiResponse.success(true);
     }
 
     @GetMapping("/connections/{id}/test")
-    public ResponseEntity<?> testConnection(@PathVariable String id) {
+    public ApiResponse<Boolean> testConnection(@PathVariable String id) {
         var opt = repo.findConnectionById(id);
-        if (opt.isEmpty()) return ResponseEntity.notFound().build();
+        if (opt.isEmpty()) {
+            throw new BizException(ErrorCode.BUSINESS_ERROR, "connection not found");
+        }
         ConnectionConfig cfg = opt.get();
         var provider = registry.getProvider(cfg.getDbType());
-        if (provider == null) return ResponseEntity.badRequest().body(Map.of("ok", false, "msg", "no provider: " + cfg.getDbType()));
-        boolean ok = provider.testConnection(cfg);
-        return ResponseEntity.ok(Map.of("ok", ok));
+        if (provider == null) {
+            throw new BizException(ErrorCode.BUSINESS_ERROR, "no provider: " + cfg.getDbType());
+        }
+        return ApiResponse.success(provider.testConnection(cfg));
     }
 
     @PostMapping("/connections/test")
-    public ResponseEntity<?> testConnection(@RequestBody ConnectionConfig cfg) {
+    public ApiResponse<Boolean> testConnection(@RequestBody ConnectionConfig cfg) {
         var provider = registry.getProvider(cfg.getDbType());
-        if (provider == null) return ResponseEntity.badRequest().body(Map.of("ok", false, "msg", "no provider: " + cfg.getDbType()));
-        boolean ok = provider.testConnection(cfg);
-        return ResponseEntity.ok(Map.of("ok", ok));
+        if (provider == null) {
+            throw new BizException(ErrorCode.BUSINESS_ERROR, "no provider: " + cfg.getDbType());
+        }
+        return ApiResponse.success(provider.testConnection(cfg));
     }
 }

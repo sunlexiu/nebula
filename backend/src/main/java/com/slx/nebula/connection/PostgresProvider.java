@@ -1,5 +1,7 @@
 package com.slx.nebula.connection;
 
+import com.slx.nebula.common.ErrorCode;
+import com.slx.nebula.exception.BizException;
 import com.slx.nebula.model.ConnectionConfig;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -19,7 +21,7 @@ public class PostgresProvider implements DatabaseProvider {
         try (Connection c = createConnection(config)) {
             return c.isValid(2);
         } catch (SQLException e) {
-            return false;
+            throw new BizException(ErrorCode.BUSINESS_ERROR, e.getMessage());
         }
     }
 

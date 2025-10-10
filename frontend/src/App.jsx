@@ -54,7 +54,7 @@ export default function App() {
         throw new Error('Failed to fetch tree data');
       }
       const data = await response.json();
-      setTreeData(data || []);
+      setTreeData(data.data || []);
     } catch (error) {
       console.error('Error fetching tree data:', error);
       setTreeData([]);
