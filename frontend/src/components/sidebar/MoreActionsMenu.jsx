@@ -1,4 +1,3 @@
-// components/sidebar/MoreActionsMenu.jsx
 import React, { useState } from 'react';
 import { getAllActions } from './actions';
 
@@ -13,6 +12,7 @@ const MoreActionsMenu = ({ node, position, onClose, treeData, setTreeData, setEx
 
   return (
     <div
+      className="more-actions-menu"  // 新增：用于外部点击检测
       style={{
         position: 'fixed',
         left: position.x,

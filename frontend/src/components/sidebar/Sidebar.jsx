@@ -1,5 +1,4 @@
-// components/sidebar/Sidebar.jsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';  // 新增：useEffect
 import TreeNode from './TreeNode';
 import { findNode } from './actions';
 import deegoLogo from '../../public/icons/deego_1.svg';
@@ -9,6 +8,33 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection }) => 
   const [hoveredNode, setHoveredNode] = useState(null);
   const [showMoreMenu, setShowMoreMenu] = useState(null);
   const [moreMenuPosition, setMoreMenuPosition] = useState({ x: 0, y: 0 });
+
+  // 新增：外部点击检测和 Escape 键关闭
+  useEffect(() => {
+    if (!showMoreMenu) return;
+
+    const handleClickOutside = (event) => {
+      // 如果点击不在弹窗内，关闭
+      if (!event.target.closest('.more-actions-menu')) {
+        setShowMoreMenu(null);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setShowMoreMenu(null);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+
+    // 清理监听器
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [showMoreMenu]);
 
   // 处理更多菜单
   const handleMoreMenu = (e, node) => {
