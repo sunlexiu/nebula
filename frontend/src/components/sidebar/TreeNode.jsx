@@ -1,4 +1,5 @@
 import React, { useState, memo } from 'react';
+import MoreActionsMenu from './MoreActionsMenu';
 import {
   getExpandIcon,
   getNodeIcon,
@@ -27,6 +28,7 @@ import {
 const TreeNode = memo(({
   openNewGroup,
   openNewConnection,
+  openConfirm,
   node,
   level = 0,
   hoveredNode,

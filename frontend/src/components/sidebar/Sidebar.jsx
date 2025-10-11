@@ -5,7 +5,7 @@ import { findNode } from './actions';
 import deegoLogo from '../../public/icons/deego_1.svg';
 import MoreActionsMenu from './MoreActionsMenu';
 
-const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection }) => {
+const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openConfirm }) => {
   const [expandedKeys, setExpandedKeys] = useState(new Map());
   const [hoveredNode, setHoveredNode] = useState(null);
   const [showMoreMenu, setShowMoreMenu] = useState(null);
@@ -101,6 +101,7 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection }) => 
           onMoreMenu={handleMoreMenu}
           openNewGroup={openNewGroup}
           openNewConnection={openNewConnection}
+          openConfirm={openConfirm}
         />
       );
 
@@ -124,7 +125,7 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection }) => 
 
       return renderedNode;
     });
-  }, [expandedKeys, hoveredNode, treeData, openNewGroup, openNewConnection]);
+  }, [expandedKeys, hoveredNode, treeData, openNewGroup, openNewConnection, openConfirm]);
 
   // Portal 渲染菜单
   const renderMoreMenuPortal = () => {
@@ -145,6 +146,7 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection }) => 
         setExpandedKeys={setExpandedKeys}
         openNewGroup={openNewGroup}
         openNewConnection={openNewConnection}
+        openConfirm={openConfirm}
       />,
       document.body
     );

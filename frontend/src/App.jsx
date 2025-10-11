@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import Sidebar from './components/sidebar/Sidebar.jsx';
 import NewGroupModal from './components/toptoolbar/NewGroupModal';
 import NewConnectionModal from './components/toptoolbar/NewConnectionModal';
+import ConfirmModal from './components/modals/ConfirmModal.jsx';
 import ToolbarTop from './components/toptoolbar/ToolbarTop.jsx';
 import SqlEditor from './components/SqlEditor.jsx';
 import { format } from 'sql-formatter';
@@ -40,6 +41,15 @@ export default function App() {
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
   const [currentParentId, setCurrentParentId] = useState(null);
+
+  // 确认弹窗状态
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState({
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'danger'
+  });
 
   // DOM 引用
   const sidebarRef = useRef(null);
@@ -104,6 +114,21 @@ export default function App() {
     } catch (err) {
       console.error('Error creating connection:', err);
     }
+  };
+
+  // 通用 confirm 函数
+  const openConfirm = (title, message, onConfirm, variant = 'danger') => {
+    setConfirmConfig({ title, message, onConfirm, variant });
+    setShowConfirm(true);
+  };
+
+  const handleConfirmClose = () => {
+    setShowConfirm(false);
+  };
+
+  const handleConfirmSubmit = () => {
+    confirmConfig.onConfirm();
+    setShowConfirm(false);
   };
 
   // 进入软件自动拉取树
@@ -334,12 +359,28 @@ export default function App() {
         onSubmit={handleNewConnectionSubmit}
         parentId={currentParentId}
       />
+      <ConfirmModal
+        isOpen={showConfirm}
+        onClose={handleConfirmClose}
+        onConfirm={handleConfirmSubmit}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText="确认"
+        cancelText="取消"
+        variant={confirmConfig.variant}
+      />
       <ToolbarTop addTab={addTab} setActiveTabId={setActiveTabId} refreshTree={refreshTree} openNewGroup={openNewGroup} openNewConnection={openNewConnection} />
       <div
         ref={sidebarRef}
         className={`sidebar ${isSidebarDragging ? 'dragging-parent' : ''}`}
       >
-        <Sidebar treeData={treeData} setTreeData={setTreeData} openNewGroup={openNewGroup} openNewConnection={openNewConnection} />
+        <Sidebar
+          treeData={treeData}
+          setTreeData={setTreeData}
+          openNewGroup={openNewGroup}
+          openNewConnection={openNewConnection}
+          openConfirm={openConfirm}
+        />
         <div
           className={`resizer sidebar-resizer ${isSidebarDragging ? 'dragging' : ''}`}
           onMouseDown={handleSidebarMouseDown}
