@@ -25,7 +25,7 @@ public class ConfigController {
     }
 
     @PostMapping("/folders")
-    public ApiResponse<Folder> createFolder(@RequestBody Folder folder) {
+    public ApiResponse<Folder> upsertFolders(@RequestBody Folder folder) {
         repo.saveFolder(folder);
         return ApiResponse.success(folder);
     }

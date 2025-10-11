@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
 import { getAllActions } from './actions';
 
-const MoreActionsMenu = ({ node, position, onClose, treeData, setTreeData, setExpandedKeys, openNewGroup, openNewConnection, openConfirm }) => {
+const MoreActionsMenu = ({ node, position, onClose, treeData, setTreeData, setExpandedKeys, openNewGroup, openNewConnection, openConfirm, openRenameFolder }) => {
   const [hoveredItem, setHoveredItem] = useState(null);
-  const actions = getAllActions(node.type, node, treeData, setTreeData, setExpandedKeys, openNewGroup, openNewConnection, openConfirm);
+  const actions = getAllActions(node.type, node, treeData, setTreeData, setExpandedKeys, openNewGroup, openNewConnection, openConfirm, openRenameFolder);
 
   const handleAction = (action) => {
     action();
     onClose();
   };
 
-  // 翻转时调整样式
   const flipStyle = position.flip ? {
     borderTop: '2px solid #e0e0e0',
     borderBottom: '1px solid #e0e0e0'

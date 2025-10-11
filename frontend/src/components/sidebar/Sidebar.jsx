@@ -4,23 +4,26 @@ import TreeNode from './TreeNode';
 import { findNode } from './actions';
 import deegoLogo from '../../public/icons/deego_1.svg';
 import MoreActionsMenu from './MoreActionsMenu';
+import RenameFolderModal from './RenameFolderModal';
 
 const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openConfirm }) => {
   const [expandedKeys, setExpandedKeys] = useState(new Map());
   const [hoveredNode, setHoveredNode] = useState(null);
   const [showMoreMenu, setShowMoreMenu] = useState(null);
   const [moreMenuPosition, setMoreMenuPosition] = useState({ x: 0, y: 0, flip: false });
-  const [activeMoreMenuNode, setActiveMoreMenuNode] = useState(null); // New: Track active menu node
+  const [activeMoreMenuNode, setActiveMoreMenuNode] = useState(null);
+  const [renameFolderModal, setRenameFolderModal] = useState({ isOpen: false, node: null, onSubmit: null });
 
   // 外部点击检测和 Escape 键关闭
   useEffect(() => {
-    if (!showMoreMenu) return;
+    if (!showMoreMenu && !renameFolderModal.isOpen) return;
 
     const handleClickOutside = (event) => {
-      if (!event.target.closest('.more-actions-menu') && !event.target.closest('.tree-node')) {
+      if (!event.target.closest('.more-actions-menu') && !event.target.closest('.tree-node') && !event.target.closest('.modal-content')) {
         setShowMoreMenu(null);
         setMoreMenuPosition({ x: 0, y: 0, flip: false });
-        setActiveMoreMenuNode(null); // Reset active node
+        setActiveMoreMenuNode(null);
+        setRenameFolderModal({ isOpen: false, node: null, onSubmit: null });
       }
     };
 
@@ -28,7 +31,8 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
       if (event.key === 'Escape') {
         setShowMoreMenu(null);
         setMoreMenuPosition({ x: 0, y: 0, flip: false });
-        setActiveMoreMenuNode(null); // Reset active node
+        setActiveMoreMenuNode(null);
+        setRenameFolderModal({ isOpen: false, node: null, onSubmit: null });
       }
     };
 
@@ -39,9 +43,9 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
       document.removeEventListener('click', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
     };
-  }, [showMoreMenu]);
+  }, [showMoreMenu, renameFolderModal.isOpen]);
 
-  // 处理更多菜单 - 优先下方展示，如果空间不足再上方
+  // 处理更多菜单
   const handleMoreMenu = (e, node) => {
     e.stopPropagation();
     const treeItem = e.currentTarget;
@@ -75,6 +79,15 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
     setShowMoreMenu(node.id);
   };
 
+  // 打开重命名模态框
+  const openRenameFolderModal = (options) => {
+    setRenameFolderModal({
+      isOpen: true,
+      node: { id: options.id, name: options.name },
+      onSubmit: options.onSubmit
+    });
+  };
+
   // 渲染树节点
   const renderTreeNodes = useMemo(() => (nodes, level = 0) => {
     if (!nodes || nodes.length === 0) {
@@ -101,6 +114,7 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
           openNewGroup={openNewGroup}
           openNewConnection={openNewConnection}
           openConfirm={openConfirm}
+          openRenameFolder={openRenameFolderModal}
           activeMoreMenuNode={activeMoreMenuNode}
           setActiveMoreMenuNode={setActiveMoreMenuNode}
         />
@@ -166,6 +180,7 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
           openNewGroup={openNewGroup}
           openNewConnection={openNewConnection}
           openConfirm={openConfirm}
+          openRenameFolder={openRenameFolderModal}
         />
       </>,
       document.body
@@ -181,7 +196,6 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
         background: 'var(--sidebar-bg)',
         position: 'relative'
       }}>
-        {/* 头部信息区域 */}
         <div style={{ padding: '0 16px', marginBottom: '20px' }}>
           <div style={{
             display: 'flex',
@@ -233,6 +247,17 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
 
       {/* Portal 菜单渲染 */}
       {renderMoreMenuPortal()}
+
+      {/* 重命名文件夹模态框 */}
+      {renameFolderModal.isOpen && (
+        <RenameFolderModal
+          isOpen={renameFolderModal.isOpen}
+          onClose={() => setRenameFolderModal({ isOpen: false, node: null, onSubmit: null })}
+          onSubmit={renameFolderModal.onSubmit}
+          parentId={renameFolderModal.node?.id}
+          defaultName={renameFolderModal.node?.name}
+        />
+      )}
     </>
   );
 };

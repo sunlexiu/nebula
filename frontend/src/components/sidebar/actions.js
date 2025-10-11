@@ -16,7 +16,7 @@ export const getPrimaryAction = (nodeType) => {
 };
 
 // 获取所有操作菜单
-export const getAllActions = (nodeType, node, treeData, setTreeData, setExpandedKeys, openNewGroup, openNewConnection, openConfirm) => {
+export const getAllActions = (nodeType, node, treeData, setTreeData, setExpandedKeys, openNewGroup, openNewConnection, openConfirm, openRenameFolder) => {
   const actions = {
     folder: [
       { label: '新建文件夹', action: () => openNewGroup(node.id), icon: '📁' },
@@ -25,7 +25,7 @@ export const getAllActions = (nodeType, node, treeData, setTreeData, setExpanded
       { label: '刷新', action: () => refreshFolder(node), icon: '🔄' },
       { type: 'separator' },
       { label: '删除文件夹', action: () => deleteFolder(node, setTreeData, openConfirm), icon: '🗑️' },
-      { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
+      { label: '重命名', action: () => renameFolder(node, setTreeData, openRenameFolder), icon: '✏️' }
     ],
     connection: [
       { label: '连接', action: () => connectDatabase(node, setTreeData), icon: '⚡' },
@@ -92,7 +92,7 @@ export const updateTreePath = (treeData, targetId, updaterFn) => {
   const newTree = JSON.parse(JSON.stringify(treeData));
   const targetNode = findNode(newTree, targetId);
   if (targetNode) {
-    const updated = updaterFn({ ...targetNode }); // 传入拷贝，避免直接修改
+    const updated = updaterFn({ ...targetNode });
     Object.assign(targetNode, updated);
   }
   return newTree;
@@ -109,24 +109,19 @@ export const toggleExpand = (setExpandedKeys, nodeId, loadChildren = true) => {
 
 // 新增：递归删除节点及其子树，返回新树数据（局部增量更新）
 export const deleteNode = (treeData, nodeId) => {
-  const newTree = JSON.parse(JSON.stringify(treeData)); // 深拷贝根树
-
+  const newTree = JSON.parse(JSON.stringify(treeData));
   function deleteRecursive(nodes) {
     for (let i = 0; i < nodes.length; i++) {
       if (nodes[i].id === nodeId) {
-        // 移除节点（splice 修改拷贝）
         nodes.splice(i, 1);
-        return true; // 已删除
+        return true;
       }
       if (nodes[i].children && deleteRecursive(nodes[i].children)) {
-        // 子树删除后，可选：更新父节点计数（如 node.childCount--，如果有此字段）
-        // nodes[i].childCount = (nodes[i].children || []).length;
         return true;
       }
     }
     return false;
   }
-
   deleteRecursive(newTree);
   return newTree;
 };
@@ -141,14 +136,43 @@ export const deleteFolder = async (node, setTreeData, openConfirm) => {
         const response = await fetch(`/api/config/folders/${node.id}`, { method: 'DELETE' });
         if (!response.ok) throw new Error('Failed to delete folder');
         setTreeData((prev) => deleteNode(prev, node.id));
-        console.log(`文件夹 "${node.name}" 已删除`); // 未来换 toast
+        console.log(`文件夹 "${node.name}" 已删除`);
       } catch (error) {
         console.error('Delete folder error:', error);
-        // alert('删除失败，请重试'); // 未来换 toast
+        alert('删除失败，请重试');
       }
     },
     'danger'
   );
+};
+
+// 新增：重命名文件夹
+export const renameFolder = (node, setTreeData, openRenameFolderModal) => {
+  openRenameFolderModal({
+    id: node.id,
+    name: node.name,
+    onSubmit: async (newName) => {
+      if (!newName || newName.trim() === '') {
+        throw new Error('文件夹名称不能为空');
+      }
+      try {
+        const response = await fetch(`/api/config/folders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName.trim(), id: node.id , type: 'folder'})
+        });
+        if (!response.ok) throw new Error('Failed to rename folder');
+        setTreeData((prev) => updateTreePath(prev, node.id, (current) => ({
+          ...current,
+          name: newName.trim()
+        })));
+        console.log(`文件夹已重命名为 "${newName}"`);
+      } catch (error) {
+        console.error('Rename folder error:', error);
+        throw error; // 让模态框处理错误
+      }
+    }
+  });
 };
 
 // 新增：删除连接（API: /api/config/connections/{id} DELETE）
@@ -161,10 +185,10 @@ export const deleteConnection = async (node, setTreeData, openConfirm) => {
         const response = await fetch(`/api/config/connections/${node.id}`, { method: 'DELETE' });
         if (!response.ok) throw new Error('Failed to delete connection');
         setTreeData((prev) => deleteNode(prev, node.id));
-        console.log(`连接 "${node.name}" 已删除`); // 未来换 toast
+        console.log(`连接 "${node.name}" 已删除`);
       } catch (error) {
         console.error('Delete connection error:', error);
-        // alert('删除失败，请重试');
+        alert('删除失败，请重试');
       }
     },
     'danger'
@@ -178,7 +202,7 @@ export const deleteDatabase = async (node, setTreeData, openConfirm) => {
     `确定要删除数据库 "${node.name}" 吗？此操作不可恢复。`,
     async () => {
       try {
-        const connectionId = node.parentId || findConnectionId(node.id); // 假设 node 有 parentId，或用 findNode 推导
+        const connectionId = node.parentId || findConnectionId(node.id);
         const response = await fetch('/api/db/delete-database', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
@@ -189,7 +213,7 @@ export const deleteDatabase = async (node, setTreeData, openConfirm) => {
         console.log(`数据库 "${node.name}" 已删除`);
       } catch (error) {
         console.error('Delete database error:', error);
-        // alert('删除失败，请重试');
+        alert('删除失败，请重试');
       }
     },
     'danger'
@@ -203,8 +227,8 @@ export const deleteSchema = async (node, setTreeData, openConfirm) => {
     `确定要删除Schema "${node.name}" 吗？此操作不可恢复。`,
     async () => {
       try {
-        const connectionId = findConnectionId(node.id); // 推导连接 ID
-        const dbName = node.dbName || 'default'; // 假设从 node 或路径获取
+        const connectionId = findConnectionId(node.id);
+        const dbName = node.dbName || 'default';
         const response = await fetch('/api/db/delete-schema', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
@@ -215,7 +239,7 @@ export const deleteSchema = async (node, setTreeData, openConfirm) => {
         console.log(`Schema "${node.name}" 已删除`);
       } catch (error) {
         console.error('Delete schema error:', error);
-        // alert('删除失败，请重试');
+        alert('删除失败，请重试');
       }
     },
     'danger'
@@ -255,7 +279,7 @@ const deleteDbObject = async (node, setTreeData, objectType, openConfirm) => {
         console.log(`${label} "${node.name}" 已删除`);
       } catch (error) {
         console.error(`Delete ${objectType} error:`, error);
-        // alert('删除失败，请重试');
+        alert('删除失败，请重试');
       }
     },
     'danger'
@@ -264,9 +288,7 @@ const deleteDbObject = async (node, setTreeData, objectType, openConfirm) => {
 
 // 辅助：查找连接 ID（递归从树中找 connection 祖先）
 const findConnectionId = (nodeId, treeData) => {
-  // 假设 treeData 全局可用，或传入；简化：从 node.parentId 向上爬
-  // 实际实现：递归 findNode 到 type==='connection'
-  return 'example-connection-id'; // 占位，实际用 findNode(treeData, nodeId, (n) => n.type === 'connection')?.id
+  return 'example-connection-id';
 };
 
 // 刷新函数（原有）
@@ -275,7 +297,6 @@ export const refreshConnection = (node, setTreeData, setExpandedKeys) => {
     alert('请先连接');
     return;
   }
-  // 模拟加载 databases
   setTimeout(() => {
     const databases = [
       {
@@ -343,7 +364,6 @@ export const connectDatabase = (node, setTreeData) => {
     alert(`已连接: ${node.name}`);
     return;
   }
-  // 模拟延迟
   setTimeout(() => {
     setTreeData((prev) => updateTreePath(prev, node.id, (current) => ({
       ...current,

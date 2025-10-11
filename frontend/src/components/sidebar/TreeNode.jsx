@@ -29,6 +29,7 @@ const TreeNode = memo(({
   openNewGroup,
   openNewConnection,
   openConfirm,
+  openRenameFolder,
   node,
   level = 0,
   hoveredNode,
@@ -43,7 +44,7 @@ const TreeNode = memo(({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const isHovered = hoveredNode === node.id;
-  const isActive = activeMoreMenuNode === node.id; // New: Track active menu node
+  const isActive = activeMoreMenuNode === node.id;
   const hasChildren = node.children && node.children.length > 0;
   const isExpandable = hasChildren || node.type === 'connection' || node.type === 'schema' || node.type === 'database';
   const primaryAction = getPrimaryAction(node.type);
@@ -80,7 +81,7 @@ const TreeNode = memo(({
 
   const handlePrimaryAction = (e) => {
     e.stopPropagation();
-    if (primaryAction && !activeMoreMenuNode) { // Disable when menu is open
+    if (primaryAction && !activeMoreMenuNode) {
       switch (node.type) {
         case 'connection':
           connectDatabase(node, setTreeData);
@@ -99,8 +100,8 @@ const TreeNode = memo(({
 
   const handleMoreMenu = (e) => {
     e.stopPropagation();
-    if (!activeMoreMenuNode) { // Only open if no menu is active
-      setActiveMoreMenuNode(node.id); // Set active node
+    if (!activeMoreMenuNode) {
+      setActiveMoreMenuNode(node.id);
       onMoreMenu(e, node);
     }
   };
@@ -131,10 +132,8 @@ const TreeNode = memo(({
       onKeyDown={(e) => { if (e.key === 'Enter') handleClick(e); }}
       tabIndex={0}
     >
-      {/* 左侧指示条 */}
       {(isHovered || isActive) && <div style={indicatorBarStyles(theme)} />}
 
-      {/* 展开图标 */}
       <div style={expandIconStyles(isHovered || isActive, theme)}>
         {isLoading ? (
           <span style={{ fontSize: 9 }}>⟳</span>
@@ -147,33 +146,29 @@ const TreeNode = memo(({
         )}
       </div>
 
-      {/* 节点图标 */}
       <img
         src={getNodeIcon(node)}
         alt={node.type + (isConnected ? ' (connected)' : '')}
         style={nodeIconStyles(isHovered || isActive, theme)}
       />
 
-      {/* 节点名称 */}
       <span style={{...nodeNameStyles(isHovered || isActive), color: (isHovered || isActive) ? theme.textColor : '#333' }}>
         {node.name}
       </span>
 
-      {/* 类型标签 */}
       {(isHovered || isActive) && (
         <span style={typeLabelStyles(isHovered || isActive, theme)}>
           {node.type} {isConnected && '(已连接)'}
         </span>
       )}
 
-      {/* 功能按钮区域 */}
       {(isHovered || isActive) && !isLoading && (
         <div style={actionContainerStyles}>
           {primaryAction && (
             <button
               onClick={handlePrimaryAction}
               style={actionButtonStyles(theme)}
-              disabled={!!activeMoreMenuNode} // Disable when menu is open
+              disabled={!!activeMoreMenuNode}
               onMouseEnter={(e) => {
                 if (!activeMoreMenuNode) {
                   e.target.style.background = 'white';
@@ -200,7 +195,7 @@ const TreeNode = memo(({
               color: '#666',
               fontSize: '14px'
             }}
-            disabled={!!activeMoreMenuNode && activeMoreMenuNode !== node.id} // Disable other more buttons
+            disabled={!!activeMoreMenuNode && activeMoreMenuNode !== node.id}
             onMouseEnter={(e) => {
               if (!activeMoreMenuNode || activeMoreMenuNode === node.id) {
                 e.target.style.background = 'white';
@@ -223,7 +218,6 @@ const TreeNode = memo(({
         </div>
       )}
 
-      {/* 子项指示器 */}
       {(isHovered || isActive) && hasChildren && !primaryAction && !isLoading && (
         <div style={childIndicatorStyles(theme)} />
       )}
