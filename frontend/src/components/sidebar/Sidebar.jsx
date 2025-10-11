@@ -10,15 +10,17 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
   const [hoveredNode, setHoveredNode] = useState(null);
   const [showMoreMenu, setShowMoreMenu] = useState(null);
   const [moreMenuPosition, setMoreMenuPosition] = useState({ x: 0, y: 0, flip: false });
+  const [activeMoreMenuNode, setActiveMoreMenuNode] = useState(null); // New: Track active menu node
 
   // 外部点击检测和 Escape 键关闭
   useEffect(() => {
     if (!showMoreMenu) return;
 
     const handleClickOutside = (event) => {
-      if (!event.target.closest('.more-actions-menu')) {
+      if (!event.target.closest('.more-actions-menu') && !event.target.closest('.tree-node')) {
         setShowMoreMenu(null);
         setMoreMenuPosition({ x: 0, y: 0, flip: false });
+        setActiveMoreMenuNode(null); // Reset active node
       }
     };
 
@@ -26,6 +28,7 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
       if (event.key === 'Escape') {
         setShowMoreMenu(null);
         setMoreMenuPosition({ x: 0, y: 0, flip: false });
+        setActiveMoreMenuNode(null); // Reset active node
       }
     };
 
@@ -41,35 +44,31 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
   // 处理更多菜单 - 优先下方展示，如果空间不足再上方
   const handleMoreMenu = (e, node) => {
     e.stopPropagation();
-    const treeItem = e.currentTarget;  // 树项 div
+    const treeItem = e.currentTarget;
     const rect = treeItem.getBoundingClientRect();
-    const baseY = rect.bottom;  // 基准：项底部
-    const estimatedMenuHeight = 200;  // 预计菜单高度
+    const baseY = rect.bottom;
+    const estimatedMenuHeight = 200;
     const viewportHeight = window.innerHeight;
     const spaceBelow = viewportHeight - baseY;
-    const minTop = 20;  // 顶部最小边距
-    const bottomMargin = 20;  // 底部最小边距
+    const minTop = 20;
+    const bottomMargin = 20;
 
-    let flip = false;  // 默认不翻转（向下）
-    let adjustedY = baseY + 10;  // 默认向下 + 小间隙
+    let flip = false;
+    let adjustedY = baseY + 10;
 
     if (spaceBelow >= estimatedMenuHeight) {
-      // 下方空间够，向下展示
       adjustedY = baseY + 10;
     } else {
-      // 下方不足，翻转向上
       flip = true;
-      adjustedY = rect.top - estimatedMenuHeight;  // 项顶部 - 菜单高
-      // 确保不超出顶部
+      adjustedY = rect.top - estimatedMenuHeight;
       if (adjustedY < minTop) {
         adjustedY = minTop;
       }
     }
 
-    // 最终检查不超出视口底部（安全网）
     if (adjustedY + estimatedMenuHeight > viewportHeight - bottomMargin) {
       adjustedY = viewportHeight - estimatedMenuHeight - bottomMargin;
-      flip = adjustedY < rect.top;  // 如果调整后在上方，标记翻转
+      flip = adjustedY < rect.top;
     }
 
     setMoreMenuPosition({ x: e.clientX + 5, y: adjustedY, flip });
@@ -102,6 +101,8 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
           openNewGroup={openNewGroup}
           openNewConnection={openNewConnection}
           openConfirm={openConfirm}
+          activeMoreMenuNode={activeMoreMenuNode}
+          setActiveMoreMenuNode={setActiveMoreMenuNode}
         />
       );
 
@@ -125,7 +126,7 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
 
       return renderedNode;
     });
-  }, [expandedKeys, hoveredNode, treeData, openNewGroup, openNewConnection, openConfirm]);
+  }, [expandedKeys, hoveredNode, treeData, openNewGroup, openNewConnection, openConfirm, activeMoreMenuNode]);
 
   // Portal 渲染菜单
   const renderMoreMenuPortal = () => {
@@ -134,20 +135,39 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
     if (!node) return null;
 
     return createPortal(
-      <MoreActionsMenu
-        node={node}
-        position={moreMenuPosition}
-        onClose={() => {
-          setShowMoreMenu(null);
-          setMoreMenuPosition({ x: 0, y: 0, flip: false });
-        }}
-        treeData={treeData}
-        setTreeData={setTreeData}
-        setExpandedKeys={setExpandedKeys}
-        openNewGroup={openNewGroup}
-        openNewConnection={openNewConnection}
-        openConfirm={openConfirm}
-      />,
+      <>
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.1)',
+            zIndex: 999
+          }}
+          onClick={() => {
+            setShowMoreMenu(null);
+            setMoreMenuPosition({ x: 0, y: 0, flip: false });
+            setActiveMoreMenuNode(null);
+          }}
+        />
+        <MoreActionsMenu
+          node={node}
+          position={moreMenuPosition}
+          onClose={() => {
+            setShowMoreMenu(null);
+            setMoreMenuPosition({ x: 0, y: 0, flip: false });
+            setActiveMoreMenuNode(null);
+          }}
+          treeData={treeData}
+          setTreeData={setTreeData}
+          setExpandedKeys={setExpandedKeys}
+          openNewGroup={openNewGroup}
+          openNewConnection={openNewConnection}
+          openConfirm={openConfirm}
+        />
+      </>,
       document.body
     );
   };

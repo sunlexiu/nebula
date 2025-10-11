@@ -37,10 +37,13 @@ const TreeNode = memo(({
   setTreeData,
   expandedKeys,
   setExpandedKeys,
-  onMoreMenu
+  onMoreMenu,
+  activeMoreMenuNode,
+  setActiveMoreMenuNode
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const isHovered = hoveredNode === node.id;
+  const isActive = activeMoreMenuNode === node.id; // New: Track active menu node
   const hasChildren = node.children && node.children.length > 0;
   const isExpandable = hasChildren || node.type === 'connection' || node.type === 'schema' || node.type === 'database';
   const primaryAction = getPrimaryAction(node.type);
@@ -77,7 +80,7 @@ const TreeNode = memo(({
 
   const handlePrimaryAction = (e) => {
     e.stopPropagation();
-    if (primaryAction) {
+    if (primaryAction && !activeMoreMenuNode) { // Disable when menu is open
       switch (node.type) {
         case 'connection':
           connectDatabase(node, setTreeData);
@@ -96,7 +99,10 @@ const TreeNode = memo(({
 
   const handleMoreMenu = (e) => {
     e.stopPropagation();
-    onMoreMenu(e, node);
+    if (!activeMoreMenuNode) { // Only open if no menu is active
+      setActiveMoreMenuNode(node.id); // Set active node
+      onMoreMenu(e, node);
+    }
   };
 
   const handleContextMenu = (e) => {
@@ -107,16 +113,16 @@ const TreeNode = memo(({
 
   return (
     <div
-      className={`tree-node ${node.type} ${isExpanded ? 'expanded' : ''} ${isHovered ? 'hovered' : ''}`}
+      className={`tree-node ${node.type} ${isExpanded ? 'expanded' : ''} ${isHovered || isActive ? 'hovered' : ''}`}
       style={{
         ...nodeBaseStyles,
         paddingLeft: `${12 + level * 12}px`,
         cursor: isExpandable ? 'pointer' : (isLoading ? 'wait' : 'default'),
-        background: isHovered ? theme.hoverBg : 'transparent',
-        border: isHovered ? `1px solid ${theme.accentColor}20` : (isConnected ? `1px solid ${theme.accentColor}10` : '1px solid transparent'),
-        transform: isHovered ? 'translateX(1px)' : 'translateX(0)',
-        boxShadow: isHovered ? `0 1px 4px ${theme.accentColor}10` : 'none',
-        paddingRight: isHovered ? '4px' : '8px'
+        background: (isHovered || isActive) ? theme.hoverBg : 'transparent',
+        border: (isHovered || isActive) ? `1px solid ${theme.accentColor}20` : (isConnected ? `1px solid ${theme.accentColor}10` : '1px solid transparent'),
+        transform: (isHovered || isActive) ? 'translateX(1px)' : 'translateX(0)',
+        boxShadow: (isHovered || isActive) ? `0 1px 4px ${theme.accentColor}10` : 'none',
+        paddingRight: (isHovered || isActive) ? '4px' : '8px'
       }}
       onMouseEnter={() => setHoveredNode(node.id)}
       onMouseLeave={() => setHoveredNode(null)}
@@ -126,10 +132,10 @@ const TreeNode = memo(({
       tabIndex={0}
     >
       {/* 左侧指示条 */}
-      {isHovered && <div style={indicatorBarStyles(theme)} />}
+      {(isHovered || isActive) && <div style={indicatorBarStyles(theme)} />}
 
       {/* 展开图标 */}
-      <div style={expandIconStyles(isHovered, theme)}>
+      <div style={expandIconStyles(isHovered || isActive, theme)}>
         {isLoading ? (
           <span style={{ fontSize: 9 }}>⟳</span>
         ) : getExpandIcon(node) ? (
@@ -145,37 +151,42 @@ const TreeNode = memo(({
       <img
         src={getNodeIcon(node)}
         alt={node.type + (isConnected ? ' (connected)' : '')}
-        style={nodeIconStyles(isHovered, theme)}
+        style={nodeIconStyles(isHovered || isActive, theme)}
       />
 
       {/* 节点名称 */}
-      <span style={{...nodeNameStyles(isHovered), color: isHovered ? theme.textColor : '#333' }}>
+      <span style={{...nodeNameStyles(isHovered || isActive), color: (isHovered || isActive) ? theme.textColor : '#333' }}>
         {node.name}
       </span>
 
       {/* 类型标签 */}
-      {isHovered && (
-        <span style={typeLabelStyles(isHovered, theme)}>
+      {(isHovered || isActive) && (
+        <span style={typeLabelStyles(isHovered || isActive, theme)}>
           {node.type} {isConnected && '(已连接)'}
         </span>
       )}
 
       {/* 功能按钮区域 */}
-      {isHovered && !isLoading && (
+      {(isHovered || isActive) && !isLoading && (
         <div style={actionContainerStyles}>
           {primaryAction && (
             <button
               onClick={handlePrimaryAction}
               style={actionButtonStyles(theme)}
+              disabled={!!activeMoreMenuNode} // Disable when menu is open
               onMouseEnter={(e) => {
-                e.target.style.background = 'white';
-                e.target.style.transform = 'scale(1.05)';
-                e.target.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.15)';
+                if (!activeMoreMenuNode) {
+                  e.target.style.background = 'white';
+                  e.target.style.transform = 'scale(1.05)';
+                  e.target.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.15)';
+                }
               }}
               onMouseLeave={(e) => {
-                e.target.style.background = 'rgba(255, 255, 255, 0.8)';
-                e.target.style.transform = 'scale(1)';
-                e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                if (!activeMoreMenuNode) {
+                  e.target.style.background = 'rgba(255, 255, 255, 0.8)';
+                  e.target.style.transform = 'scale(1)';
+                  e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                }
               }}
             >
               {primaryAction.icon}
@@ -189,17 +200,22 @@ const TreeNode = memo(({
               color: '#666',
               fontSize: '14px'
             }}
+            disabled={!!activeMoreMenuNode && activeMoreMenuNode !== node.id} // Disable other more buttons
             onMouseEnter={(e) => {
-              e.target.style.background = 'white';
-              e.target.style.transform = 'scale(1.05)';
-              e.target.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.15)';
-              e.target.style.color = theme.accentColor;
+              if (!activeMoreMenuNode || activeMoreMenuNode === node.id) {
+                e.target.style.background = 'white';
+                e.target.style.transform = 'scale(1.05)';
+                e.target.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.15)';
+                e.target.style.color = theme.accentColor;
+              }
             }}
             onMouseLeave={(e) => {
-              e.target.style.background = 'rgba(255, 255, 255, 0.8)';
-              e.target.style.transform = 'scale(1)';
-              e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
-              e.target.style.color = '#666';
+              if (!activeMoreMenuNode || activeMoreMenuNode === node.id) {
+                e.target.style.background = 'rgba(255, 255, 255, 0.8)';
+                e.target.style.transform = 'scale(1)';
+                e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                e.target.style.color = '#666';
+              }
             }}
           >
             ⋯
@@ -208,7 +224,7 @@ const TreeNode = memo(({
       )}
 
       {/* 子项指示器 */}
-      {isHovered && hasChildren && !primaryAction && !isLoading && (
+      {(isHovered || isActive) && hasChildren && !primaryAction && !isLoading && (
         <div style={childIndicatorStyles(theme)} />
       )}
     </div>

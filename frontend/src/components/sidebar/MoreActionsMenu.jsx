@@ -35,7 +35,6 @@ const MoreActionsMenu = ({ node, position, onClose, treeData, setTreeData, setEx
         fontFamily: 'var(--font)',
         ...flipStyle
       }}
-      onMouseLeave={onClose}
     >
       {actions.map((item, index) => {
         if (item.type === 'separator') {
