@@ -10,22 +10,30 @@ const MoreActionsMenu = ({ node, position, onClose, treeData, setTreeData, setEx
     onClose();
   };
 
+  // 翻转时调整样式
+  const flipStyle = position.flip ? {
+    borderTop: '2px solid #e0e0e0',
+    borderBottom: '1px solid #e0e0e0'
+  } : {};
+
   return (
     <div
-      className="more-actions-menu"  // 新增：用于外部点击检测
+      className="more-actions-menu"
       style={{
         position: 'fixed',
         left: position.x,
-        top: position.y + 25,
+        top: position.y,
         background: 'white',
         border: '1px solid #e0e0e0',
         borderRadius: '8px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-        zIndex: 10,
+        zIndex: 1000,
         minWidth: '180px',
+        maxHeight: '300px',
+        overflowY: 'auto',
         fontSize: '13px',
         fontFamily: 'var(--font)',
-        overflow: 'hidden'
+        ...flipStyle
       }}
       onMouseLeave={onClose}
     >
