@@ -7,6 +7,7 @@ import com.slx.nebula.exception.BizException;
 import com.slx.nebula.model.ConfigItem;
 import com.slx.nebula.model.ConnectionConfig;
 import com.slx.nebula.model.Folder;
+import com.slx.nebula.model.MoveNodeReq;
 import com.slx.nebula.repository.ConfigRepository;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,6 +41,14 @@ public class ConfigController {
     public ApiResponse<List<ConfigItem>> loadAll() {
         return ApiResponse.success(repo.loadAll().getRoots());
     }
+
+    @PostMapping("/move-node")
+    public ApiResponse<Boolean> getFolder(@RequestBody MoveNodeReq req) {
+        repo.move(req);
+        return ApiResponse.success(Boolean.TRUE);
+    }
+
+
 
     @DeleteMapping("/folders/{id}")
     public ApiResponse<Boolean> deleteFolder(@PathVariable String id) {

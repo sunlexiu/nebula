@@ -3,6 +3,7 @@ package com.slx.nebula.repository;
 import com.slx.nebula.model.ConfigData;
 import com.slx.nebula.model.ConnectionConfig;
 import com.slx.nebula.model.Folder;
+import com.slx.nebula.model.MoveNodeReq;
 
 import java.util.List;
 import java.util.Optional;
@@ -10,6 +11,7 @@ import java.util.Optional;
 public interface ConfigRepository {
     void saveFolder(Folder folder);
     List<Folder> findAllFolders();
+    void move(MoveNodeReq req);
     ConfigData loadAll();
     void deleteFolder(String id);
 

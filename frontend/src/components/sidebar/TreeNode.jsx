@@ -1,3 +1,4 @@
+// TreeNode.jsx
 import React, { useState, memo } from 'react';
 import MoreActionsMenu from './MoreActionsMenu';
 import {
@@ -22,7 +23,9 @@ import {
   actionButtonStyles,
   indicatorBarStyles,
   childIndicatorStyles,
-  actionContainerStyles
+  actionContainerStyles,
+  dragOverStyles,
+  dragSourceStyles
 } from './styles';
 
 const TreeNode = memo(({
@@ -40,18 +43,62 @@ const TreeNode = memo(({
   setExpandedKeys,
   onMoreMenu,
   activeMoreMenuNode,
-  setActiveMoreMenuNode
+  setActiveMoreMenuNode,
+  // 新增：拖拽 props
+  dragSourceId,
+  setDragSourceId,
+  dragOverNodeId,
+  setDragOverNodeId,
+  moveNode
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const isHovered = hoveredNode === node.id;
   const isActive = activeMoreMenuNode === node.id;
+  const isDragging = dragSourceId === node.id;
+  const isDragOver = dragOverNodeId === node.id;
   const hasChildren = node.children && node.children.length > 0;
   const isExpandable = hasChildren || node.type === 'connection' || node.type === 'schema' || node.type === 'database';
+  const isDraggable = node.type === 'folder' || node.type === 'connection'; // 只允许文件夹和连接拖拽
+  const isDropTarget = node.type === 'folder'; // 只允许 drop 到文件夹
   const primaryAction = getPrimaryAction(node.type);
   const theme = getThemeColors(node.type);
   const isExpanded = node.expanded;
   const isConnected = node.connected;
   if (isConnected) theme.accentColor = '#10b981';
+
+  // 新增：拖拽事件
+  const handleDragStart = (e) => {
+    if (isDraggable) {
+      setDragSourceId(node.id);
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', node.id);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    if (isDropTarget && dragSourceId && dragSourceId !== node.id) {
+      setDragOverNodeId(node.id);
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    e.stopPropagation();
+    if (isDropTarget && dragOverNodeId === node.id) {
+      setDragOverNodeId(null);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isDropTarget && dragSourceId && dragSourceId !== node.id) {
+      moveNode(dragSourceId, node.id);
+    }
+    setDragOverNodeId(null);
+  };
 
   const handleClick = async (e) => {
     e.stopPropagation();
@@ -112,29 +159,40 @@ const TreeNode = memo(({
     handleMoreMenu(e);
   };
 
+  // 组合样式：优先拖拽 > 悬浮 > 基础
+  const combinedStyles = {
+    ...nodeBaseStyles,
+    ...(isDragging && dragSourceStyles),
+    ...(isDragOver && dragOverStyles(theme)),
+    paddingLeft: `${12 + level * 12}px`,
+    cursor: isDraggable ? 'grab' : (isExpandable ? 'pointer' : (isLoading ? 'wait' : 'default')),
+    background: (isDragging ? 'transparent' : ((isHovered || isActive) ? theme.hoverBg : 'transparent')),
+    border: (isDragOver ? `2px dashed ${theme.accentColor}` : ((isHovered || isActive) ? `1px solid ${theme.accentColor}20` : (isConnected ? `1px solid ${theme.accentColor}10` : '1px solid transparent'))),
+    transform: (isDragging ? 'rotate(5deg)' : ((isHovered || isActive) ? 'translateX(1px)' : 'translateX(0)')),
+    boxShadow: (isDragging ? '0 4px 12px rgba(0,0,0,0.2)' : ((isHovered || isActive) ? `0 1px 4px ${theme.accentColor}10` : 'none')),
+    opacity: isDragging ? 0.5 : 1,
+    paddingRight: (isHovered || isActive) ? '4px' : '8px'
+  };
+
   return (
     <div
-      className={`tree-node ${node.type} ${isExpanded ? 'expanded' : ''} ${isHovered || isActive ? 'hovered' : ''}`}
-      style={{
-        ...nodeBaseStyles,
-        paddingLeft: `${12 + level * 12}px`,
-        cursor: isExpandable ? 'pointer' : (isLoading ? 'wait' : 'default'),
-        background: (isHovered || isActive) ? theme.hoverBg : 'transparent',
-        border: (isHovered || isActive) ? `1px solid ${theme.accentColor}20` : (isConnected ? `1px solid ${theme.accentColor}10` : '1px solid transparent'),
-        transform: (isHovered || isActive) ? 'translateX(1px)' : 'translateX(0)',
-        boxShadow: (isHovered || isActive) ? `0 1px 4px ${theme.accentColor}10` : 'none',
-        paddingRight: (isHovered || isActive) ? '4px' : '8px'
-      }}
-      onMouseEnter={() => setHoveredNode(node.id)}
-      onMouseLeave={() => setHoveredNode(null)}
+      className={`tree-node ${node.type} ${isExpanded ? 'expanded' : ''} ${isHovered || isActive ? 'hovered' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
+      style={combinedStyles}
+      draggable={isDraggable}
+      onMouseEnter={() => !isDragging && setHoveredNode(node.id)}
+      onMouseLeave={() => !isDragging && setHoveredNode(null)}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       onKeyDown={(e) => { if (e.key === 'Enter') handleClick(e); }}
       tabIndex={0}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
-      {(isHovered || isActive) && <div style={indicatorBarStyles(theme)} />}
+      {(isHovered || isActive || isDragOver) && <div style={indicatorBarStyles(theme)} />}
 
-      <div style={expandIconStyles(isHovered || isActive, theme)}>
+      <div style={expandIconStyles(isHovered || isActive || isDragOver, theme)}>
         {isLoading ? (
           <span style={{ fontSize: 9 }}>⟳</span>
         ) : getExpandIcon(node) ? (
@@ -149,20 +207,20 @@ const TreeNode = memo(({
       <img
         src={getNodeIcon(node)}
         alt={node.type + (isConnected ? ' (connected)' : '')}
-        style={nodeIconStyles(isHovered || isActive, theme)}
+        style={nodeIconStyles(isHovered || isActive || isDragOver, theme)}
       />
 
-      <span style={{...nodeNameStyles(isHovered || isActive), color: (isHovered || isActive) ? theme.textColor : '#333' }}>
+      <span style={{...nodeNameStyles(isHovered || isActive || isDragOver), color: (isHovered || isActive || isDragOver) ? theme.textColor : '#333' }}>
         {node.name}
       </span>
 
-      {(isHovered || isActive) && (
-        <span style={typeLabelStyles(isHovered || isActive, theme)}>
+      {(isHovered || isActive || isDragOver) && (
+        <span style={typeLabelStyles(isHovered || isActive || isDragOver, theme)}>
           {node.type} {isConnected && '(已连接)'}
         </span>
       )}
 
-      {(isHovered || isActive) && !isLoading && (
+      {(isHovered || isActive) && !isLoading && !isDragging && (
         <div style={actionContainerStyles}>
           {primaryAction && (
             <button
@@ -218,7 +276,7 @@ const TreeNode = memo(({
         </div>
       )}
 
-      {(isHovered || isActive) && hasChildren && !primaryAction && !isLoading && (
+      {(isHovered || isActive || isDragOver) && hasChildren && !primaryAction && !isLoading && (
         <div style={childIndicatorStyles(theme)} />
       )}
     </div>

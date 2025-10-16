@@ -3,6 +3,22 @@
 
 const ACCENT_COLOR = '#0b69ff';
 
+// 新增：拖拽高亮样式
+export const dragOverStyles = (theme) => ({
+  background: `${theme.hoverBg} !important`,
+  border: `2px dashed ${theme.accentColor} !important`,
+  opacity: 0.8,
+  transform: 'scale(1.02)',
+  boxShadow: `0 2px 8px ${theme.accentColor}20 !important`
+});
+
+// 新增：拖拽源样式
+export const dragSourceStyles = {
+  opacity: 0.5,
+  transform: 'rotate(5deg)',
+  boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+};
+
 // 节点主题配置
 export const getThemeColors = (nodeType) => {
   switch (nodeType) {

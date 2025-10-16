@@ -87,6 +87,70 @@ export const getAllActions = (nodeType, node, treeData, setTreeData, setExpanded
   ];
 };
 
+// 新增：移动节点（支持文件夹和连接移动到目标文件夹或根路径）
+// API 示例：POST /api/config/move-node { sourceId, targetParentId }（targetParentId 为 null 表示根路径）
+export const moveNode = async (sourceId, targetParentId, setTreeData, openConfirm, nodeType) => {
+  // 可选：确认移动
+  openConfirm(
+    `移动${nodeType === 'folder' ? '文件夹' : '连接'}`,
+    `确定要将此${nodeType === 'folder' ? '文件夹' : '连接'}移动到目标位置吗？`,
+    async () => {
+      try {
+        // 模拟 API 调用（根据实际后端调整）
+        const response = await fetch('/api/config/move-node', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sourceId, targetParentId: targetParentId || null, type: nodeType })
+        });
+        if (!response.ok) throw new Error(`Failed to move ${nodeType}`);
+
+        // 更新树数据：移除源节点，添加到目标
+        setTreeData((prev) => {
+          const newTree = JSON.parse(JSON.stringify(prev));
+          // 移除源节点（使用 deleteNode 逻辑但保留节点）
+          const removeNodeFromTree = (nodes, id) => {
+            if (!Array.isArray(nodes)) return null;
+            for (let i = 0; i < nodes.length; i++) {
+              if (nodes[i] && nodes[i].id === id) {
+                return nodes.splice(i, 1)[0]; // 返回移除的节点
+              }
+              if (nodes[i] && nodes[i].children) {
+                const removed = removeNodeFromTree(nodes[i].children, id);
+                if (removed !== null) {
+                  return removed;
+                }
+              }
+            }
+            return null;
+          };
+          const removedNode = removeNodeFromTree(newTree, sourceId);
+          if (!removedNode) return newTree;
+
+          // 更新 parentId 并添加到目标
+          removedNode.parentId = targetParentId || null;
+          if (!targetParentId) {
+            // 根路径
+            newTree.push(removedNode);
+          } else {
+            // 目标文件夹
+            const targetNode = findNode(newTree, targetParentId);
+            if (targetNode && targetNode.children) {
+              targetNode.children.push(removedNode);
+            }
+          }
+
+          return newTree;
+        });
+        console.log(`${nodeType} 已移动到新位置`);
+      } catch (error) {
+        console.error(`Move ${nodeType} error:`, error);
+        alert('移动失败，请重试');
+      }
+    },
+    'warning'
+  );
+};
+
 // 不可变更新树特定路径
 export const updateTreePath = (treeData, targetId, updaterFn) => {
   const newTree = JSON.parse(JSON.stringify(treeData));
@@ -111,12 +175,13 @@ export const toggleExpand = (setExpandedKeys, nodeId, loadChildren = true) => {
 export const deleteNode = (treeData, nodeId) => {
   const newTree = JSON.parse(JSON.stringify(treeData));
   function deleteRecursive(nodes) {
+    if (!Array.isArray(nodes)) return false;
     for (let i = 0; i < nodes.length; i++) {
-      if (nodes[i].id === nodeId) {
+      if (nodes[i] && nodes[i].id === nodeId) {
         nodes.splice(i, 1);
         return true;
       }
-      if (nodes[i].children && deleteRecursive(nodes[i].children)) {
+      if (nodes[i] && nodes[i].children && deleteRecursive(nodes[i].children)) {
         return true;
       }
     }
@@ -465,8 +530,8 @@ export const refreshFolder = (node) => {
 export const findNode = (nodes, id) => {
   if (!Array.isArray(nodes)) return null;
   for (let node of nodes) {
-    if (node.id === id) return node;
-    if (node.children) {
+    if (node && node.id === id) return node;
+    if (node && node.children) {
       const found = findNode(node.children, id);
       if (found) return found;
     }

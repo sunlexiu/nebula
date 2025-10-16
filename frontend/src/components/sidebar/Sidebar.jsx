@@ -1,7 +1,8 @@
+// Sidebar.jsx
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import TreeNode from './TreeNode';
-import { findNode } from './actions';
+import { findNode, moveNode } from './actions';
 import deegoLogo from '../../public/icons/deego_1.svg';
 import MoreActionsMenu from './MoreActionsMenu';
 import RenameFolderModal from './RenameFolderModal';
@@ -13,6 +14,9 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
   const [moreMenuPosition, setMoreMenuPosition] = useState({ x: 0, y: 0, flip: false });
   const [activeMoreMenuNode, setActiveMoreMenuNode] = useState(null);
   const [renameFolderModal, setRenameFolderModal] = useState({ isOpen: false, node: null, onSubmit: null });
+  // 新增：拖拽状态
+  const [dragSourceId, setDragSourceId] = useState(null);
+  const [dragOverNodeId, setDragOverNodeId] = useState(null);
 
   // 外部点击检测和 Escape 键关闭
   useEffect(() => {
@@ -44,6 +48,28 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
       document.removeEventListener('keydown', handleEscape);
     };
   }, [showMoreMenu, renameFolderModal.isOpen]);
+
+  // 新增：拖拽结束清理
+  useEffect(() => {
+    const handleDragEnd = () => {
+      setDragSourceId(null);
+      setDragOverNodeId(null);
+    };
+    document.addEventListener('dragend', handleDragEnd);
+    return () => document.removeEventListener('dragend', handleDragEnd);
+  }, []);
+
+  // 新增：处理根路径 drop
+  const handleRootDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dragSourceId) {
+      const sourceNode = findNode(treeData, dragSourceId);
+      if (sourceNode && (sourceNode.type === 'folder' || sourceNode.type === 'connection')) {
+        moveNode(dragSourceId, null, setTreeData, openConfirm, sourceNode.type);
+      }
+    }
+  };
 
   // 处理更多菜单
   const handleMoreMenu = (e, node) => {
@@ -88,6 +114,14 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
     });
   };
 
+  // 新增：修正的 moveNode wrapper，自动获取 source type
+  const handleMoveNode = (sourceId, targetId) => {
+    const sourceNode = findNode(treeData, sourceId);
+    if (sourceNode && (sourceNode.type === 'folder' || sourceNode.type === 'connection')) {
+      moveNode(sourceId, targetId, setTreeData, openConfirm, sourceNode.type);
+    }
+  };
+
   // 渲染树节点
   const renderTreeNodes = useMemo(() => (nodes, level = 0) => {
     if (!nodes || nodes.length === 0) {
@@ -117,6 +151,12 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
           openRenameFolder={openRenameFolderModal}
           activeMoreMenuNode={activeMoreMenuNode}
           setActiveMoreMenuNode={setActiveMoreMenuNode}
+          // 新增：拖拽 props
+          dragSourceId={dragSourceId}
+          setDragSourceId={setDragSourceId}
+          dragOverNodeId={dragOverNodeId}
+          setDragOverNodeId={setDragOverNodeId}
+          moveNode={handleMoveNode}
         />
       );
 
@@ -124,14 +164,35 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
         return (
           <React.Fragment key={node.id}>
             {renderedNode}
-            <div style={{
-              marginLeft: '2px',
-              paddingLeft: '1px',
-              borderLeft: '1px solid #e0e7ff',
-              marginTop: '1px',
-              transition: 'max-height 0.3s ease',
-              overflow: 'hidden'
-            }}>
+            <div
+              style={{
+                marginLeft: '2px',
+                paddingLeft: '1px',
+                borderLeft: '1px solid #e0e7ff',
+                marginTop: '1px',
+                transition: 'max-height 0.3s ease',
+                overflow: 'hidden'
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (dragSourceId && dragSourceId !== node.id && node.type === 'folder') {
+                  setDragOverNodeId(node.id);
+                }
+              }}
+              onDragLeave={(e) => {
+                if (dragOverNodeId === node.id) {
+                  setDragOverNodeId(null);
+                }
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (dragSourceId && dragSourceId !== node.id && node.type === 'folder') {
+                  handleMoveNode(dragSourceId, node.id);
+                }
+                setDragOverNodeId(null);
+              }}
+            >
               {renderTreeNodes(node.children, level + 1)}
             </div>
           </React.Fragment>
@@ -140,7 +201,7 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
 
       return renderedNode;
     });
-  }, [expandedKeys, hoveredNode, treeData, openNewGroup, openNewConnection, openConfirm, activeMoreMenuNode]);
+  }, [expandedKeys, hoveredNode, treeData, openNewGroup, openNewConnection, openConfirm, activeMoreMenuNode, dragSourceId, dragOverNodeId, handleMoveNode]);
 
   // Portal 渲染菜单
   const renderMoreMenuPortal = () => {
@@ -240,7 +301,13 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
           </div>
         </div>
 
-        <div className="tree-container">
+        {/* 新增：根路径拖拽容器 */}
+        <div
+          className="tree-container"
+          style={{ minHeight: '20px', padding: '0 16px' }}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleRootDrop}
+        >
           {renderTreeNodes(treeData)}
         </div>
       </div>

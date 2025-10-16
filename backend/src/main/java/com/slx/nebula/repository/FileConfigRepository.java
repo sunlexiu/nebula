@@ -2,14 +2,22 @@ package com.slx.nebula.repository;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.slx.nebula.model.*;
 import com.github.yitter.idgen.YitIdHelper;
+import com.slx.nebula.common.Wrapper;
+import com.slx.nebula.model.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 import java.io.IOException;
-import java.nio.file.*;
-import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
@@ -53,6 +61,44 @@ public class FileConfigRepository implements ConfigRepository {
     // -------------------- 新增：返回整个树 --------------------
     public synchronized ConfigData loadAll() {
         return cache;
+    }
+
+    @Override
+    public void move(MoveNodeReq req) {
+        List<ConfigItem> roots = cache.getRoots();
+        if (CollectionUtils.isEmpty(roots)) {
+            return ;
+        }
+
+        Wrapper<ConfigItem> sourceNodeWrapper = new Wrapper<>();
+        Iterator<ConfigItem> iterator = roots.iterator();
+        while (iterator.hasNext()) {
+            ConfigItem next = iterator.next();
+            if (req.getSourceId().equals(next.getId())) {
+                sourceNodeWrapper.setData(next);
+                iterator.remove();
+                break;
+            }
+        }
+        if (sourceNodeWrapper.getData() == null) {
+            return;
+        }
+
+        if (!StringUtils.hasText(req.getTargetParentId())) {
+            roots.add(sourceNodeWrapper.getData());
+            sourceNodeWrapper.getData().setParentId(null);
+            persist();
+            return;
+        }
+
+        for (ConfigItem next : roots) {
+            if (next instanceof Folder folder && req.getTargetParentId().equals(folder.getId())) {
+                folder.getChildren().add(sourceNodeWrapper.getData());
+                sourceNodeWrapper.getData().setParentId(folder.getId());
+                persist();
+                break;
+            }
+        }
     }
 
     // -------------------- 工具方法 --------------------

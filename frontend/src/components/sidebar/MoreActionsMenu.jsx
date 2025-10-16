@@ -1,3 +1,4 @@
+// frontend/src/components/sidebar/MoreActionsMenu.jsx
 import React, { useState } from 'react';
 import { getAllActions } from './actions';
 
