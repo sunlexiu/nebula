@@ -1,10 +1,10 @@
-// frontend/src/components/sidebar/MoreActionsMenu.jsx
+// components/sidebar/MoreActionsMenu.jsx
 import React, { useState } from 'react';
 import { getAllActions } from './actions';
 
-const MoreActionsMenu = ({ node, position, onClose, treeData, setTreeData, setExpandedKeys, openNewGroup, openNewConnection, openConfirm, openRenameFolder }) => {
+const MoreActionsMenu = ({ node, position, onClose, treeData, setTreeData, setExpandedKeys, openNewGroup, openNewConnection, openConfirm, openRenameFolder, openEditConnection }) => {
   const [hoveredItem, setHoveredItem] = useState(null);
-  const actions = getAllActions(node.type, node, treeData, setTreeData, setExpandedKeys, openNewGroup, openNewConnection, openConfirm, openRenameFolder);
+  const actions = getAllActions(node.type, node, treeData, setTreeData, setExpandedKeys, openNewGroup, openNewConnection, openConfirm, openRenameFolder, openEditConnection);
 
   const handleAction = (action) => {
     action();

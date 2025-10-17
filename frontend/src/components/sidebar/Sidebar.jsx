@@ -6,6 +6,7 @@ import { findNode, moveNode } from './actions';
 import deegoLogo from '../../public/icons/deego_1.svg';
 import MoreActionsMenu from './MoreActionsMenu';
 import RenameFolderModal from './RenameFolderModal';
+import EditConnectionModal from './EditConnectionModal';
 
 const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openConfirm }) => {
   const [expandedKeys, setExpandedKeys] = useState(new Map());
@@ -17,10 +18,14 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
   // 新增：拖拽状态
   const [dragSourceId, setDragSourceId] = useState(null);
   const [dragOverNodeId, setDragOverNodeId] = useState(null);
+  // 新增：根拖拽高亮状态
+  const [isDragOverRoot, setIsDragOverRoot] = useState(false);
+  // 新增：编辑连接模态框状态
+  const [editConnectionModal, setEditConnectionModal] = useState({ isOpen: false, connection: null, onSubmit: null });
 
   // 外部点击检测和 Escape 键关闭
   useEffect(() => {
-    if (!showMoreMenu && !renameFolderModal.isOpen) return;
+    if (!showMoreMenu && !renameFolderModal.isOpen && !editConnectionModal.isOpen) return;
 
     const handleClickOutside = (event) => {
       if (!event.target.closest('.more-actions-menu') && !event.target.closest('.tree-node') && !event.target.closest('.modal-content')) {
@@ -28,6 +33,7 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
         setMoreMenuPosition({ x: 0, y: 0, flip: false });
         setActiveMoreMenuNode(null);
         setRenameFolderModal({ isOpen: false, node: null, onSubmit: null });
+        setEditConnectionModal({ isOpen: false, connection: null, onSubmit: null });
       }
     };
 
@@ -37,6 +43,7 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
         setMoreMenuPosition({ x: 0, y: 0, flip: false });
         setActiveMoreMenuNode(null);
         setRenameFolderModal({ isOpen: false, node: null, onSubmit: null });
+        setEditConnectionModal({ isOpen: false, connection: null, onSubmit: null });
       }
     };
 
@@ -47,13 +54,14 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
       document.removeEventListener('click', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
     };
-  }, [showMoreMenu, renameFolderModal.isOpen]);
+  }, [showMoreMenu, renameFolderModal.isOpen, editConnectionModal.isOpen]);
 
   // 新增：拖拽结束清理
   useEffect(() => {
     const handleDragEnd = () => {
       setDragSourceId(null);
       setDragOverNodeId(null);
+      setIsDragOverRoot(false);
     };
     document.addEventListener('dragend', handleDragEnd);
     return () => document.removeEventListener('dragend', handleDragEnd);
@@ -63,12 +71,27 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
   const handleRootDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    setIsDragOverRoot(false);
     if (dragSourceId) {
       const sourceNode = findNode(treeData, dragSourceId);
       if (sourceNode && (sourceNode.type === 'folder' || sourceNode.type === 'connection')) {
         moveNode(dragSourceId, null, setTreeData, openConfirm, sourceNode.type);
       }
     }
+  };
+
+  // 新增：根路径 drag over
+  const handleRootDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragSourceId) {
+      setIsDragOverRoot(true);
+    }
+  };
+
+  // 新增：根路径 drag leave
+  const handleRootDragLeave = (e) => {
+    setIsDragOverRoot(false);
   };
 
   // 处理更多菜单
@@ -114,6 +137,15 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
     });
   };
 
+  // 新增：打开编辑连接模态框
+  const openEditConnectionModal = (options) => {
+    setEditConnectionModal({
+      isOpen: true,
+      connection: options,
+      onSubmit: options.onSubmit
+    });
+  };
+
   // 新增：修正的 moveNode wrapper，自动获取 source type
   const handleMoveNode = (sourceId, targetId) => {
     const sourceNode = findNode(treeData, sourceId);
@@ -149,6 +181,7 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
           openNewConnection={openNewConnection}
           openConfirm={openConfirm}
           openRenameFolder={openRenameFolderModal}
+          openEditConnection={openEditConnectionModal}
           activeMoreMenuNode={activeMoreMenuNode}
           setActiveMoreMenuNode={setActiveMoreMenuNode}
           // 新增：拖拽 props
@@ -201,7 +234,7 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
 
       return renderedNode;
     });
-  }, [expandedKeys, hoveredNode, treeData, openNewGroup, openNewConnection, openConfirm, activeMoreMenuNode, dragSourceId, dragOverNodeId, handleMoveNode]);
+  }, [expandedKeys, hoveredNode, treeData, openNewGroup, openNewConnection, openConfirm, activeMoreMenuNode, dragSourceId, dragOverNodeId, handleMoveNode, openEditConnectionModal]);
 
   // Portal 渲染菜单
   const renderMoreMenuPortal = () => {
@@ -242,10 +275,22 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
           openNewConnection={openNewConnection}
           openConfirm={openConfirm}
           openRenameFolder={openRenameFolderModal}
+          openEditConnection={openEditConnectionModal}
         />
       </>,
       document.body
     );
+  };
+
+  // 新增：根容器拖拽高亮样式
+  const rootContainerStyle = {
+    minHeight: '20px',
+    padding: '0 16px',
+    transition: 'all 0.2s ease',
+    border: isDragOverRoot ? '2px dashed #0b69ff' : 'none',
+    background: isDragOverRoot ? '#f8f9fa' : 'transparent',
+    borderRadius: '4px',
+    margin: '0 4px'
   };
 
   return (
@@ -304,8 +349,9 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
         {/* 新增：根路径拖拽容器 */}
         <div
           className="tree-container"
-          style={{ minHeight: '20px', padding: '0 16px' }}
-          onDragOver={(e) => e.preventDefault()}
+          style={rootContainerStyle}
+          onDragOver={handleRootDragOver}
+          onDragLeave={handleRootDragLeave}
           onDrop={handleRootDrop}
         >
           {renderTreeNodes(treeData)}
@@ -323,6 +369,16 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
           onSubmit={renameFolderModal.onSubmit}
           parentId={renameFolderModal.node?.id}
           defaultName={renameFolderModal.node?.name}
+        />
+      )}
+
+      {/* 新增：编辑连接模态框 */}
+      {editConnectionModal.isOpen && (
+        <EditConnectionModal
+          isOpen={editConnectionModal.isOpen}
+          onClose={() => setEditConnectionModal({ isOpen: false, connection: null, onSubmit: null })}
+          onSubmit={editConnectionModal.onSubmit}
+          connection={editConnectionModal.connection}
         />
       )}
     </>

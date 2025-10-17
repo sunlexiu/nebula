@@ -16,7 +16,7 @@ export const getPrimaryAction = (nodeType) => {
 };
 
 // 获取所有操作菜单
-export const getAllActions = (nodeType, node, treeData, setTreeData, setExpandedKeys, openNewGroup, openNewConnection, openConfirm, openRenameFolder) => {
+export const getAllActions = (nodeType, node, treeData, setTreeData, setExpandedKeys, openNewGroup, openNewConnection, openConfirm, openRenameFolder, openEditConnection) => {
   const actions = {
     folder: [
       { label: '新建文件夹', action: () => openNewGroup(node.id), icon: '📁' },
@@ -32,7 +32,7 @@ export const getAllActions = (nodeType, node, treeData, setTreeData, setExpanded
       { label: '断开连接', action: () => disconnectDatabase(node, setTreeData), icon: '🔌' },
       { type: 'separator' },
       { label: '刷新', action: () => refreshConnection(node, setTreeData, setExpandedKeys), icon: '🔄' },
-      { label: '连接设置', action: () => showConnectionSettings(node), icon: '⚙️' },
+      { label: '连接设置', action: () => showConnectionSettings(node, openEditConnection), icon: '⚙️' },
       { type: 'separator' },
       { label: '删除连接', action: () => deleteConnection(node, setTreeData, openConfirm), icon: '🗑️' },
       { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
@@ -148,6 +148,40 @@ export const moveNode = async (sourceId, targetParentId, setTreeData, openConfir
       }
     },
     'warning'
+  );
+};
+
+// 新增：更新连接（API: /api/config/connections/{id} PUT）
+export const updateConnection = async (payload, setTreeData, openConfirm) => {
+  openConfirm(
+    '保存连接',
+    '确定要保存这些更改吗？',
+    async () => {
+      try {
+        const response = await fetch(`/api/config/connections/${payload.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error('Failed to update connection');
+        // 更新树数据
+        setTreeData((prev) => updateTreePath(prev, payload.id, (current) => ({
+          ...current,
+          name: payload.name,
+          dbType: payload.dbType,
+          host: payload.host,
+          port: payload.port,
+          database: payload.database,
+          username: payload.username,
+          // 注意：密码不存储在前端树数据中
+        })));
+        console.log(`连接 "${payload.name}" 已更新`);
+      } catch (error) {
+        console.error('Update connection error:', error);
+        alert('更新失败，请重试');
+      }
+    },
+    'info'
   );
 };
 
@@ -453,8 +487,20 @@ export const disconnectDatabase = (node, setTreeData) => {
   alert(`断开连接: ${node.name}`);
 };
 
-export const showConnectionSettings = (node) => {
-  alert(`连接设置: ${node.name}`);
+// 修改：连接设置 - 打开编辑模态框
+export const showConnectionSettings = (node, openEditConnection) => {
+  openEditConnection({
+    id: node.id,
+    name: node.name,
+    dbType: node.dbType,
+    host: node.host,
+    port: node.port,
+    database: node.database,
+    username: node.username,
+    password: '', // 密码需重新输入或从安全存储获取
+    savePassword: node.savePassword || false,
+    onSubmit: (payload) => updateConnection(payload, openEditConnection.setTreeData, openEditConnection.openConfirm)
+  });
 };
 
 // 架构操作

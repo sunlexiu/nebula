@@ -33,6 +33,7 @@ const TreeNode = memo(({
   openNewConnection,
   openConfirm,
   openRenameFolder,
+  openEditConnection,
   node,
   level = 0,
   hoveredNode,
