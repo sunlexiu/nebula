@@ -1,3 +1,4 @@
+// \frontend\src\components\ResultTable.jsx
 import React from 'react'
 
 export default function ResultTable({ data }) {

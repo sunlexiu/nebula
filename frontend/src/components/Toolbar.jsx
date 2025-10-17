@@ -1,3 +1,4 @@
+// \frontend\src\components\Toolbar.jsx
 import React from 'react'
 
 export default function Toolbar({ onExecute }) {
