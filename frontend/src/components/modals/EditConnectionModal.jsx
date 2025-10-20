@@ -1,8 +1,8 @@
-// NewConnectionModal.jsx
-import React, { useState } from "react";
-import "../../css/NewConnectionModal.css";
+import React, { useState, useEffect } from "react";
+import "../../css/NewConnectionModal.css"; // 复用现有样式
+import toast from 'react-hot-toast';
 
-const NewConnectionModal = ({ isOpen, onClose, onSubmit, parentId }) => {
+const EditConnectionModal = ({ isOpen, onClose, connection, onSubmit }) => {
   const [connectionData, setConnectionData] = useState({
     name: "",
     dbType: "POSTGRESQL",
@@ -15,6 +15,22 @@ const NewConnectionModal = ({ isOpen, onClose, onSubmit, parentId }) => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState(null);
+
+  useEffect(() => {
+    if (isOpen && connection) {
+      setConnectionData({
+        name: connection.name || "",
+        dbType: connection.dbType || "POSTGRESQL",
+        host: connection.host || "localhost",
+        port: connection.port?.toString() || "5432",
+        database: connection.database || "postgres",
+        username: connection.username || "",
+        password: connection.password || "", // 注意：密码可能需要从后端安全获取，或提示重新输入
+        savePassword: connection.savePassword || false,
+      });
+      setConnectionStatus(null);
+    }
+  }, [isOpen, connection]);
 
   if (!isOpen) return null;
 
@@ -47,11 +63,14 @@ const NewConnectionModal = ({ isOpen, onClose, onSubmit, parentId }) => {
       const result = await response.json();
       if (!response.ok) {
         setConnectionStatus("Connection failed: " + result.message);
-        return ;
+        toast.error('连接测试失败');
+        return;
       }
       setConnectionStatus("Connected successfully!");
+      toast.success('连接测试成功');
     } catch (error) {
       setConnectionStatus("Connection failed: " + error.message);
+      toast.error('连接测试失败');
     }
   };
 
@@ -59,21 +78,23 @@ const NewConnectionModal = ({ isOpen, onClose, onSubmit, parentId }) => {
     e.preventDefault();
     if (connectionData.name && connectionData.host && connectionData.port && connectionData.username) {
       try {
-        // 构建完整 payload
+        // 构建完整 payload，包括 id 用于更新
         const payload = {
+          id: connection.id,
           ...connectionData,
           port: parseInt(connectionData.port),
           type: 'connection',
-          parentId: parentId || null, // 如果是根目录，parentId 为 null
         };
-        onSubmit(payload);
+        await onSubmit(payload);
         if (connectionData.savePassword) {
           // 安全存储密码（建议加密）
-          localStorage.setItem("savedPassword", connectionData.password);
+          localStorage.setItem(`savedPassword_${connection.id}`, connectionData.password);
         }
+        toast.success('编辑连接成功');
         onClose();
       } catch (error) {
-        console.error('Error submitting connection:', error);
+        console.error('Error updating connection:', error);
+        toast.error('编辑连接失败');
       }
     }
   };
@@ -94,9 +115,9 @@ const NewConnectionModal = ({ isOpen, onClose, onSubmit, parentId }) => {
   };
 
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay" onClick={handleCancel}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <h2 className="modal-title">新建连接</h2>
+        <h2 className="modal-title">编辑连接</h2>
         <form onSubmit={handleSubmit}>
           <div className="form-section">
             <div className="form-group">
@@ -225,7 +246,7 @@ const NewConnectionModal = ({ isOpen, onClose, onSubmit, parentId }) => {
             <button type="submit" className="btn btn-primary" disabled={
               !connectionData.name || !connectionData.host || !connectionData.port || !connectionData.username
             }>
-              确认
+              保存
             </button>
           </div>
         </form>
@@ -234,4 +255,4 @@ const NewConnectionModal = ({ isOpen, onClose, onSubmit, parentId }) => {
   );
 };
 
-export default NewConnectionModal;
+export default EditConnectionModal;

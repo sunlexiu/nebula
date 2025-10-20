@@ -1,17 +1,14 @@
-// TreeNode.jsx
-import React, { useState, memo } from 'react';
-import MoreActionsMenu from './MoreActionsMenu';
+import React, { useState, memo, useMemo } from 'react';
 import {
   getExpandIcon,
   getNodeIcon,
   loadNodeChildren
-} from './utils';
+} from '../../utils/treeUtils'; // 修复：从 treeUtils 导入（相对路径调整）
 import {
   getPrimaryAction,
   connectDatabase,
-  previewTable,
-  updateTreePath
-} from './actions';
+  previewTable
+} from '../../actions/dbActions'; // 从 dbActions 导入
 import {
   getThemeColors,
   nodeBaseStyles,
@@ -29,28 +26,24 @@ import {
 } from './styles';
 
 const TreeNode = memo(({
-  openNewGroup,
-  openNewConnection,
-  openConfirm,
-  openRenameFolder,
-  openEditConnection,
   node,
   level = 0,
   hoveredNode,
   setHoveredNode,
-  treeData,
-  setTreeData,
   expandedKeys,
   setExpandedKeys,
   onMoreMenu,
   activeMoreMenuNode,
   setActiveMoreMenuNode,
-  // 新增：拖拽 props
   dragSourceId,
   setDragSourceId,
   dragOverNodeId,
   setDragOverNodeId,
-  moveNode
+  moveNode,
+  openNewGroup,
+  openNewConnection,
+  openRenameFolder,
+  openEditConnection
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const isHovered = hoveredNode === node.id;
@@ -58,16 +51,31 @@ const TreeNode = memo(({
   const isDragging = dragSourceId === node.id;
   const isDragOver = dragOverNodeId === node.id;
   const hasChildren = node.children && node.children.length > 0;
-  const isExpandable = hasChildren || node.type === 'connection' || node.type === 'schema' || node.type === 'database';
-  const isDraggable = node.type === 'folder' || node.type === 'connection'; // 只允许文件夹和连接拖拽
-  const isDropTarget = node.type === 'folder'; // 只允许 drop 到文件夹
+  const isExpandable = hasChildren || node.type === 'connection' || node.type === 'database' || node.type === 'schema';
+  const isDraggable = node.type === 'folder' || node.type === 'connection';
+  const isDropTarget = node.type === 'folder';
   const primaryAction = getPrimaryAction(node.type);
   const theme = getThemeColors(node.type);
   const isExpanded = node.expanded;
   const isConnected = node.connected;
   if (isConnected) theme.accentColor = '#10b981';
 
-  // 新增：拖拽事件
+  // useMemo 优化：仅在必要时重新计算样式
+  const combinedStyles = useMemo(() => ({
+    ...nodeBaseStyles,
+    ...(isDragging && dragSourceStyles),
+    ...(isDragOver && dragOverStyles(theme)),
+    paddingLeft: `${12 + level * 12}px`,
+    cursor: isDraggable ? 'grab' : (isExpandable ? 'pointer' : (isLoading ? 'wait' : 'default')),
+    background: (isDragging ? 'transparent' : ((isHovered || isActive) ? theme.hoverBg : 'transparent')),
+    border: (isDragOver ? `2px dashed ${theme.accentColor}` : ((isHovered || isActive) ? `1px solid ${theme.accentColor}20` : (isConnected ? `1px solid ${theme.accentColor}10` : '1px solid transparent'))),
+    transform: (isDragging ? 'rotate(5deg)' : ((isHovered || isActive) ? 'translateX(1px)' : 'translateX(0)')),
+    boxShadow: (isDragging ? '0 4px 12px rgba(0,0,0,0.2)' : ((isHovered || isActive) ? `0 1px 4px ${theme.accentColor}10` : 'none')),
+    opacity: isDragging ? 0.5 : 1,
+    paddingRight: (isHovered || isActive) ? '4px' : '8px'
+  }), [isDragging, isDragOver, isHovered, isActive, level, theme, isConnected]);
+
+  // 拖拽事件
   const handleDragStart = (e) => {
     if (isDraggable) {
       setDragSourceId(node.id);
@@ -107,17 +115,14 @@ const TreeNode = memo(({
       if (!hasChildren) {
         setIsLoading(true);
         try {
-          const updatedNode = await loadNodeChildren(node, setTreeData, setExpandedKeys);
+          const updatedNode = await loadNodeChildren(node, setExpandedKeys);
           if (updatedNode) {
-            setTreeData((prev) => updateTreePath(prev, node.id, (current) => ({
-              ...current,
-              ...updatedNode
-            })));
+            // 更新 store 或 props
+            console.log('Node loaded:', updatedNode); // 实际集成 store
           }
           setExpandedKeys((prev) => new Map(prev).set(node.id, true));
         } catch (error) {
           console.error('加载失败:', error);
-          alert('加载出错，请重试');
         } finally {
           setIsLoading(false);
         }
@@ -132,7 +137,7 @@ const TreeNode = memo(({
     if (primaryAction && !activeMoreMenuNode) {
       switch (node.type) {
         case 'connection':
-          connectDatabase(node, setTreeData);
+          connectDatabase(node);
           break;
         case 'table':
           previewTable(node);
@@ -158,21 +163,6 @@ const TreeNode = memo(({
     e.preventDefault();
     e.stopPropagation();
     handleMoreMenu(e);
-  };
-
-  // 组合样式：优先拖拽 > 悬浮 > 基础
-  const combinedStyles = {
-    ...nodeBaseStyles,
-    ...(isDragging && dragSourceStyles),
-    ...(isDragOver && dragOverStyles(theme)),
-    paddingLeft: `${12 + level * 12}px`,
-    cursor: isDraggable ? 'grab' : (isExpandable ? 'pointer' : (isLoading ? 'wait' : 'default')),
-    background: (isDragging ? 'transparent' : ((isHovered || isActive) ? theme.hoverBg : 'transparent')),
-    border: (isDragOver ? `2px dashed ${theme.accentColor}` : ((isHovered || isActive) ? `1px solid ${theme.accentColor}20` : (isConnected ? `1px solid ${theme.accentColor}10` : '1px solid transparent'))),
-    transform: (isDragging ? 'rotate(5deg)' : ((isHovered || isActive) ? 'translateX(1px)' : 'translateX(0)')),
-    boxShadow: (isDragging ? '0 4px 12px rgba(0,0,0,0.2)' : ((isHovered || isActive) ? `0 1px 4px ${theme.accentColor}10` : 'none')),
-    opacity: isDragging ? 0.5 : 1,
-    paddingRight: (isHovered || isActive) ? '4px' : '8px'
   };
 
   return (
@@ -211,7 +201,7 @@ const TreeNode = memo(({
         style={nodeIconStyles(isHovered || isActive || isDragOver, theme)}
       />
 
-      <span style={{...nodeNameStyles(isHovered || isActive || isDragOver), color: (isHovered || isActive || isDragOver) ? theme.textColor : '#333' }}>
+      <span style={{ ...nodeNameStyles(isHovered || isActive || isDragOver), color: (isHovered || isActive || isDragOver) ? theme.textColor : '#333' }}>
         {node.name}
       </span>
 

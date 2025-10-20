@@ -1,13 +1,61 @@
-// components/sidebar/MoreActionsMenu.jsx
 import React, { useState } from 'react';
-import { getAllActions } from './actions';
+import { getAllActions } from '../../actions/dbActions';
+import toast from 'react-hot-toast';
 
-const MoreActionsMenu = ({ node, position, onClose, treeData, setTreeData, setExpandedKeys, openNewGroup, openNewConnection, openConfirm, openRenameFolder, openEditConnection }) => {
+const MoreActionsMenu = ({
+  node,
+  position,
+  onClose,
+  setExpandedKeys,
+  openNewGroup,
+  openNewConnection,
+  openConfirm,
+  openRenameFolder,
+  openEditConnection,
+  refreshFolder,
+  deleteFolder,
+  refreshConnection,
+  connectDatabase,
+  disconnectDatabase,
+  refreshDatabase,
+  refreshSchema,
+  createNewSchema,
+  exportDatabase,
+  createNewTable,
+  exportSchema,
+  previewTable,
+  editTableStructure,
+  generateTableSQL,
+  exportTableData,
+  viewDefinition,
+  editView,
+  generateViewSQL,
+  editFunction,
+  viewFunctionSource,
+  testFunction,
+  showProperties,
+  deleteConnection,
+  deleteDatabase,
+  deleteSchema,
+  deleteTable,
+  deleteView,
+  deleteFunction
+}) => {
   const [hoveredItem, setHoveredItem] = useState(null);
-  const actions = getAllActions(node.type, node, treeData, setTreeData, setExpandedKeys, openNewGroup, openNewConnection, openConfirm, openRenameFolder, openEditConnection);
+  // 修复：传入所有必要 props 到 getAllActions
+  const actions = getAllActions(node.type, node, setExpandedKeys, openNewGroup, openNewConnection, openConfirm, openRenameFolder, openEditConnection, refreshFolder, deleteFolder, refreshConnection, connectDatabase, disconnectDatabase, refreshDatabase, refreshSchema, createNewSchema, exportDatabase, createNewTable, exportSchema, previewTable, editTableStructure, generateTableSQL, exportTableData, viewDefinition, editView, generateViewSQL, editFunction, viewFunctionSource, testFunction, showProperties, deleteConnection, deleteDatabase, deleteSchema, deleteTable, deleteView, deleteFunction);
 
   const handleAction = (action) => {
-    action();
+    try {
+      if (typeof action === 'function') {
+        action();
+      } else {
+        toast.error('无效操作');
+      }
+    } catch (error) {
+      console.error('Action error:', error);
+      toast.error('操作执行失败');
+    }
     onClose();
   };
 

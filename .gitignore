@@ -40,3 +40,4 @@ build/
 /**/node_modules/
 /frontend/dist-electron/
 /.nebula/
+/frontend/dist/

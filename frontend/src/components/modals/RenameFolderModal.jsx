@@ -1,29 +1,41 @@
-// NewGroupModal.jsx
-import React, { useState } from "react";
-import "../../css/NewGroupModal.css";
+import React, { useState, useEffect } from "react";
+import '../../css/NewGroupModal.css'; // 复用样式
+import toast from 'react-hot-toast';
 
-const NewGroupModal = ({ isOpen, onClose, onSubmit, parentId }) => {
-  const [groupName, setGroupName] = useState("");
+const RenameFolderModal = ({ isOpen, onClose, parentId, defaultName = "", onSubmit }) => {
+  const [groupName, setGroupName] = useState(defaultName || "");
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setGroupName(defaultName || "");
+      setError(null);
+    }
+  }, [defaultName, isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!groupName.trim()) return;
+    if (!groupName.trim()) {
+      setError("文件夹名称不能为空");
+      return;
+    }
 
     try {
-      onSubmit(groupName, parentId);
+      await onSubmit(groupName, parentId);
+      toast.success("重命名成功");
       setGroupName("");
       onClose();
     } catch (err) {
-      console.error("Error creating group:", err);
-      setError("创建分组失败，请重试。");
+      console.error("Error renaming folder:", err);
+      setError("重命名文件夹失败，请重试。");
+      toast.error("重命名失败");
     }
   };
 
   const handleCancel = () => {
-    setGroupName("");
+    setGroupName(defaultName || "");
     setError(null);
     onClose();
   };
@@ -31,17 +43,17 @@ const NewGroupModal = ({ isOpen, onClose, onSubmit, parentId }) => {
   return (
     <div className="modal-overlay">
       <div className="modal-content">
-        <h2 className="modal-title">新建分组</h2>
+        <h2 className="modal-title">重命名文件夹</h2>
         {error && <div className="error-message">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="groupName">分组名称</label>
+            <label htmlFor="groupName">文件夹名称</label>
             <input
               type="text"
               id="groupName"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
-              placeholder="输入分组名称"
+              placeholder="输入文件夹名称"
               className="modal-input"
               autoFocus
             />
@@ -68,4 +80,4 @@ const NewGroupModal = ({ isOpen, onClose, onSubmit, parentId }) => {
   );
 };
 
-export default NewGroupModal;
+export default RenameFolderModal;

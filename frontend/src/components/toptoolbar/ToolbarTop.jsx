@@ -1,19 +1,20 @@
-// ToolbarTop.jsx
-import React, { useState } from 'react';
+import React from 'react';
 import '../../css/ToolbarTop.css';
-// Modals moved to App
-
-
-// Import your static icon assets
 import NewFileIcon from '../../public/icons/toptoolbar/new_folder_2_color.svg';
 import ConnectIcon from '../../public/icons/toptoolbar/new_connection_3_color.svg';
 import QueryIcon from '../../public/icons/toptoolbar/query_3.svg';
-import SettingsIcon from '../../public/icons/toptoolbar/setting_2_color.svg';
-import SearchIcon from '../../public/icons/toptoolbar/new_folder_1.svg';
-import ExecuteIcon from '../../public/icons/toptoolbar/new_folder_1.svg';
+import SearchIcon from '../../public/icons/toptoolbar/new_folder_1.svg'; // 假设图标
+import ExecuteIcon from '../../public/icons/toptoolbar/new_folder_1.svg'; // 假设图标
+import RefreshIcon from '../../public/icons/toptoolbar/refresh.svg'; // 假设刷新图标
+import { useTabsStore } from '../../stores/useTabsStore';
+import { useTreeStore } from '../../stores/useTreeStore';
+import { openNewGroup, openNewConnection } from '../modals/modalActions'; // 导入 actions
+import { useModal } from '../modals/ModalProvider'; // 修复：导入 useModal Hook
 
-const ToolbarTop = ({ addTab, refreshTree, openNewGroup, openNewConnection }) => {
-  // Handlers moved to App
+const ToolbarTop = () => {
+  const addTab = useTabsStore((state) => state.addTab);
+  const refreshTree = useTreeStore((state) => state.refreshTree);
+  const { openModal } = useModal(); // 修复：获取 openModal
 
   return (
     <div className="toolbar-top">
@@ -21,14 +22,14 @@ const ToolbarTop = ({ addTab, refreshTree, openNewGroup, openNewConnection }) =>
         <button
           className="btn btn-icon"
           title="新建分组"
-          onClick={() => openNewGroup()}
+          onClick={() => openNewGroup(null, openModal)} // 修复：传递 openModal 参数
         >
           <img src={NewFileIcon} alt="新建分组" className="icon" />
         </button>
         <button
           className="btn btn-icon"
           title="新建连接"
-          onClick={() => openNewConnection()}
+          onClick={() => openNewConnection(null, openModal)} // 修复：传递 openModal 参数
         >
           <img src={ConnectIcon} alt="新建连接" className="icon" />
         </button>
@@ -48,8 +49,10 @@ const ToolbarTop = ({ addTab, refreshTree, openNewGroup, openNewConnection }) =>
         <button className="btn btn-icon" title="执行">
           <img src={ExecuteIcon} alt="执行" className="icon" />
         </button>
+        <button className="btn btn-icon" title="刷新树" onClick={refreshTree}>
+          <img src={RefreshIcon} alt="刷新" className="icon" />
+        </button>
       </div>
-
     </div>
   );
 };

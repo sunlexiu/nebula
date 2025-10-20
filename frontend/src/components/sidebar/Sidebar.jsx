@@ -1,104 +1,42 @@
-// Sidebar.jsx
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import TreeNode from './TreeNode';
-import { findNode, moveNode } from './actions';
-import deegoLogo from '../../public/icons/deego_1.svg';
+import TreeContainer from './TreeContainer';
 import MoreActionsMenu from './MoreActionsMenu';
-import RenameFolderModal from './RenameFolderModal';
-import EditConnectionModal from './EditConnectionModal';
+import deegoLogo from '../../public/icons/deego_1.svg';
+import { useTreeStore } from '../../stores/useTreeStore';
+import { useModal } from '../modals/ModalProvider';
+import { openNewGroup, openNewConnection, openConfirm, openRenameFolder, openEditConnection } from '../modals/modalActions';
+import { refreshFolder, deleteFolder } from '../../actions/treeActions'; // 修复：从 treeActions 导入树函数
+import { connectDatabase, disconnectDatabase, refreshConnection, deleteConnection, refreshDatabase, refreshSchema, createNewSchema, exportDatabase, createNewTable, exportSchema, previewTable, editTableStructure, generateTableSQL, exportTableData, viewDefinition, editView, generateViewSQL, editFunction, viewFunctionSource, testFunction, showProperties, deleteDatabase, deleteSchema, deleteTable, deleteView, deleteFunction } from '../../actions/dbActions'; // 修复：从 dbActions 导入 DB 函数
+import { useDragDrop } from './hooks/useDragDrop';
 
-const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openConfirm }) => {
+const Sidebar = ({ treeData }) => {
   const [expandedKeys, setExpandedKeys] = useState(new Map());
-  const [hoveredNode, setHoveredNode] = useState(null);
   const [showMoreMenu, setShowMoreMenu] = useState(null);
   const [moreMenuPosition, setMoreMenuPosition] = useState({ x: 0, y: 0, flip: false });
   const [activeMoreMenuNode, setActiveMoreMenuNode] = useState(null);
-  const [renameFolderModal, setRenameFolderModal] = useState({ isOpen: false, node: null, onSubmit: null });
-  // 新增：拖拽状态
-  const [dragSourceId, setDragSourceId] = useState(null);
-  const [dragOverNodeId, setDragOverNodeId] = useState(null);
-  // 新增：根拖拽高亮状态
-  const [isDragOverRoot, setIsDragOverRoot] = useState(false);
-  // 新增：编辑连接模态框状态
-  const [editConnectionModal, setEditConnectionModal] = useState({ isOpen: false, connection: null, onSubmit: null });
+  const [hoveredNode, setHoveredNode] = useState(null);
+  const { openModal } = useModal();
+  const { dragSourceId, setDragSourceId, dragOverNodeId, setDragOverNodeId, isDragOverRoot, setIsDragOverRoot } = useDragDrop();
+  const updateTreePath = useTreeStore((state) => state.updateTreePath); // 从 store 获取 updateTreePath
 
-  // 外部点击检测和 Escape 键关闭
+  // 外部点击关闭菜单
   useEffect(() => {
-    if (!showMoreMenu && !renameFolderModal.isOpen && !editConnectionModal.isOpen) return;
-
+    if (!showMoreMenu) return;
     const handleClickOutside = (event) => {
-      if (!event.target.closest('.more-actions-menu') && !event.target.closest('.tree-node') && !event.target.closest('.modal-content')) {
+      if (!event.target.closest('.more-actions-menu') && !event.target.closest('.tree-node')) {
         setShowMoreMenu(null);
         setMoreMenuPosition({ x: 0, y: 0, flip: false });
         setActiveMoreMenuNode(null);
-        setRenameFolderModal({ isOpen: false, node: null, onSubmit: null });
-        setEditConnectionModal({ isOpen: false, connection: null, onSubmit: null });
       }
     };
-
-    const handleEscape = (event) => {
-      if (event.key === 'Escape') {
-        setShowMoreMenu(null);
-        setMoreMenuPosition({ x: 0, y: 0, flip: false });
-        setActiveMoreMenuNode(null);
-        setRenameFolderModal({ isOpen: false, node: null, onSubmit: null });
-        setEditConnectionModal({ isOpen: false, connection: null, onSubmit: null });
-      }
-    };
-
     document.addEventListener('click', handleClickOutside);
-    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showMoreMenu]);
 
-    return () => {
-      document.removeEventListener('click', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [showMoreMenu, renameFolderModal.isOpen, editConnectionModal.isOpen]);
-
-  // 新增：拖拽结束清理
-  useEffect(() => {
-    const handleDragEnd = () => {
-      setDragSourceId(null);
-      setDragOverNodeId(null);
-      setIsDragOverRoot(false);
-    };
-    document.addEventListener('dragend', handleDragEnd);
-    return () => document.removeEventListener('dragend', handleDragEnd);
-  }, []);
-
-  // 新增：处理根路径 drop
-  const handleRootDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOverRoot(false);
-    if (dragSourceId) {
-      const sourceNode = findNode(treeData, dragSourceId);
-      if (sourceNode && (sourceNode.type === 'folder' || sourceNode.type === 'connection')) {
-        moveNode(dragSourceId, null, setTreeData, openConfirm, sourceNode.type);
-      }
-    }
-  };
-
-  // 新增：根路径 drag over
-  const handleRootDragOver = (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragSourceId) {
-      setIsDragOverRoot(true);
-    }
-  };
-
-  // 新增：根路径 drag leave
-  const handleRootDragLeave = (e) => {
-    setIsDragOverRoot(false);
-  };
-
-  // 处理更多菜单
   const handleMoreMenu = (e, node) => {
     e.stopPropagation();
-    const treeItem = e.currentTarget;
-    const rect = treeItem.getBoundingClientRect();
+    const rect = e.currentTarget.getBoundingClientRect();
     const baseY = rect.bottom;
     const estimatedMenuHeight = 200;
     const viewportHeight = window.innerHeight;
@@ -126,261 +64,111 @@ const Sidebar = ({ treeData, setTreeData, openNewGroup, openNewConnection, openC
 
     setMoreMenuPosition({ x: e.clientX + 5, y: adjustedY, flip });
     setShowMoreMenu(node.id);
+    setActiveMoreMenuNode(node.id);
   };
 
-  // 打开重命名模态框
-  const openRenameFolderModal = (options) => {
-    setRenameFolderModal({
-      isOpen: true,
-      node: { id: options.id, name: options.name },
-      onSubmit: options.onSubmit
-    });
-  };
+  const openRenameFolderModal = (node) => openRenameFolder(node, openModal);
+  const openEditConnectionModal = (connection) => openEditConnection(connection, openModal);
 
-  // 新增：打开编辑连接模态框
-  const openEditConnectionModal = (options) => {
-    setEditConnectionModal({
-      isOpen: true,
-      connection: options,
-      onSubmit: options.onSubmit
-    });
-  };
-
-  // 新增：修正的 moveNode wrapper，自动获取 source type
-  const handleMoveNode = (sourceId, targetId) => {
-    const sourceNode = findNode(treeData, sourceId);
-    if (sourceNode && (sourceNode.type === 'folder' || sourceNode.type === 'connection')) {
-      moveNode(sourceId, targetId, setTreeData, openConfirm, sourceNode.type);
-    }
-  };
-
-  // 渲染树节点
-  const renderTreeNodes = useMemo(() => (nodes, level = 0) => {
-    if (!nodes || nodes.length === 0) {
-      return (
-        <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '14px' }}>
-          无数据
-        </div>
-      );
-    }
-    return nodes.map((node) => {
-      const isExpanded = expandedKeys.get(node.id) || false;
-      const renderedNode = (
-        <TreeNode
-          key={node.id}
-          node={{ ...node, expanded: isExpanded }}
-          level={level}
-          hoveredNode={hoveredNode}
-          setHoveredNode={setHoveredNode}
-          treeData={treeData}
-          setTreeData={setTreeData}
-          expandedKeys={expandedKeys}
-          setExpandedKeys={setExpandedKeys}
-          onMoreMenu={handleMoreMenu}
-          openNewGroup={openNewGroup}
-          openNewConnection={openNewConnection}
-          openConfirm={openConfirm}
-          openRenameFolder={openRenameFolderModal}
-          openEditConnection={openEditConnectionModal}
-          activeMoreMenuNode={activeMoreMenuNode}
-          setActiveMoreMenuNode={setActiveMoreMenuNode}
-          // 新增：拖拽 props
-          dragSourceId={dragSourceId}
-          setDragSourceId={setDragSourceId}
-          dragOverNodeId={dragOverNodeId}
-          setDragOverNodeId={setDragOverNodeId}
-          moveNode={handleMoveNode}
-        />
-      );
-
-      if (isExpanded && node.children && node.children.length > 0) {
-        return (
-          <React.Fragment key={node.id}>
-            {renderedNode}
-            <div
-              style={{
-                marginLeft: '2px',
-                paddingLeft: '1px',
-                borderLeft: '1px solid #e0e7ff',
-                marginTop: '1px',
-                transition: 'max-height 0.3s ease',
-                overflow: 'hidden'
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                if (dragSourceId && dragSourceId !== node.id && node.type === 'folder') {
-                  setDragOverNodeId(node.id);
-                }
-              }}
-              onDragLeave={(e) => {
-                if (dragOverNodeId === node.id) {
-                  setDragOverNodeId(null);
-                }
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (dragSourceId && dragSourceId !== node.id && node.type === 'folder') {
-                  handleMoveNode(dragSourceId, node.id);
-                }
-                setDragOverNodeId(null);
-              }}
-            >
-              {renderTreeNodes(node.children, level + 1)}
-            </div>
-          </React.Fragment>
-        );
-      }
-
-      return renderedNode;
-    });
-  }, [expandedKeys, hoveredNode, treeData, openNewGroup, openNewConnection, openConfirm, activeMoreMenuNode, dragSourceId, dragOverNodeId, handleMoveNode, openEditConnectionModal]);
-
-  // Portal 渲染菜单
   const renderMoreMenuPortal = () => {
     if (!showMoreMenu || !treeData) return null;
-    const node = findNode(treeData, showMoreMenu);
+    const node = treeData.find((n) => n.id === showMoreMenu) || null; // 简化，实际可递归
     if (!node) return null;
-
     return createPortal(
-      <>
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.1)',
-            zIndex: 999
-          }}
-          onClick={() => {
-            setShowMoreMenu(null);
-            setMoreMenuPosition({ x: 0, y: 0, flip: false });
-            setActiveMoreMenuNode(null);
-          }}
-        />
-        <MoreActionsMenu
-          node={node}
-          position={moreMenuPosition}
-          onClose={() => {
-            setShowMoreMenu(null);
-            setMoreMenuPosition({ x: 0, y: 0, flip: false });
-            setActiveMoreMenuNode(null);
-          }}
-          treeData={treeData}
-          setTreeData={setTreeData}
-          setExpandedKeys={setExpandedKeys}
-          openNewGroup={openNewGroup}
-          openNewConnection={openNewConnection}
-          openConfirm={openConfirm}
-          openRenameFolder={openRenameFolderModal}
-          openEditConnection={openEditConnectionModal}
-        />
-      </>,
+      <MoreActionsMenu
+        node={node}
+        position={moreMenuPosition}
+        onClose={() => { setShowMoreMenu(null); setActiveMoreMenuNode(null); }}
+        setExpandedKeys={setExpandedKeys}
+        openNewGroup={(parentId) => openNewGroup(parentId, openModal)}
+        openNewConnection={(parentId) => openNewConnection(parentId, openModal)}
+        openConfirm={(title, message, onConfirm, variant) => openConfirm(title, message, onConfirm, variant, openModal)}
+        openRenameFolder={openRenameFolderModal}
+        openEditConnection={openEditConnectionModal}
+        refreshFolder={(node) => refreshFolder(node)}
+        deleteFolder={(node) => deleteFolder(node, openModal)}
+        refreshConnection={(node, setExpandedKeys) => refreshConnection(node, setExpandedKeys)}
+        connectDatabase={(node) => connectDatabase(node, updateTreePath)}
+        disconnectDatabase={(node) => disconnectDatabase(node, updateTreePath)}
+        refreshDatabase={(node, setExpandedKeys) => refreshDatabase(node, setExpandedKeys)}
+        refreshSchema={(node, setExpandedKeys) => refreshSchema(node, setExpandedKeys)}
+        createNewSchema={(node) => createNewSchema(node)}
+        exportDatabase={(node) => exportDatabase(node)}
+        createNewTable={(node) => createNewTable(node)}
+        exportSchema={(node) => exportSchema(node)}
+        previewTable={(node) => previewTable(node)}
+        editTableStructure={(node) => editTableStructure(node)}
+        generateTableSQL={(node) => generateTableSQL(node)}
+        exportTableData={(node) => exportTableData(node)}
+        viewDefinition={(node) => viewDefinition(node)}
+        editView={(node) => editView(node)}
+        generateViewSQL={(node) => generateViewSQL(node)}
+        editFunction={(node) => editFunction(node)}
+        viewFunctionSource={(node) => viewFunctionSource(node)}
+        testFunction={(node) => testFunction(node)}
+        showProperties={(node) => showProperties(node)}
+        deleteConnection={(node) => deleteConnection(node, openModal)}
+        deleteDatabase={(node) => deleteDatabase(node, openModal)}
+        deleteSchema={(node) => deleteSchema(node, openModal)}
+        deleteTable={(node) => deleteTable(node, openModal)}
+        deleteView={(node) => deleteView(node, openModal)}
+        deleteFunction={(node) => deleteFunction(node, openModal)}
+      />,
       document.body
     );
   };
 
-  // 新增：根容器拖拽高亮样式
-  const rootContainerStyle = {
-    minHeight: '20px',
-    padding: '0 16px',
-    transition: 'all 0.2s ease',
-    border: isDragOverRoot ? '2px dashed #0b69ff' : 'none',
-    background: isDragOverRoot ? '#f8f9fa' : 'transparent',
-    borderRadius: '4px',
-    margin: '0 4px'
-  };
-
   return (
     <>
-      <div className="sidebar-tree" style={{
-        padding: '12px 0',
-        height: '100%',
-        overflow: 'auto',
-        background: 'var(--sidebar-bg)',
-        position: 'relative'
-      }}>
+      <div className="sidebar-tree">
         <div style={{ padding: '0 16px', marginBottom: '20px' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '12px 16px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            borderRadius: '10px',
-            boxShadow: '0 4px 14px rgba(102, 126, 234, 0.2)',
-            marginBottom: '16px',
-            color: 'white',
-            transition: 'all 0.3s ease',
-            cursor: 'pointer'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.3)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 4px 14px rgba(102, 126, 234, 0.2)';
-          }}
-          onClick={() => console.log('打开数据库设置')}
+          <div
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '10px',
+              boxShadow: '0 4px 14px rgba(102, 126, 234, 0.2)', marginBottom: '16px', color: 'white',
+              transition: 'all 0.3s ease', cursor: 'pointer'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(102, 126, 234, 0.2)';
+            }}
+            onClick={() => console.log('打开数据库设置')}
           >
-            <img
-              src={deegoLogo}
-              alt="Deego"
-              style={{
-                width: 25,
-                height: 25,
-                filter: 'brightness(0) invert(1)'
-              }}
-            />
+            <img src={deegoLogo} alt="Deego" style={{ width: 25, height: 25, filter: 'brightness(0) invert(1)' }} />
             <div>
-              <div style={{ fontSize: '14px', fontWeight: '600' }}>
-                Deego
-              </div>
-              <div style={{ fontSize: '11px', opacity: 0.9, marginTop: '2px' }}>
-                Your Data Buddy
-              </div>
+              <div style={{ fontSize: '14px', fontWeight: '600' }}>Deego</div>
+              <div style={{ fontSize: '11px', opacity: 0.9, marginTop: '2px' }}>Your Data Buddy</div>
             </div>
           </div>
         </div>
-
-        {/* 新增：根路径拖拽容器 */}
-        <div
-          className="tree-container"
-          style={rootContainerStyle}
-          onDragOver={handleRootDragOver}
-          onDragLeave={handleRootDragLeave}
-          onDrop={handleRootDrop}
-        >
-          {renderTreeNodes(treeData)}
-        </div>
+        <TreeContainer
+          treeData={treeData}
+          expandedKeys={expandedKeys}
+          setExpandedKeys={setExpandedKeys}
+          hoveredNode={hoveredNode}
+          setHoveredNode={setHoveredNode}
+          onMoreMenu={handleMoreMenu}
+          activeMoreMenuNode={activeMoreMenuNode}
+          setActiveMoreMenuNode={setActiveMoreMenuNode}
+          dragSourceId={dragSourceId}
+          setDragSourceId={setDragSourceId}
+          dragOverNodeId={dragOverNodeId}
+          setDragOverNodeId={setDragOverNodeId}
+          isDragOverRoot={isDragOverRoot}
+          setIsDragOverRoot={setIsDragOverRoot}
+          openNewGroup={(parentId) => openNewGroup(parentId, openModal)}
+          openNewConnection={(parentId) => openNewConnection(parentId, openModal)}
+          openRenameFolder={(node) => openRenameFolder(node, openModal)}
+          openEditConnection={(connection) => openEditConnection(connection, openModal)}
+          openModal={openModal}
+        />
       </div>
-
-      {/* Portal 菜单渲染 */}
       {renderMoreMenuPortal()}
-
-      {/* 重命名文件夹模态框 */}
-      {renameFolderModal.isOpen && (
-        <RenameFolderModal
-          isOpen={renameFolderModal.isOpen}
-          onClose={() => setRenameFolderModal({ isOpen: false, node: null, onSubmit: null })}
-          onSubmit={renameFolderModal.onSubmit}
-          parentId={renameFolderModal.node?.id}
-          defaultName={renameFolderModal.node?.name}
-        />
-      )}
-
-      {/* 新增：编辑连接模态框 */}
-      {editConnectionModal.isOpen && (
-        <EditConnectionModal
-          isOpen={editConnectionModal.isOpen}
-          onClose={() => setEditConnectionModal({ isOpen: false, connection: null, onSubmit: null })}
-          onSubmit={editConnectionModal.onSubmit}
-          connection={editConnectionModal.connection}
-        />
-      )}
     </>
   );
 };
