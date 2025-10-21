@@ -9,6 +9,7 @@ import { openNewGroup, openNewConnection, openConfirm, openRenameFolder, openEdi
 import { refreshFolder, deleteFolder } from '../../actions/treeActions'; // 修复：从 treeActions 导入树函数
 import { connectDatabase, disconnectDatabase, refreshConnection, deleteConnection, refreshDatabase, refreshSchema, createNewSchema, exportDatabase, createNewTable, exportSchema, previewTable, editTableStructure, generateTableSQL, exportTableData, viewDefinition, editView, generateViewSQL, editFunction, viewFunctionSource, testFunction, showProperties, deleteDatabase, deleteSchema, deleteTable, deleteView, deleteFunction } from '../../actions/dbActions'; // 修复：从 dbActions 导入 DB 函数
 import { useDragDrop } from './hooks/useDragDrop';
+import { findNode } from '../../utils/treeUtils';
 
 const Sidebar = ({ treeData }) => {
   const [expandedKeys, setExpandedKeys] = useState(new Map());
@@ -72,7 +73,7 @@ const Sidebar = ({ treeData }) => {
 
   const renderMoreMenuPortal = () => {
     if (!showMoreMenu || !treeData) return null;
-    const node = treeData.find((n) => n.id === showMoreMenu) || null; // 简化，实际可递归
+    const node = findNode(treeData, showMoreMenu);
     if (!node) return null;
     return createPortal(
       <MoreActionsMenu
