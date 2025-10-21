@@ -9,6 +9,7 @@ import com.slx.nebula.model.ConnectionConfig;
 import com.slx.nebula.model.Folder;
 import com.slx.nebula.model.MoveNodeReq;
 import com.slx.nebula.repository.ConfigRepository;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -98,6 +99,11 @@ public class ConfigController {
         if (provider == null) {
             throw new BizException(ErrorCode.BUSINESS_ERROR, "no provider: " + cfg.getDbType());
         }
+        if (!StringUtils.hasText(cfg.getPassword()) && StringUtils.hasText(cfg.getId())) {
+            var opt = repo.findConnectionById(cfg.getId());
+			opt.ifPresent(connectionConfig -> cfg.setPassword(connectionConfig.getPassword()));
+        }
+
         return ApiResponse.success(provider.testConnection(cfg));
     }
 }

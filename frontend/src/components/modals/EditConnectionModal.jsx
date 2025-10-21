@@ -93,6 +93,7 @@ const EditConnectionModal = ({ isOpen, onClose, connection, onSubmit }) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          id: connection.id,
           ...connectionData,
           host: normalizeHost(connectionData.host),
           port: parseInt(connectionData.port, 10),
