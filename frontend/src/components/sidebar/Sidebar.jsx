@@ -51,6 +51,7 @@ const Sidebar = ({ treeData }) => {
       window.removeEventListener('scroll', close, true);
       window.removeEventListener('resize', close);
     };
+
   }, [showMoreMenu]);
 
   const handleMoreMenu = (e, node) => {

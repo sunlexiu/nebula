@@ -1,6 +1,40 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import "../../css/NewConnectionModal.css"; // 复用现有样式
-import toast from 'react-hot-toast';
+import toast from "react-hot-toast";
+
+const defaultPort = (dbType) => ({
+  POSTGRESQL: "5432",
+  MYSQL: "3306",
+  SQLSERVER: "1433",
+  ORACLE: "1521",
+}[dbType] || "");
+
+const rowStyle = { display: "flex", gap: 12, flexWrap: "wrap" };
+const colStyle = { flex: "1 1 240px", minWidth: 240 };
+const statusBox = (ok) => ({
+  marginTop: 12,
+  padding: "10px 12px",
+  borderRadius: 8,
+  fontSize: 13,
+  lineHeight: 1.5,
+  border: `1px solid ${ok ? "#16a34a30" : "#ef444430"}`,
+  background: ok ? "#16a34a15" : "#ef44441a",
+  color: ok ? "#065f46" : "#7f1d1d",
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 8,
+});
+const footerStyle = {
+  position: "sticky",
+  bottom: 0,
+  background: "#fff",
+  paddingTop: 12,
+  marginTop: 12,
+  borderTop: "1px solid #eee",
+  display: "flex",
+  gap: 8,
+  justifyContent: "flex-end",
+};
 
 const EditConnectionModal = ({ isOpen, onClose, connection, onSubmit }) => {
   const [connectionData, setConnectionData] = useState({
@@ -15,6 +49,8 @@ const EditConnectionModal = ({ isOpen, onClose, connection, onSubmit }) => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState(null);
+  const [isTesting, setIsTesting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isOpen && connection) {
@@ -22,15 +58,20 @@ const EditConnectionModal = ({ isOpen, onClose, connection, onSubmit }) => {
         name: connection.name || "",
         dbType: connection.dbType || "POSTGRESQL",
         host: connection.host || "localhost",
-        port: connection.port?.toString() || "5432",
+        port: String(connection.port || defaultPort(connection.dbType || "POSTGRESQL")),
         database: connection.database || "postgres",
         username: connection.username || "",
-        password: connection.password || "", // 注意：密码可能需要从后端安全获取，或提示重新输入
-        savePassword: connection.savePassword || false,
+        password: "",
+        savePassword: false,
       });
       setConnectionStatus(null);
     }
   }, [isOpen, connection]);
+
+  const requiredOk = useMemo(() => {
+    const { name, host, port, username } = connectionData;
+    return !!name && !!host && !!port && !!username;
+  }, [connectionData]);
 
   if (!isOpen) return null;
 
@@ -42,84 +83,98 @@ const EditConnectionModal = ({ isOpen, onClose, connection, onSubmit }) => {
     }));
   };
 
+  const normalizeHost = (host) => (host === "localhost" ? "127.0.0.1" : host);
+
   const handleTestConnection = async () => {
-    // 实际测试连接逻辑：调用后端测试接口
-    setConnectionStatus("Testing...");
+    setIsTesting(true);
+    setConnectionStatus({ ok: null, msg: "Testing..." });
     try {
-      const testPayload = {
-        dbType: connectionData.dbType,
-        host: connectionData.host,
-        port: parseInt(connectionData.port),
-        database: connectionData.database,
-        username: connectionData.username,
-        password: connectionData.password,
-        type: "connection",
-      };
-      const response = await fetch('/api/config/connections/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(testPayload),
+      const response = await fetch("/api/config/connections/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...connectionData,
+          host: normalizeHost(connectionData.host),
+          port: parseInt(connectionData.port, 10),
+          type: "connection",
+        }),
       });
-      const result = await response.json();
+      const result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setConnectionStatus("Connection failed: " + result.message);
-        toast.error('连接测试失败');
+        const msg =
+          result?.message ||
+          "Connection failed. Please check host/port and DB service.";
+        setConnectionStatus({ ok: false, msg });
         return;
       }
-      setConnectionStatus("Connected successfully!");
-      toast.success('连接测试成功');
+      setConnectionStatus({ ok: true, msg: "Connected successfully!" });
+      toast.success("连接测试成功");
     } catch (error) {
-      setConnectionStatus("Connection failed: " + error.message);
-      toast.error('连接测试失败');
+      setConnectionStatus({
+        ok: false,
+        msg:
+          error?.message ||
+          "Connection failed. Check that the service is listening.",
+      });
+    } finally {
+      setIsTesting(false);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (connectionData.name && connectionData.host && connectionData.port && connectionData.username) {
-      try {
-        // 构建完整 payload，包括 id 用于更新
-        const payload = {
-          id: connection.id,
-          ...connectionData,
-          port: parseInt(connectionData.port),
-          type: 'connection',
-        };
-        await onSubmit(payload);
-        if (connectionData.savePassword) {
-          // 安全存储密码（建议加密）
-          localStorage.setItem(`savedPassword_${connection.id}`, connectionData.password);
-        }
-        toast.success('编辑连接成功');
-        onClose();
-      } catch (error) {
-        console.error('Error updating connection:', error);
-        toast.error('编辑连接失败');
+    if (!requiredOk) return;
+    setIsSaving(true);
+    try {
+      const payload = {
+        id: connection.id,
+        ...connectionData,
+        host: normalizeHost(connectionData.host),
+        port: parseInt(connectionData.port, 10),
+        type: "connection",
+      };
+      await onSubmit(payload);
+      if (connectionData.savePassword) {
+        localStorage.setItem(`savedPassword_${connection.id}`, connectionData.password);
       }
+      toast.success("修改连接成功");
+      onClose();
+    } catch (error) {
+      toast.error("修改连接失败");
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleCancel = () => {
-    setConnectionData({
-      name: "",
-      dbType: "POSTGRESQL",
-      host: "localhost",
-      port: "5432",
-      database: "postgres",
-      username: "",
-      password: "",
-      savePassword: false,
-    });
     setConnectionStatus(null);
     onClose();
   };
 
   return (
     <div className="modal-overlay" onClick={handleCancel}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <h2 className="modal-title">编辑连接</h2>
+      <div
+        className="modal-content"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 680, width: "92%", maxHeight: "82vh", overflow: "auto" }}
+      >
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            background: "#fff",
+            paddingBottom: 10,
+            marginBottom: 8,
+            zIndex: 1,
+          }}
+        >
+          <h2 className="modal-title" style={{ marginBottom: 0 }}>
+            编辑连接
+          </h2>
+        </div>
+
         <form onSubmit={handleSubmit}>
-          <div className="form-section">
+          <div className="form-section" style={{ paddingBottom: 0 }}>
             <div className="form-group">
               <label htmlFor="name">连接名称</label>
               <input
@@ -133,6 +188,7 @@ const EditConnectionModal = ({ isOpen, onClose, connection, onSubmit }) => {
                 autoFocus
               />
             </div>
+
             <div className="form-group">
               <label htmlFor="dbType">数据库类型</label>
               <select
@@ -148,30 +204,35 @@ const EditConnectionModal = ({ isOpen, onClose, connection, onSubmit }) => {
                 <option value="ORACLE">Oracle</option>
               </select>
             </div>
-            <div className="form-group">
-              <label htmlFor="host">主机</label>
-              <input
-                type="text"
-                id="host"
-                name="host"
-                value={connectionData.host}
-                onChange={handleChange}
-                placeholder="e.g., localhost"
-                className="modal-input"
-              />
+
+            <div style={rowStyle}>
+              <div className="form-group" style={colStyle}>
+                <label htmlFor="host">主机</label>
+                <input
+                  type="text"
+                  id="host"
+                  name="host"
+                  value={connectionData.host}
+                  onChange={handleChange}
+                  placeholder="localhost / 127.0.0.1 / 192.168.x.x"
+                  className="modal-input"
+                />
+              </div>
+              <div className="form-group" style={{ ...colStyle, maxWidth: 200 }}>
+                <label htmlFor="port">端口</label>
+                <input
+                  type="number"
+                  id="port"
+                  name="port"
+                  value={connectionData.port}
+                  onChange={handleChange}
+                  placeholder={defaultPort(connectionData.dbType)}
+                  className="modal-input"
+                  min="1"
+                />
+              </div>
             </div>
-            <div className="form-group">
-              <label htmlFor="port">端口</label>
-              <input
-                type="number"
-                id="port"
-                name="port"
-                value={connectionData.port}
-                onChange={handleChange}
-                placeholder="e.g., 5432"
-                className="modal-input"
-              />
-            </div>
+
             <div className="form-group">
               <label htmlFor="database">数据库</label>
               <input
@@ -180,73 +241,81 @@ const EditConnectionModal = ({ isOpen, onClose, connection, onSubmit }) => {
                 name="database"
                 value={connectionData.database}
                 onChange={handleChange}
-                placeholder="e.g., postgres"
+                placeholder="postgres / db_name"
                 className="modal-input"
               />
             </div>
-          </div>
-          <div className="form-section">
-            <div className="form-group">
-              <label htmlFor="username">用户名</label>
-              <input
-                type="text"
-                id="username"
-                name="username"
-                value={connectionData.username}
-                onChange={handleChange}
-                placeholder="输入用户名"
-                className="modal-input"
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="password">密码</label>
-              <div className="password-wrapper">
+
+            <div style={rowStyle}>
+              <div className="form-group" style={colStyle}>
+                <label htmlFor="username">用户名</label>
                 <input
-                  type={showPassword ? "text" : "password"}
-                  id="password"
-                  name="password"
-                  value={connectionData.password}
+                  type="text"
+                  id="username"
+                  name="username"
+                  value={connectionData.username}
                   onChange={handleChange}
-                  placeholder="输入密码"
+                  placeholder="输入用户名"
                   className="modal-input"
                 />
-                <button
-                  type="button"
-                  className="toggle-password"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? "隐藏" : "显示"}
-                </button>
+              </div>
+
+              <div className="form-group" style={colStyle}>
+                <label htmlFor="password">密码</label>
+                <div className="password-wrapper">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    id="password"
+                    name="password"
+                    value={connectionData.password}
+                    onChange={handleChange}
+                    placeholder="可留空"
+                    className="modal-input"
+                  />
+                  <button
+                    type="button"
+                    className="toggle-password"
+                    onClick={() => setShowPassword((v) => !v)}
+                  >
+                    {showPassword ? "隐藏" : "显示"}
+                  </button>
+                </div>
               </div>
             </div>
-            <div className="form-group checkbox-group">
-              <label>
-                <input
-                  type="checkbox"
-                  name="savePassword"
-                  checked={connectionData.savePassword}
-                  onChange={handleChange}
-                />
-                记住密码
-              </label>
-            </div>
+
+            {connectionStatus && (
+              <div style={statusBox(!!connectionStatus.ok)}>
+                <span style={{ fontWeight: 700 }}>
+                  {connectionStatus.ok === true ? "✓" : connectionStatus.ok === false ? "!" : "…" }
+                </span>
+                <span>{connectionStatus.msg}</span>
+              </div>
+            )}
           </div>
-          {connectionStatus && (
-            <div className={`status-message ${connectionStatus.includes("success") ? "success" : "error"}`}>
-              {connectionStatus}
-            </div>
-          )}
-          <div className="modal-actions">
-            <button type="button" className="btn btn-secondary" onClick={handleTestConnection}>
-              测试连接
+
+          <div style={footerStyle}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleTestConnection}
+              disabled={isSaving || isTesting}
+            >
+              {isTesting ? "测试中…" : "测试连接"}
             </button>
-            <button type="button" className="btn btn-cancel" onClick={handleCancel}>
+            <button
+              type="button"
+              className="btn btn-cancel"
+              onClick={handleCancel}
+              disabled={isSaving}
+            >
               取消
             </button>
-            <button type="submit" className="btn btn-primary" disabled={
-              !connectionData.name || !connectionData.host || !connectionData.port || !connectionData.username
-            }>
-              保存
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={!requiredOk || isSaving || isTesting}
+            >
+              {isSaving ? "保存中…" : "保存"}
             </button>
           </div>
         </form>
