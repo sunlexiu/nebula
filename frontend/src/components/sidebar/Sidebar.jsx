@@ -35,6 +35,24 @@ const Sidebar = ({ treeData }) => {
     return () => document.removeEventListener('click', handleClickOutside);
   }, [showMoreMenu]);
 
+  useEffect(() => {
+    if (!showMoreMenu) return;
+    const onKey = (e) => { if (e.key === 'Escape') { setShowMoreMenu(null); setActiveMoreMenuNode(null); setMoreMenuPosition({ x: 0, y: 0, flip: false });} };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showMoreMenu]);
+
+  useEffect(() => {
+    if (!showMoreMenu) return;
+    const close = () => { setShowMoreMenu(null); setActiveMoreMenuNode(null); setMoreMenuPosition({ x: 0, y: 0, flip: false });};
+    window.addEventListener('scroll', close, true); // 捕获所有滚动容器
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [showMoreMenu]);
+
   const handleMoreMenu = (e, node) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
