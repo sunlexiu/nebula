@@ -1,4 +1,6 @@
 import toast from 'react-hot-toast';
+import { updateConnection } from '../../actions/dbActions';
+import { useTreeStore } from '../../stores/useTreeStore';
 
 // openNewGroup 接收 openModal 参数
 export const openNewGroup = (parentId = null, openModal) => {
@@ -75,9 +77,9 @@ export const openEditConnection = (connection, openModal) => {
   }
   openModal('editConnection', {
     connection,
-    onSubmit: (payload) => {
-      // 调用 updateConnection（从 dbActions）
-      // 假设 updateConnection 已定义
+    onSubmit: async (payload) => {
+      const { updateTreePath } = useTreeStore.getState();
+      await updateConnection(payload, updateTreePath);
     }
   });
 };

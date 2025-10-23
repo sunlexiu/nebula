@@ -138,10 +138,9 @@ const EditConnectionModal = ({ isOpen, onClose, connection, onSubmit }) => {
       if (connectionData.savePassword) {
         localStorage.setItem(`savedPassword_${connection.id}`, connectionData.password);
       }
-      toast.success("修改连接成功");
       onClose();
     } catch (error) {
-      toast.error("修改连接失败");
+      console.error(error)
     } finally {
       setIsSaving(false);
     }

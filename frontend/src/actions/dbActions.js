@@ -86,30 +86,36 @@ export const getAllActions = (nodeType, node, setExpandedKeys, openNewGroup, ope
   ];
 };
 
-// 更新连接
+// 更新连接（自动展示：加载中 → 成功/失败）
 export const updateConnection = async (payload, updateTreePath) => {
-  // openConfirm 逻辑移到组件，保持原样
-  toast.info('保存连接中...');
-  try {
-    const response = await fetch(`/api/config/connections/${payload.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (!response.ok) throw new Error('Failed to update connection');
-    updateTreePath(payload.id, (current) => ({
-      ...current,
-      name: payload.name,
-      dbType: payload.dbType,
-      host: payload.host,
-      port: payload.port,
-      database: payload.database,
-      username: payload.username,
-    }));
-    toast.success(`连接 "${payload.name}" 已更新`);
-  } catch (error) {
-    toast.error('更新失败，请重试');
-  }
+  return toast.promise(
+      (async () => {
+        const response = await fetch(`/api/config/connections/${payload.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) throw new Error('Failed to update connection');
+
+        // 本地状态更新
+        updateTreePath(payload.id, (current) => ({
+          ...current,
+          name: payload.name,
+          dbType: payload.dbType,
+          host: payload.host,
+          port: payload.port,
+          database: payload.database,
+          username: payload.username,
+        }));
+
+        return true; // 成功分支
+      })(),
+      {
+        loading: '保存连接中...',
+        success: `连接 "${payload.name}" 已更新`,
+        error: '更新失败，请重试',
+      }
+  );
 };
 
 // 连接数据库
