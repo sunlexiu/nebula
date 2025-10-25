@@ -1,4 +1,5 @@
 import React, { useState, memo, useMemo } from 'react';
+import { useTreeStore } from '../../stores/useTreeStore';
 import {
   getExpandIcon,
   getNodeIcon,
@@ -56,6 +57,7 @@ const TreeNode = memo(({
   const isDropTarget = node.type === 'folder';
   const primaryAction = getPrimaryAction(node.type);
   const theme = getThemeColors(node.type);
+  const { updateTreePath } = useTreeStore();
   const isExpanded = node.expanded;
   const isConnected = node.connected;
   if (isConnected) theme.accentColor = '#10b981';
@@ -115,10 +117,14 @@ const TreeNode = memo(({
       if (!hasChildren) {
         setIsLoading(true);
         try {
-          const updatedNode = await loadNodeChildren(node, setExpandedKeys);
-          if (updatedNode) {
-            // 更新 store 或 props
-            console.log('Node loaded:', updatedNode); // 实际集成 store
+          const updatedNode = await loadNodeChildren(node);
+          if (updatedNode && updatedNode.children) {
+            // 写回树：只更新 children/expanded
+            updateTreePath(node.id, (current) => ({
+              ...current,
+              children: updatedNode.children,
+              expanded: true
+            }));
           }
           setExpandedKeys((prev) => new Map(prev).set(node.id, true));
         } catch (error) {
@@ -137,7 +143,28 @@ const TreeNode = memo(({
     if (primaryAction && !activeMoreMenuNode) {
       switch (node.type) {
         case 'connection':
-          connectDatabase(node);
+          (async () => {
+            const ok = await connectDatabase(node);
+            if (ok) {
+              // 连接成功后，自动加载并展开下一层（数据库列表）
+              setIsLoading(true);
+              try {
+                const updatedNode = await loadNodeChildren({ ...node, connected: true });
+                if (updatedNode && updatedNode.children) {
+                  updateTreePath(node.id, (current) => ({
+                    ...current,
+                    connected: true,
+                    status: 'connected',
+                    children: updatedNode.children,
+                    expanded: true
+                  }));
+                  setExpandedKeys((prev) => new Map(prev).set(node.id, true));
+                }
+              } finally {
+                setIsLoading(false);
+              }
+            }
+          })();
           break;
         case 'table':
           previewTable(node);

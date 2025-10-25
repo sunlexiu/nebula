@@ -1,4 +1,5 @@
 import toast from 'react-hot-toast';
+import { useTreeStore } from '../stores/useTreeStore';
 
 // 获取主要操作
 export const getPrimaryAction = (nodeType) => {
@@ -87,7 +88,8 @@ export const getAllActions = (nodeType, node, setExpandedKeys, openNewGroup, ope
 };
 
 // 更新连接（自动展示：加载中 → 成功/失败）
-export const updateConnection = async (payload, updateTreePath) => {
+export const updateConnection = async (payload) => {
+  const { updateTreePath } = useTreeStore.getState();
   return toast.promise(
       (async () => {
         const response = await fetch(`/api/config/connections/${payload.id}`, {
@@ -118,26 +120,32 @@ export const updateConnection = async (payload, updateTreePath) => {
   );
 };
 
-// 连接数据库
-export const connectDatabase = (node, updateTreePath) => {
+// 连接数据库（返回 Promise，便于后续自动展开）
+export const connectDatabase = (node) => {
+  const { updateTreePath } = useTreeStore.getState();
   if (node.connected) {
-    toast.info(`已连接: ${node.name}`);
-    return;
+    toast(`已连接: ${node.name}`);
+    return Promise.resolve(false);
   }
-  setTimeout(() => {
-    updateTreePath(node.id, (current) => ({
-      ...current,
-      connected: true,
-      status: 'connected'
-    }));
-    toast.success(`连接成功: ${node.name}`);
-  }, 500);
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      updateTreePath(node.id, (current) => ({
+        ...current,
+        connected: true,
+        status: 'connected'
+      }));
+      toast.success(`已连接: ${node.name}`);
+      resolve(true);
+    }, 300);
+  });
 };
 
+
 // 断开连接
-export const disconnectDatabase = (node, updateTreePath) => {
+export const disconnectDatabase = (node) => {
+  const { updateTreePath } = useTreeStore.getState();
   if (!node.connected) {
-    toast.info(`未连接: ${node.name}`);
+    toast(`未连接: ${node.name}`);
     return;
   }
   updateTreePath(node.id, (current) => ({
@@ -334,19 +342,19 @@ export const deleteView = (node, openModal) => deleteDbObject(node, 'view', open
 export const deleteFunction = (node, openModal) => deleteDbObject(node, 'function', openModal);
 
 // 其他操作（模拟，添加 toast）
-export const createNewSchema = (node) => toast.info(`新建Schema在数据库: ${node.name}`);
-export const exportDatabase = (node) => toast.info(`导出数据库: ${node.name}`);
-export const createNewTable = (node) => toast.info(`新建表在架构: ${node.name}`);
-export const exportSchema = (node) => toast.info(`导出架构: ${node.name}`);
-export const previewTable = (node) => toast.info(`预览表: ${node.name}`);
-export const editTableStructure = (node) => toast.info(`编辑表结构: ${node.name}`);
-export const generateTableSQL = (node) => toast.info(`生成SQL: ${node.name}`);
-export const exportTableData = (node) => toast.info(`导出数据: ${node.name}`);
-export const viewDefinition = (node) => toast.info(`查看定义: ${node.name}`);
-export const editView = (node) => toast.info(`编辑视图: ${node.name}`);
-export const generateViewSQL = (node) => toast.info(`生成视图SQL: ${node.name}`);
-export const editFunction = (node) => toast.info(`编辑函数: ${node.name}`);
-export const viewFunctionSource = (node) => toast.info(`查看源码: ${node.name}`);
-export const testFunction = (node) => toast.info(`测试函数: ${node.name}`);
-export const showProperties = (node) => toast.info(`节点属性:\nID: ${node.id}\n类型: ${node.type}\n名称: ${node.name}\n连接状态: ${node.connected ? '已连接' : '未连接'}`);
-export const refreshFolder = (node) => toast.info(`刷新文件夹: ${node.name}`);
+export const createNewSchema = (node) => toast(`新建Schema在数据库: ${node.name}`);
+export const exportDatabase = (node) => toast(`导出数据库: ${node.name}`);
+export const createNewTable = (node) => toast(`新建表在架构: ${node.name}`);
+export const exportSchema = (node) => toast(`导出架构: ${node.name}`);
+export const previewTable = (node) => toast(`预览表: ${node.name}`);
+export const editTableStructure = (node) => toast(`编辑表结构: ${node.name}`);
+export const generateTableSQL = (node) => toast(`生成SQL: ${node.name}`);
+export const exportTableData = (node) => toast(`导出数据: ${node.name}`);
+export const viewDefinition = (node) => toast(`查看定义: ${node.name}`);
+export const editView = (node) => toast(`编辑视图: ${node.name}`);
+export const generateViewSQL = (node) => toast(`生成视图SQL: ${node.name}`);
+export const editFunction = (node) => toast(`编辑函数: ${node.name}`);
+export const viewFunctionSource = (node) => toast(`查看源码: ${node.name}`);
+export const testFunction = (node) => toast(`测试函数: ${node.name}`);
+export const showProperties = (node) => toast(`节点属性:\nID: ${node.id}\n类型: ${node.type}\n名称: ${node.name}\n连接状态: ${node.connected ? '已连接' : '未连接'}`);
+export const refreshFolder = (node) => toast(`刷新文件夹: ${node.name}`);

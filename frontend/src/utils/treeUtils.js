@@ -50,26 +50,89 @@ export const getExpandIcon = (node) => {
   return '';
 };
 
-// 懒加载节点子项
-export const loadNodeChildren = async (node, setExpandedKeys) => {
+export const loadNodeChildren = async (node) => {
+  const fakeList = (prefix, n) =>
+      Array.from({ length: n }, (_, i) => `${prefix}_${i1}`);
+
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       try {
-        if (!node.connected && (node.type === 'connection' || node.type === 'database' || node.type === 'schema')) {
-          alert('请先连接数据库'); // 或用 toast
-          return resolve({ ...node });
+        // 需要已连接才能往下看
+        if (
+            !node.connected &&
+            (node.type === 'connection' || node.type === 'database' || node.type === 'schema')
+        ) {
+          resolve({ ...node });
+          return;
         }
 
-        let updatedNode = { ...node, expanded: true };
+        // 根据类型构造下一层
+        if (node.type === 'connection') {
+          const dbs =
+              node.database && node.database.trim()
+                  ? [node.database]
+                  : fakeList('db', 3);
+          const children = dbs.map((name) => ({
+            id: `${node.id}::db::${name}`,
+            parentId: node.id,
+            name,
+            type: 'database',
+            connected: node.connected,
+            children: []
+          }));
+          resolve({ ...node, expanded: true, children });
+          return;
+        }
 
-        // 根据类型调用刷新（模拟，实际集成后端 API）
-        // 示例：refreshConnection 等函数从 actions 导入
-        resolve(updatedNode);
-      } catch (error) {
-        console.error('加载节点失败:', error);
-        reject(error);
+        if (node.type === 'database') {
+          const schemas = ['public', 'information_schema', 'pg_catalog'];
+          const children = schemas.map((name) => ({
+            id: `${node.id}::schema::${name}`,
+            parentId: node.id,
+            name,
+            type: 'schema',
+            connected: node.connected,
+            children: []
+          }));
+          resolve({ ...node, expanded: true, children });
+          return;
+        }
+
+        if (node.type === 'schema') {
+          const tables = fakeList('table', 5).map((name) => ({
+            id: `${node.id}::table::${name}`,
+            parentId: node.id,
+            name,
+            type: 'table',
+            connected: node.connected,
+            children: []
+          }));
+          const views = fakeList('view', 2).map((name) => ({
+            id: `${node.id}::view::${name}`,
+            parentId: node.id,
+            name,
+            type: 'view',
+            connected: node.connected,
+            children: []
+          }));
+          const functions = fakeList('fn', 2).map((name) => ({
+            id: `${node.id}::function::${name}`,
+            parentId: node.id,
+            name,
+            type: 'function',
+            connected: node.connected,
+            children: []
+          }));
+          resolve({ ...node, expanded: true, children: [...tables, ...views, ...functions] });
+          return;
+        }
+
+        resolve({ ...node, expanded: true });
+      } catch (e) {
+        console.error('加载节点失败:', e);
+        reject(e);
       }
-    }, 300);
+    }, 200);
   });
 };
 
