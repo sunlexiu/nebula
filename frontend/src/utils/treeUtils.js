@@ -51,90 +51,74 @@ export const getExpandIcon = (node) => {
 };
 
 export const loadNodeChildren = async (node) => {
-  const fakeList = (prefix, n) =>
-      Array.from({ length: n }, (_, i) => `${prefix}_${i1}`);
+  const q = async (url) => {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  };
 
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      try {
-        // 需要已连接才能往下看
-        if (
-            !node.connected &&
-            (node.type === 'connection' || node.type === 'database' || node.type === 'schema')
-        ) {
-          resolve({ ...node });
-          return;
-        }
+  if (node.type === 'connection') {
+    const data = await q(`/api/meta/${encodeURIComponent(node.id)}/databases`);
+    const children = data.data.items.map((name) => ({
+      id: `${node.id}::db::${name}`,
+      parentId: node.id,
+      name,
+      type: 'database',
+      connected: node.connected,
+      children: []
+    }));
+    return { ...node, expanded: true, children };
+  }
 
-        // 根据类型构造下一层
-        if (node.type === 'connection') {
-          const dbs =
-              node.database && node.database.trim()
-                  ? [node.database]
-                  : fakeList('db', 3);
-          const children = dbs.map((name) => ({
-            id: `${node.id}::db::${name}`,
-            parentId: node.id,
-            name,
-            type: 'database',
-            connected: node.connected,
-            children: []
-          }));
-          resolve({ ...node, expanded: true, children });
-          return;
-        }
+  if (node.type === 'database') {
+    const [_, __, ___, db] = node.id.split('::'); // connId::db::DBNAME
+    const data = await q(`/api/meta/${encodeURIComponent(node.parentId)}/databases/${encodeURIComponent(node.name)}/schemas`);
+    const children = data.data.items.map((name) => ({
+      id: `${node.id}::schema::${name}`,
+      parentId: node.id,
+      name,
+      type: 'schema',
+      connected: node.connected,
+      children: []
+    }));
+    return { ...node, expanded: true, children };
+  }
 
-        if (node.type === 'database') {
-          const schemas = ['public', 'information_schema', 'pg_catalog'];
-          const children = schemas.map((name) => ({
-            id: `${node.id}::schema::${name}`,
-            parentId: node.id,
-            name,
-            type: 'schema',
-            connected: node.connected,
-            children: []
-          }));
-          resolve({ ...node, expanded: true, children });
-          return;
-        }
+  if (node.type === 'schema') {
+    const [connId, dbToken, dbName] = node.parentId.split('::'); // parent = connId::db::DBNAME
+    const schema = node.name;
+    const data = await q(`/api/meta/${encodeURIComponent(connId)}/databases/${encodeURIComponent(dbName)}/schemas/${encodeURIComponent(schema)}/objects?types=tables,views,functions`);
+    const tables = data.data.tables.map((name) => ({
+      id: `${node.id}::table::${name}`,
+      parentId: node.id,
+      name,
+      type: 'table',
+      connected: node.connected,
+      children: []
+    }));
+    const views = data.data.views.map((name) => ({
+      id: `${node.id}::view::${name}`,
+      parentId: node.id,
+      name,
+      type: 'view',
+      connected: node.connected,
+      children: []
+    }));
+    const functions = data.data.functions.map((fn) => ({
+      id: `${node.id}::function::${fn.name}${fn.args ? `(${fn.args})` : ''}`,
+      parentId: node.id,
+      name: fn.name,
+      signature: fn.args,
+      type: 'function',
+      connected: node.connected,
+      children: []
+    }));
+    return { ...node, expanded: true, children: [...tables, ...views, ...functions] };
+  }
 
-        if (node.type === 'schema') {
-          const tables = fakeList('table', 5).map((name) => ({
-            id: `${node.id}::table::${name}`,
-            parentId: node.id,
-            name,
-            type: 'table',
-            connected: node.connected,
-            children: []
-          }));
-          const views = fakeList('view', 2).map((name) => ({
-            id: `${node.id}::view::${name}`,
-            parentId: node.id,
-            name,
-            type: 'view',
-            connected: node.connected,
-            children: []
-          }));
-          const functions = fakeList('fn', 2).map((name) => ({
-            id: `${node.id}::function::${name}`,
-            parentId: node.id,
-            name,
-            type: 'function',
-            connected: node.connected,
-            children: []
-          }));
-          resolve({ ...node, expanded: true, children: [...tables, ...views, ...functions] });
-          return;
-        }
-
-        resolve({ ...node, expanded: true });
-      } catch (e) {
-        console.error('加载节点失败:', e);
-        reject(e);
-      }
-    }, 200);
-  });
+  return { ...node, expanded: true };
 };
+
 
 // 其他工具函数（原有）
 export const findNode = (nodes, id) => {

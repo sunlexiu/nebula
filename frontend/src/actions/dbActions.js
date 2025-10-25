@@ -127,17 +127,17 @@ export const connectDatabase = (node) => {
     toast(`已连接: ${node.name}`);
     return Promise.resolve(false);
   }
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      updateTreePath(node.id, (current) => ({
-        ...current,
-        connected: true,
-        status: 'connected'
-      }));
-      toast.success(`已连接: ${node.name}`);
-      resolve(true);
-    }, 300);
-  });
+  return (async () => {
+    const r = await fetch(`/api/config/connections/${encodeURIComponent(node.id)}/test`, { method: 'GET' });
+    if (!r.ok) {
+      const msg = await r.text();
+      toast.error(msg || '连接失败');
+      return false;
+    }
+    updateTreePath(node.id, (cur) => ({ ...cur, connected: true, status: 'connected' }));
+    toast.success(`已连接: ${node.name}`);
+    return true;
+  })();
 };
 
 
