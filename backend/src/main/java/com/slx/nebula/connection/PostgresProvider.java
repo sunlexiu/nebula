@@ -5,6 +5,7 @@ import com.slx.nebula.exception.BizException;
 import com.slx.nebula.model.ConnectionConfig;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
@@ -14,6 +15,7 @@ import java.sql.SQLException;
 import java.time.Duration;
 
 @Component("POSTGRESQL")
+@Slf4j
 public class PostgresProvider implements DatabaseProvider {
 
     @Override
@@ -21,6 +23,7 @@ public class PostgresProvider implements DatabaseProvider {
         try (Connection c = createConnection(config)) {
             return c.isValid(2);
         } catch (SQLException e) {
+            log.error("测试连接失败", e);
             throw new BizException(ErrorCode.BUSINESS_ERROR, e.getMessage());
         }
     }
