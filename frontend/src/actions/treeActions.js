@@ -1,217 +1,309 @@
-import toast from 'react-hot-toast';
-import { findNode } from '../utils/treeUtils';
+// src/actions/treeActions.js
+// 统一的“树动作层” —— 只保留新世界逻辑，不做任何旧接口兼容。
+// 后端接口约定：
+// - 树加载：   POST /api/tree/children           { connectionId, nodeKey }
+// - 分组保存： POST /api/config/folder           { id?, name, parentId? }
+// - 分组删除： DELETE /api/config/folder/{id}
+// - 连接保存： POST /api/config/connection       { id?, name, dbType, host, port, database, username, password, parentId? }
+// - 连接删除： DELETE /api/config/connection/{id}
+// - 连接测试： POST /api/connection/test         { dbType, host, port, database, username, password }
+// - 节点移动： POST /api/config/move             { sourceId, targetParentId }
+
+import { buildNodeKey } from '../utils/treeUtils';
 import { useTreeStore } from '../stores/useTreeStore';
 
-// handleNewGroupSubmit 和 handleNewConnectionSubmit 保持原样
-export const handleNewGroupSubmit = async (groupName, parentId) => {
-  try {
-    const response = await fetch('/api/config/folders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: groupName, type: 'folder', parentId }),
-    });
-    if (!response.ok) throw new Error('Failed to create group');
-    await response.json();
-    useTreeStore.getState().refreshTree();
-    toast.success('新建分组成功');
-  } catch (err) {
-    console.error('Error creating group:', err);
-    toast.error('创建分组失败');
-    throw err;
-  }
-};
+// --------------------------- 基础 HTTP 封装 ---------------------------
+async function api(method, url, body) {
+  const init = {
+    method,
+    headers: { 'Content-Type': 'application/json' }
+  };
+  if (body != null) init.body = JSON.stringify(body);
 
-export const handleNewConnectionSubmit = async (connectionData, parentId) => {
-  try {
-    const response = await fetch('/api/config/connections', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...connectionData, type: 'connection', parentId }),
-    });
-    if (!response.ok) throw new Error('Failed to create connection');
-    await response.json();
-    useTreeStore.getState().refreshTree();
-    toast.success('新建连接成功');
-  } catch (err) {
-    console.error('Error creating connection:', err);
-    toast.error('创建连接失败');
-    throw err;
+  const resp = await fetch(url, init);
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`HTTP ${resp.status}: ${txt}`);
   }
-};
-
-// 修复：moveNode 接收 openModal 参数，直接内部调用 openConfirm
-export const moveNode = async (sourceId, targetParentId, updateTreePathFn, openModal, nodeType) => {
-  if (typeof openModal !== 'function') {
-    console.error('openModal must be a function');
-    return;
+  const json = await resp.json();
+  if (json.code !== 0) {
+    throw new Error(json.message || 'Request failed');
   }
+  return json.data;
+}
 
-  // 内部构建 openConfirm，使用传入的 openModal
-  const localOpenConfirm = (title, message, onConfirm, variant = 'danger') => {
-    openModal('confirm', {
-      title,
-      message,
-      onConfirm: async () => {
-        try {
-          await onConfirm();
-        } catch (error) {
-          toast.error('操作失败');
-          console.error('Move confirm error:', error);
-        }
-      },
-      variant
-    });
+const post   = (url, body)   => api('POST', url, body);
+const del    = (url)         => api('DELETE', url);
+const patch  = (url, body)   => api('PATCH', url, body);
+
+// --------------------------- 拖拽移动 ---------------------------
+/**
+ * 把树节点移动到目标父节点下（用于拖拽）
+ * @param {string} sourceId
+ * @param {string|null} targetParentId
+ */
+export async function moveNode(sourceId, targetParentId = null) {
+  await post('/api/config/move', { sourceId, targetParentId });
+  return true;
+}
+
+// --------------------------- 分组（Folder/Group） ---------------------------
+/**
+ * 新建分组（供 NewGroupModal.jsx 调用）
+ * @param {{name:string, parentId?:string|null}} values
+ * @param {{reload?:Function, notify?:Function}} deps
+ */
+export async function handleNewGroupSubmit(values, deps = {}) {
+  const payload = {
+    name: String(values.name || '').trim(),
+    parentId: values.parentId ?? null
+  };
+  if (!payload.name) throw new Error('分组名称不能为空');
+  await post('/api/config/folder', payload);
+  deps.reload && deps.reload(); // 让调用方决定怎么刷新树（通常刷新当前父节点）
+  deps.notify && deps.notify('success', '分组已创建');
+}
+
+/**
+ * 重命名分组（供 RenameModal.jsx 或右键菜单）
+ * @param {{id:string, name:string}} values
+ */
+export async function renameGroup(values, deps = {}) {
+  const payload = { id: values.id, name: String(values.name || '').trim() };
+  if (!payload.id) throw new Error('缺少分组ID');
+  if (!payload.name) throw new Error('分组名称不能为空');
+  await post('/api/config/folder', payload);
+  deps.reload && deps.reload();
+  deps.notify && deps.notify('success', '分组已重命名');
+}
+
+/**
+ * 删除分组
+ * @param {string} id
+ */
+export async function deleteGroup(id, deps = {}) {
+  if (!id) throw new Error('缺少分组ID');
+  await del(`/api/config/folder/${encodeURIComponent(id)}`);
+  deps.reload && deps.reload();
+  deps.notify && deps.notify('success', '分组已删除');
+}
+
+// --------------------------- 连接（Connection） ---------------------------
+/**
+ * 新建/保存连接（供 ConnectionModal.jsx）
+ * @param {{id?:string,name:string,dbType:string,host:string,port:number,database?:string,username:string,password?:string,parentId?:string|null}} values
+ */
+export async function handleNewConnectionSubmit(values, deps = {}) {
+  const payload = {
+    id: values.id || undefined,
+    name: String(values.name || '').trim(),
+    dbType: values.dbType,
+    host: String(values.host || '').trim(),
+    port: Number(values.port),
+    database: values.database || '',
+    username: values.username || '',
+    password: values.password || '',
+    parentId: values.parentId ?? null
+  };
+  if (!payload.name) throw new Error('连接名称不能为空');
+  if (!payload.dbType) throw new Error('数据库类型不能为空');
+  if (!payload.host) throw new Error('主机不能为空');
+  if (!payload.port) throw new Error('端口不能为空');
+
+  await post('/api/config/connection', payload);
+  deps.reload && deps.reload();
+  deps.notify && deps.notify('success', payload.id ? '连接已保存' : '连接已创建');
+}
+
+/**
+ * 删除连接
+ * @param {string} id
+ */
+export async function deleteConnection(id, deps = {}) {
+  if (!id) throw new Error('缺少连接ID');
+  await del(`/api/config/connection/${encodeURIComponent(id)}`);
+  deps.reload && deps.reload();
+  deps.notify && deps.notify('success', '连接已删除');
+}
+
+/**
+ * 测试连接（表单按钮）
+ * @param {{dbType:string,host:string,port:number,database?:string,username:string,password?:string}} values
+ */
+export async function testConnection(values, deps = {}) {
+  const payload = {
+    dbType: values.dbType,
+    host: String(values.host || '').trim(),
+    port: Number(values.port),
+    database: values.database || '',
+    username: values.username || '',
+    password: values.password || ''
+  };
+  await post('/api/connection/test', payload);
+  deps.notify && deps.notify('success', '连接可用');
+  return true;
+}
+
+// --------------------------- 节点通用动作（YAML actions） ---------------------------
+/**
+ * 刷新节点（交给调用方控制刷新逻辑）
+ */
+export function refreshNode(node, deps = {}) {
+  if (deps.reload) deps.reload(node);
+  else window.dispatchEvent(new CustomEvent('TREE_NODE_REFRESH', { detail: { node } }));
+}
+
+/**
+ * 打开 SQL 标签页（依赖注入或事件兜底）
+ */
+function openSql(title, sql, deps = {}) {
+  if (deps.openSqlTab) deps.openSqlTab(title, sql);
+  else window.dispatchEvent(new CustomEvent('OPEN_SQL_TAB', { detail: { title, sql } }));
+  deps.notify && deps.notify('success', 'SQL 已写入编辑器');
+}
+
+/**
+ * 统一处理后端 YAML 下发的节点动作
+ * 支持 kind: runSql | openSql | fetchDDL | refresh | copy | custom(透传)
+ */
+export async function handleNodeAction(node, action, deps = {}) {
+  const kind = action?.kind || 'custom';
+  const ctx  = node?._ctx || {};
+  const key  = node?.key || buildNodeKey(node);
+
+  // 极简模板渲染：{database} {schema} {name} {type} {key}
+  const render = (tpl = '') => {
+    const dict = { ...ctx, name: node?.name, type: node?.type, key };
+    return String(tpl).replace(/\{(\w+)\}/g, (_, k) => (dict[k] != null ? String(dict[k]) : `{${k}}`));
   };
 
-  localOpenConfirm(
-    `移动${nodeType === 'folder' ? '文件夹' : '连接'}`,
-    `确定要将此${nodeType === 'folder' ? '文件夹' : '连接'}移动到目标位置吗？`,
-    async () => {
-      try {
-        const response = await fetch('/api/config/move-node', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sourceId, targetParentId: targetParentId || null, type: nodeType })
-        });
-        if (!response.ok) throw new Error(`Failed to move ${nodeType}`);
-
-        // 更新树数据：移除源节点，添加到目标
-        const treeData = useTreeStore.getState().treeData;
-        const newTree = JSON.parse(JSON.stringify(treeData));
-        const removeNodeFromTree = (nodes, id) => {
-          if (!Array.isArray(nodes)) return null;
-          for (let i = 0; i < nodes.length; i++) {
-            if (nodes[i] && nodes[i].id === id) {
-              return nodes.splice(i, 1)[0];
-            }
-            if (nodes[i] && nodes[i].children) {
-              const removed = removeNodeFromTree(nodes[i].children, id);
-              if (removed !== null) {
-                return removed;
-              }
-            }
-          }
-          return null;
-        };
-        const removedNode = removeNodeFromTree(newTree, sourceId);
-        if (!removedNode) return;
-
-        removedNode.parentId = targetParentId || null;
-        if (!targetParentId) {
-          newTree.push(removedNode);
-        } else {
-          const targetNode = findNode(newTree, targetParentId);
-          if (targetNode && targetNode.children) {
-            targetNode.children.push(removedNode);
-          }
-        }
-        useTreeStore.getState().setTreeData(newTree);
-        toast.success(`${nodeType} 已移动到新位置`);
-      } catch (error) {
-        console.error(`Move ${nodeType} error:`, error);
-        toast.error('移动失败，请重试');
+  try {
+    switch (kind) {
+      case 'runSql':
+      case 'openSql': {
+        const sql = render(action.payloadTemplate || action.sql || '');
+        const title = action.label || `SQL on ${node?.name || ''}`;
+        openSql(title, sql, deps);
+        break;
       }
-    },
-    'warning'
-  );
-};
-
-// 切换展开
-export const toggleExpand = (setExpandedKeys, nodeId, loadChildren = true) => {
-  setExpandedKeys((prev) => {
-    const newMap = new Map(prev);
-    newMap.set(nodeId, !newMap.get(nodeId));
-    return newMap;
-  });
-};
-
-// 删除节点（通用）
-export const deleteNode = (treeData, nodeId) => {
-  const newTree = JSON.parse(JSON.stringify(treeData));
-  function deleteRecursive(nodes) {
-    if (!Array.isArray(nodes)) return false;
-    for (let i = 0; i < nodes.length; i++) {
-      if (nodes[i] && nodes[i].id === nodeId) {
-        nodes.splice(i, 1);
-        return true;
+      case 'fetchDDL': {
+        const sql = render(action.payloadTemplate || action.sql || '');
+        const title = action.label || `DDL of ${node?.name || ''}`;
+        openSql(title, sql, deps);
+        break;
       }
-      if (nodes[i] && nodes[i].children && deleteRecursive(nodes[i].children)) {
-        return true;
+      case 'refresh': {
+        refreshNode(node, deps);
+        break;
+      }
+      case 'copy': {
+        const text = render(action.payloadTemplate || action.text || node?.name || '');
+        await navigator.clipboard?.writeText(text);
+        deps.notify && deps.notify('success', '已复制到剪贴板');
+        break;
+      }
+      default: {
+        // 透传，供上层统一监听
+        window.dispatchEvent(new CustomEvent('TREE_NODE_ACTION', { detail: { node, action } }));
+        deps.notify && deps.notify('info', `Unhandled action: ${kind}`);
       }
     }
-    return false;
+  } catch (e) {
+    console.error(e);
+    deps.notify && deps.notify('error', e.message || '节点操作失败');
   }
-  deleteRecursive(newTree);
-  return newTree;
-};
+}
 
-// 删除文件夹
-export const deleteFolder = async (node, openModal) => {
-  if (typeof openModal !== 'function') {
-    console.error('openModal must be a function');
-    return;
+// --------------------------- 右键菜单/快捷操作的通用辅助 ---------------------------
+/**
+ * 重命名节点：根据 type 路由到不同接口（目前 folder/connection）
+ */
+export async function handleRenameSubmit(values, deps = {}) {
+  const { id, name, type } = values || {};
+  if (!id) throw new Error('缺少ID');
+  const newName = String(name || '').trim();
+  if (!newName) throw new Error('名称不能为空');
+
+  if (type === 'connection') {
+    await post('/api/config/connection', { id, name: newName });
+  } else {
+    await post('/api/config/folder', { id, name: newName });
   }
-  const localOpenConfirm = (title, message, onConfirm, variant = 'danger') => {
-    openModal('confirm', {
-      title,
-      message,
-      onConfirm,
-      variant
-    });
+  deps.reload && deps.reload();
+  deps.notify && deps.notify('success', '已重命名');
+}
+
+/**
+ * 删除节点：根据 type 路由到不同接口（目前 folder/connection）
+ */
+export async function handleDeleteSubmit(values, deps = {}) {
+  const { id, type } = values || {};
+  if (!id) throw new Error('缺少ID');
+
+  if (type === 'connection') {
+    await deleteConnection(id, deps);
+  } else {
+    await deleteGroup(id, deps);
+  }
+}
+
+/**
+ * 删除分组（带确认）
+ * @param {object} node - 分组节点
+ * @param {Function} openModal - 可选：UI 确认框触发器
+ */
+export async function deleteFolder(node, openModal) {
+  const id = node?.id;
+  if (!id) throw new Error('缺少分组ID');
+  const doDelete = async () => {
+    await del(`/api/config/folder/${encodeURIComponent(id)}`);
+    try {
+      const { deleteNode } = { deleteNode: useTreeStore }; // 动态引入，避免循环依赖
+      deleteNode.getState().deleteNode(id);
+    } catch (e) {
+      // 回退：全量刷新
+      try {
+        
+        await useTreeStore.getState().refreshTree();
+      } catch (e2) {}
+    }
   };
-
-  localOpenConfirm(
-    `删除文件夹`,
-    `确定要删除文件夹 "${node.name}" 及其所有子项吗？此操作不可恢复。`,
-    async () => {
-      try {
-        const response = await fetch(`/api/config/folders/${node.id}`, { method: 'DELETE' });
-        if (!response.ok) throw new Error('Failed to delete folder');
-        useTreeStore.getState().deleteNode(node.id);
-        toast.success(`文件夹 "${node.name}" 已删除`);
-      } catch (error) {
-        toast.error('删除失败，请重试');
-      }
-    },
-    'danger'
-  );
-};
-
-// 重命名文件夹
-export const renameFolder = (node, openModal) => {
-  if (typeof openModal !== 'function') {
-    console.error('openModal must be a function');
+  if (typeof openModal === 'function') {
+    openModal('confirm', {
+      title: '删除分组',
+      message: `确定删除分组 "${node?.name || id}" 吗？此操作不可恢复`,
+      onConfirm: async () => { await doDelete(); },
+      variant: 'danger'
+    });
     return;
   }
-  openModal('renameFolder', {
-    id: node.id,
-    name: node.name,
-    onSubmit: async (newName) => {
-      if (!newName || newName.trim() === '') {
-        throw new Error('文件夹名称不能为空');
-      }
-      try {
-        const response = await fetch(`/api/config/folders`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: newName.trim(), id: node.id, type: 'folder' })
-        });
-        if (!response.ok) throw new Error('Failed to rename folder');
-        useTreeStore.getState().updateTreePath(node.id, (current) => ({
-          ...current,
-          name: newName.trim()
-        }));
-        toast.success(`文件夹已重命名为 "${newName}"`);
-      } catch (error) {
-        console.error('Rename folder error:', error);
-        throw error;
-      }
-    }
-  });
-};
+  if (typeof window !== 'undefined') {
+    if (!window.confirm(`确定删除分组 "${node?.name || id}" 吗？此操作不可恢复`)) return;
+  }
+  await doDelete();
+}
 
-// 刷新文件夹
-export const refreshFolder = (node) => {
-  toast(`刷新文件夹: ${node.name}`);
-  // 实际调用 API 刷新子项
-};
+
+/**
+ * 刷新分组：重新加载并替换其子节点
+ * @param {object} node - 分组节点
+ */
+export async function refreshFolder(node) {
+  if (!node?.id) return;
+  try {
+    
+    const { loadNodeChildren } = require('../utils/treeUtils');
+    const { updateTreePath } = useTreeStore.getState();
+    // 标记加载中
+    updateTreePath(node.id, (n) => ({ ...n, __loading: true }));
+    const children = await loadNodeChildren(node);
+    updateTreePath(node.id, (n) => ({ ...n, children, __expanded: true, __loading: false }));
+  } catch (err) {
+    try {
+      
+      const { updateTreePath } = useTreeStore.getState();
+      updateTreePath(node.id, (n) => ({ ...n, __loading: false }));
+    } catch (e) {}
+    throw err;
+  }
+}
