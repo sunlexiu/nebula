@@ -1,245 +1,216 @@
 package com.slx.nebula.repository;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.yitter.idgen.YitIdHelper;
-import com.slx.nebula.common.Wrapper;
+import com.slx.nebula.exception.BizException;
 import com.slx.nebula.model.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
 
+import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 @Slf4j
 public class FileConfigRepository implements ConfigRepository {
 
-    private final Path configFile;
-    private final ObjectMapper mapper = new ObjectMapper();
-    private ConfigData cache;
+	private final ObjectMapper mapper = new ObjectMapper();
+	private final File file;
+	private final ConfigData data;
+	private final AtomicLong idgen = new AtomicLong(System.currentTimeMillis());
 
-    public FileConfigRepository() {
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        String userHome = System.getProperty("user.dir");
-        this.configFile = Paths.get(userHome, ".nebula", "config.json");
-        log.info("Config file path-----> {}", configFile);
-        load();
-    }
+	public FileConfigRepository() {
+		File home = new File(System.getProperty("user.dir"), ".nebula");
+		if (!home.exists()) {
+			home.mkdirs();
+		}
+		this.file = new File(home, "config.json");
+		if (file.exists()) {
+			this.data = loadWithCompatibility(this.file);
+		} else {
+			this.data = new ConfigData();
+			persist();
+		}
+	}
 
-    private synchronized void load() {
-        try {
-            if (Files.exists(configFile)) {
-                cache = mapper.readValue(configFile.toFile(), ConfigData.class);
-            } else {
-                cache = new ConfigData();
-                persist();
-            }
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to load config file", e);
-        }
-    }
+	private ConfigData loadWithCompatibility(File f) {
+		try {
+			return mapper.readValue(f, ConfigData.class);
+		} catch (IOException e) {
+			log.error("load config error", e);
+			throw new BizException(e);
+		}
+	}
 
-    private synchronized void persist() {
-        try {
-            Files.createDirectories(configFile.getParent());
-            mapper.writerWithDefaultPrettyPrinter().writeValue(configFile.toFile(), cache);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to persist config file", e);
-        }
-    }
+	private void persist() {
+		try {
+			mapper.writerWithDefaultPrettyPrinter().writeValue(file, data);
+		} catch (IOException e) {
+			throw new BizException(e);
+		}
+	}
 
-    // -------------------- 新增：返回整个树 --------------------
-    public synchronized ConfigData loadAll() {
-        return cache;
-    }
+	private String nextId() {
+		return Long.toString(idgen.incrementAndGet());
+	}
 
-    @Override
-    public void move(MoveNodeReq req) {
-        List<ConfigItem> roots = cache.getRoots();
-        if (CollectionUtils.isEmpty(roots)) {
-            return ;
-        }
+	@Override
+	public List<ConfigItem> getTree() {
+		return data.roots;
+	}
 
-        Wrapper<ConfigItem> sourceNodeWrapper = new Wrapper<>();
-        Iterator<ConfigItem> iterator = roots.iterator();
-        while (iterator.hasNext()) {
-            ConfigItem next = iterator.next();
-            if (req.getSourceId().equals(next.getId())) {
-                sourceNodeWrapper.setData(next);
-                iterator.remove();
-                break;
-            }
-        }
-        if (sourceNodeWrapper.getData() == null) {
-            return;
-        }
+	@Override
+	public Folder saveFolder(Folder folder) {
+		if (folder.id == null) {
+			folder.id = nextId();
+		}
+		deleteById(folder.id);
+		data.roots.add(folder);
+		persist();
+		return folder;
+	}
 
-        if (!StringUtils.hasText(req.getTargetParentId())) {
-            roots.add(sourceNodeWrapper.getData());
-            sourceNodeWrapper.getData().setParentId(null);
-            persist();
-            return;
-        }
+	@Override
+	public void deleteFolder(String id) {
+		deleteById(id);
+		persist();
+	}
 
-        for (ConfigItem next : roots) {
-            if (next instanceof Folder folder && req.getTargetParentId().equals(folder.getId())) {
-                folder.getChildren().add(sourceNodeWrapper.getData());
-                sourceNodeWrapper.getData().setParentId(folder.getId());
-                persist();
-                break;
-            }
-        }
-    }
+	private void deleteById(String id) {
+		data.roots.removeIf(it -> Objects.equals(it.id, id));
+		for (ConfigItem root : data.roots) {
+			if (root instanceof Folder f) {
+				f.children.removeIf(it -> Objects.equals(it.id, id));
+			}
+		}
+	}
 
-    // -------------------- 工具方法 --------------------
-    private void traverse(Iterable<ConfigItem> items, java.util.function.Consumer<ConfigItem> consumer) {
-        for (ConfigItem it : items) {
-            consumer.accept(it);
-            if (it instanceof Folder) {
-                traverse(((Folder) it).getChildren(), consumer);
-            }
-        }
-    }
+	@Override
+	public ConnectionConfig saveConnection(ConnectionConfig c) {
+		if (c.id == null) {
+			c.id = nextId();
+		}
+		removeConnection(c.id);
+		data.roots.add(c);
+		persist();
+		return c;
+	}
 
-    private Optional<Folder> findFolderNode(String id) {
-        AtomicBoolean found = new AtomicBoolean(false);
-        final Folder[] holder = new Folder[1];
-        traverse(cache.getRoots(), item -> {
-            if (!found.get() && item instanceof Folder && id.equals(item.getId())) {
-                holder[0] = (Folder) item;
-                found.set(true);
-            }
-        });
-        return Optional.ofNullable(holder[0]);
-    }
+	private void removeConnection(String id) {
+		data.roots.removeIf(it -> it instanceof ConnectionConfig cc && Objects.equals(cc.id, id));
+		for (ConfigItem root : data.roots) {
+			if (root instanceof Folder f) {
+				f.children.removeIf(it -> it instanceof ConnectionConfig cc && Objects.equals(cc.id, id));
+			}
+		}
+	}
 
-    private Optional<ConnectionConfig> findConnectionNode(String id) {
-        AtomicBoolean found = new AtomicBoolean(false);
-        final ConnectionConfig[] holder = new ConnectionConfig[1];
-        traverse(cache.getRoots(), item -> {
-            if (!found.get() && item instanceof ConnectionConfig && id.equals(item.getId())) {
-                holder[0] = (ConnectionConfig) item;
-                found.set(true);
-            }
-        });
-        return Optional.ofNullable(holder[0]);
-    }
+	@Override
+	public List<ConnectionConfig> listConnections() {
+		List<ConnectionConfig> list = new ArrayList<>();
+		for (ConfigItem it : data.roots) {
+			if (it instanceof ConnectionConfig cc) {
+				list.add(cc);
+			}
+			if (it instanceof Folder f) {
+				for (ConfigItem ch : f.children) {
+					if (ch instanceof ConnectionConfig cc) {
+						list.add(cc);
+					}
+				}
+			}
+		}
+		return list;
+	}
 
-    private Optional<ConfigItem> findAnyNode(String id) {
-        AtomicBoolean found = new AtomicBoolean(false);
-        final ConfigItem[] holder = new ConfigItem[1];
-        traverse(cache.getRoots(), item -> {
-            if (!found.get() && id.equals(item.getId())) {
-                holder[0] = item;
-                found.set(true);
-            }
-        });
-        return Optional.ofNullable(holder[0]);
-    }
+	@Override
+	public ConnectionConfig getConnection(String id) {
+		for (ConfigItem it : data.roots) {
+			if (Objects.equals(it.id, id) && it instanceof ConnectionConfig cc) {
+				return cc;
+			}
+			if (it instanceof Folder f) {
+				for (ConfigItem ch : f.children) {
+					if (Objects.equals(ch.id, id) && ch instanceof ConnectionConfig cc) {
+						return cc;
+					}
+				}
+			}
+		}
+		return null;
+	}
 
-    private boolean removeNodeRecursively(List<ConfigItem> list, String id) {
-        Iterator<ConfigItem> it = list.iterator();
-        while (it.hasNext()) {
-            ConfigItem ci = it.next();
-            if (id.equals(ci.getId())) {
-                it.remove();
-                return true;
-            } else if (ci instanceof Folder) {
-                if (removeNodeRecursively(((Folder) ci).getChildren(), id)) return true;
-            }
-        }
-        return false;
-    }
+	@Override
+	public void deleteConnection(String id) {
+		removeConnection(id);
+		persist();
+	}
 
-    // -------------------- ConfigRepository 实现 --------------------
-    @Override
-    public synchronized void saveFolder(Folder folder) {
-        if (folder.getId() == null) {
-            folder.setId(String.valueOf(YitIdHelper.nextId()));
-        }
-        Optional<ConfigItem> existing = findAnyNode(folder.getId());
-        if (existing.isPresent()) {
-            Folder ex = (Folder) existing.get();
-            ex.setName(folder.getName());
-            ex.setParentId(folder.getParentId());
-        } else {
-            if (folder.getParentId() == null) {
-                cache.getRoots().add(folder);
-            } else {
-                findFolderNode(folder.getParentId())
-                        .ifPresentOrElse(f -> f.getChildren().add(folder), () -> cache.getRoots().add(folder));
-            }
-        }
-        persist();
-    }
+	@Override
+	public void move(MoveNodeReq req) {
+		if (req == null || req.sourceId == null) {
+			return;
+		}
+		ConfigItem src = null;
 
-    @Override
-    public synchronized List<Folder> findAllFolders() {
-        List<Folder> out = new ArrayList<>();
-        traverse(cache.getRoots(), item -> {
-            if (item instanceof Folder) out.add((Folder) item);
-        });
-        return out;
-    }
+		// find and remove
+		Iterator<ConfigItem> it = data.roots.iterator();
+		while (it.hasNext()) {
+			ConfigItem n = it.next();
+			if (Objects.equals(n.id, req.sourceId)) {
+				src = n;
+				it.remove();
+				break;
+			} else if (n instanceof Folder f) {
+				Iterator<ConfigItem> it2 = f.children.iterator();
+				while (it2.hasNext()) {
+					ConfigItem n2 = it2.next();
+					if (Objects.equals(n2.id, req.sourceId)) {
+						src = n2;
+						it2.remove();
+						break;
+					}
+				}
+			}
+			if (src != null) {
+				break;
+			}
+		}
+		if (src == null) {
+			return;
+		}
 
-    @Override
-    public synchronized void deleteFolder(String id) {
-        if (removeNodeRecursively(cache.getRoots(), id)) persist();
-    }
+		// find target
+		if (req.targetParentId == null) {
+			data.roots.add(src);
+		} else {
+			Folder target = findFolder(req.targetParentId);
+			if (target != null) {
+				target.children.add(src);
+			} else {
+				data.roots.add(src);
+			}
+		}
+		persist();
+	}
 
-    @Override
-    public synchronized void saveConnection(ConnectionConfig connection) {
-        if (connection.getId() == null) {
-            connection.setId(String.valueOf(YitIdHelper.nextId()));
-        }
-        Optional<ConfigItem> existing = findAnyNode(connection.getId());
-        if (existing.isPresent()) {
-            ConnectionConfig ex = (ConnectionConfig) existing.get();
-            ex.setName(connection.getName());
-            ex.setDbType(connection.getDbType());
-            ex.setHost(connection.getHost());
-            ex.setPort(connection.getPort());
-            ex.setDatabase(connection.getDatabase());
-            ex.setUsername(connection.getUsername());
-            ex.setPassword(connection.getPassword());
-            ex.setParentId(connection.getParentId());
-        } else {
-            if (connection.getParentId() == null) {
-                cache.getRoots().add(connection);
-            } else {
-                findFolderNode(connection.getParentId())
-                        .ifPresentOrElse(f -> f.getChildren().add(connection), () -> cache.getRoots().add(connection));
-            }
-        }
-        persist();
-    }
-
-    @Override
-    public synchronized List<ConnectionConfig> findAllConnections() {
-        List<ConnectionConfig> out = new ArrayList<>();
-        traverse(cache.getRoots(), item -> {
-            if (item instanceof ConnectionConfig) out.add((ConnectionConfig) item);
-        });
-        return out;
-    }
-
-    @Override
-    public synchronized Optional<ConnectionConfig> findConnectionById(String id) {
-        return findConnectionNode(id);
-    }
-
-    @Override
-    public synchronized void deleteConnection(String id) {
-        if (removeNodeRecursively(cache.getRoots(), id)) persist();
-    }
+	private Folder findFolder(String id) {
+		for (ConfigItem it : data.roots) {
+			if (it instanceof Folder f && Objects.equals(f.id, id)) {
+				return f;
+			}
+			if (it instanceof Folder f2) {
+				for (ConfigItem ch : f2.children) {
+					if (ch instanceof Folder f && Objects.equals(f.id, id)) {
+						return f;
+					}
+				}
+			}
+		}
+		return null;
+	}
 }

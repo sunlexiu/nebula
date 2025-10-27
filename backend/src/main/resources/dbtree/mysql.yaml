@@ -1,0 +1,78 @@
+dbType: MYSQL
+schemaVersion: 1
+root:
+  children:
+    - type: database
+      label: "{name}"
+      icon: database
+      resolver: databases
+resolvers:
+  databases:
+    kind: sql
+    sql: |
+      SELECT SCHEMA_NAME AS name
+      FROM information_schema.SCHEMATA
+      ORDER BY SCHEMA_NAME
+    node:
+      type: database
+      label: "{name}"
+      icon: database
+      key: "database={name}"
+      children:
+        - id: tables
+          type: group
+          label: Tables
+          icon: table
+          resolver: tables
+        - id: views
+          type: group
+          label: Views
+          icon: view
+          resolver: views
+        - id: functions
+          type: group
+          label: Functions
+          icon: function
+          resolver: functions
+  tables:
+    kind: sql
+    sql: |
+      SELECT TABLE_NAME AS name
+      FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = :database AND TABLE_TYPE = 'BASE TABLE'
+      ORDER BY TABLE_NAME
+    params: [database]
+    node:
+      type: table
+      label: "{name}"
+      icon: table
+      key: "database={database}/table={name}"
+      children: []
+  views:
+    kind: sql
+    sql: |
+      SELECT TABLE_NAME AS name
+      FROM information_schema.VIEWS
+      WHERE TABLE_SCHEMA = :database
+      ORDER BY TABLE_NAME
+    params: [database]
+    node:
+      type: view
+      label: "{name}"
+      icon: view
+      key: "database={database}/view={name}"
+      children: []
+  functions:
+    kind: sql
+    sql: |
+      SELECT ROUTINE_NAME AS name
+      FROM information_schema.ROUTINES
+      WHERE ROUTINE_SCHEMA = :database AND ROUTINE_TYPE = 'FUNCTION'
+      ORDER BY ROUTINE_NAME
+    params: [database]
+    node:
+      type: function
+      label: "{name}"
+      icon: function
+      key: "database={database}/function={name}"
+      children: []

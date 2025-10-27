@@ -1,13 +1,13 @@
 package com.slx.nebula.model;
 
-import lombok.Getter;
-import lombok.Setter;
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.util.ArrayList;
 import java.util.List;
 
-@Setter
-@Getter
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ConfigData {
-    private List<ConfigItem> roots = new ArrayList<>();
+	@JsonAlias({"folders", "items", "roots"})
+	public List<ConfigItem> roots = new ArrayList<>();
 }

@@ -1,0 +1,98 @@
+dbType: POSTGRESQL
+schemaVersion: 1
+root:
+  children:
+    - type: database
+      label: "{name}"
+      icon: database
+      resolver: databases
+resolvers:
+  databases:
+    kind: sql
+    sql: |
+      SELECT datname AS name
+      FROM pg_database
+      WHERE datistemplate = false
+      ORDER BY datname
+    node:
+      type: database
+      label: "{name}"
+      icon: database
+      key: "database={name}"
+      children: []
+  schemas:
+    kind: sql
+    switchDatabase: true
+    sql: |
+      SELECT schema_name AS name
+      FROM information_schema.schemata
+      ORDER BY schema_name
+    params: [database]
+    node:
+      type: schema
+      label: "{name}"
+      icon: schema
+      key: "database={database}/schema={name}"
+      children:
+        - id: tables
+          type: group
+          label: Tables
+          icon: table
+          resolver: tables
+        - id: views
+          type: group
+          label: Views
+          icon: view
+          resolver: views
+        - id: functions
+          type: group
+          label: Functions
+          icon: function
+          resolver: functions
+  tables:
+    kind: sql
+    switchDatabase: true
+    sql: |
+      SELECT table_name AS name
+      FROM information_schema.tables
+      WHERE table_schema = :schema
+        AND table_type = 'BASE TABLE'
+      ORDER BY table_name
+    params: [database, schema]
+    node:
+      type: table
+      label: "{name}"
+      icon: table
+      key: "database={database}/schema={schema}/table={name}"
+      children: []
+  views:
+    kind: sql
+    switchDatabase: true
+    sql: |
+      SELECT table_name AS name
+      FROM information_schema.views
+      WHERE table_schema = :schema
+      ORDER BY table_name
+    params: [database, schema]
+    node:
+      type: view
+      label: "{name}"
+      icon: view
+      key: "database={database}/schema={schema}/view={name}"
+      children: []
+  functions:
+    kind: sql
+    switchDatabase: true
+    sql: |
+      SELECT p.proname AS name
+      FROM pg_proc p
+      JOIN pg_namespace n ON p.pronamespace = n.oid
+      WHERE n.nspname = :schema
+      ORDER BY p.proname
+    params: [database, schema]
+    node:
+      type: function
+      label: "{name}"
+      icon: function
+      key: "database={database}/schema={schema}/function={name}"
+      children: []

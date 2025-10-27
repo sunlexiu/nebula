@@ -1,44 +1,55 @@
 package com.slx.nebula.controller;
 
-import com.slx.nebula.common.ApiResponse;
-import com.slx.nebula.service.MetadataService;
+import com.slx.nebula.tree.model.TreeNode;
+import com.slx.nebula.tree.service.TreeService;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/meta")
 public class MetaController {
+	private final TreeService treeService;
 
-	private final MetadataService svc;
-
-	public MetaController(MetadataService svc) {
-		this.svc = svc;
+	public MetaController(TreeService treeService) {
+		this.treeService = treeService;
 	}
 
-	/** 列出数据库 */
 	@GetMapping("/{connId}/databases")
-	public ApiResponse<Map<String, Object>> databases(@PathVariable String connId) {
-		List<String> items = svc.listDatabases(connId);
-		return ApiResponse.success(Map.of("items", items));
+	public List<Map<String, String>> databases(@PathVariable String connId) {
+		List<TreeNode> nodes = treeService.children(connId, "");
+		List<Map<String, String>> out = new ArrayList<>();
+		for (TreeNode n : nodes)
+			if ("database".equalsIgnoreCase(n.type))
+				out.add(Map.of("name", n.label));
+		return out;
 	}
 
-	/** 列出某数据库下的 schemas */
 	@GetMapping("/{connId}/databases/{db}/schemas")
-	public ApiResponse<Map<String, Object>> schemas(@PathVariable String connId, @PathVariable String db) {
-		List<String> items = svc.listSchemas(connId, db);
-		return ApiResponse.success(Map.of("items", items));
+	public List<Map<String, String>> schemas(@PathVariable String connId, @PathVariable("db") String db) {
+		List<TreeNode> nodes = treeService.children(connId, "database=" + db);
+		List<Map<String, String>> out = new ArrayList<>();
+		for (TreeNode n : nodes)
+			if ("schema".equalsIgnoreCase(n.type))
+				out.add(Map.of("name", n.label));
+		return out;
 	}
 
-	/** 列出 schema 下对象（表/视图/函数），types 逗号分隔：tables,views,functions */
 	@GetMapping("/{connId}/databases/{db}/schemas/{schema}/objects")
-	public ApiResponse<Map<String, Object>> objects(
-			@PathVariable String connId,
-			@PathVariable String db,
-			@PathVariable String schema,
-			@RequestParam(defaultValue = "tables,views,functions") String types
-	) {
-		return ApiResponse.success(svc.listObjects(connId, db, schema, types));
+	public Map<String, List<Map<String, String>>> objects(@PathVariable String connId, @PathVariable String db, @PathVariable String schema,
+			@RequestParam(defaultValue = "tables,views,functions") String types) {
+		Map<String, List<Map<String, String>>> result = new LinkedHashMap<>();
+		for (String t : types.split(",")) {
+			String key = "database=" + db + "/schema=" + schema + "/group=" + t.trim();
+			List<TreeNode> nodes = treeService.children(connId, key);
+			List<Map<String, String>> arr = new ArrayList<>();
+			for (TreeNode n : nodes)
+				arr.add(Map.of("name", n.label));
+			result.put(t.trim(), arr);
+		}
+		return result;
 	}
 }
