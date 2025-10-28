@@ -1,15 +1,12 @@
 import React, { useState, memo, useMemo } from 'react';
 import { useTreeStore } from '../../stores/useTreeStore';
+import { actionHandlers, connectDatabase } from '../../actions/dbActions';  // **修复：添加导入**
 import {
   getExpandIcon,
   getNodeIcon,
   loadNodeChildren
-} from '../../utils/treeUtils'; // 修复：从 treeUtils 导入（相对路径调整）
-import {
-  getPrimaryAction,
-  connectDatabase,
-  previewTable
-} from '../../actions/dbActions'; // 从 dbActions 导入
+} from '../../utils/treeUtils';
+import { getPrimaryAction } from '../../actions/dbActions';
 import {
   getThemeColors,
   nodeBaseStyles,
@@ -52,11 +49,11 @@ const TreeNode = memo(({
   const isDragging = dragSourceId === node.id;
   const isDragOver = dragOverNodeId === node.id;
   const hasChildren = node.children && node.children.length > 0;
-  const isExpandable = hasChildren || node.type === 'connection' || node.type === 'database' || node.type === 'schema';
+  const isExpandable = hasChildren || node.config?.nextLevel || node.virtual || node.type === 'connection' || node.type === 'database' || node.type === 'schema' || node.type.includes('_group');
   const isDraggable = node.type === 'folder' || node.type === 'connection';
-  const isDropTarget = node.type === 'folder';
-  const primaryAction = getPrimaryAction(node.type);
-  const theme = getThemeColors(node.type);
+  const isDropTarget = node.type === 'folder' || node.config?.allowDrop;  // config 支持
+  const primaryAction = getPrimaryAction(node);  // 使用 config
+  const theme = getThemeColors(node.type || node.config?.type);  // config.type fallback
   const { updateTreePath } = useTreeStore();
   const isExpanded = node.expanded;
   const isConnected = node.connected;
@@ -77,7 +74,7 @@ const TreeNode = memo(({
     paddingRight: (isHovered || isActive) ? '4px' : '8px'
   }), [isDragging, isDragOver, isHovered, isActive, level, theme, isConnected]);
 
-  // 拖拽事件
+  // 拖拽事件：不变
   const handleDragStart = (e) => {
     if (isDraggable) {
       setDragSourceId(node.id);
@@ -114,12 +111,11 @@ const TreeNode = memo(({
   const handleClick = async (e) => {
     e.stopPropagation();
     if (isExpandable) {
-      if (!hasChildren) {
+      if (!hasChildren && !node.virtual) {  // 虚拟节点已加载
         setIsLoading(true);
         try {
           const updatedNode = await loadNodeChildren(node);
           if (updatedNode && updatedNode.children) {
-            // 写回树：只更新 children/expanded
             updateTreePath(node.id, (current) => ({
               ...current,
               children: updatedNode.children,
@@ -141,39 +137,13 @@ const TreeNode = memo(({
   const handlePrimaryAction = (e) => {
     e.stopPropagation();
     if (primaryAction && !activeMoreMenuNode) {
-      switch (node.type) {
-        case 'connection':
-          (async () => {
-            const ok = await connectDatabase(node);
-            if (ok) {
-              // 连接成功后，自动加载并展开下一层（数据库列表）
-              setIsLoading(true);
-              try {
-                const updatedNode = await loadNodeChildren({ ...node, connected: true });
-                if (updatedNode && updatedNode.children) {
-                  updateTreePath(node.id, (current) => ({
-                    ...current,
-                    connected: true,
-                    status: 'connected',
-                    children: updatedNode.children,
-                    expanded: true
-                  }));
-                  setExpandedKeys((prev) => new Map(prev).set(node.id, true));
-                }
-              } finally {
-                setIsLoading(false);
-              }
-            }
-          })();
-          break;
-        case 'table':
-          previewTable(node);
-          break;
-        case 'folder':
-          openNewConnection(node.id);
-          break;
-        default:
-          console.log(`执行主要操作: ${primaryAction.label} for ${node.name}`);
+      // **修复：传递空 options（openModal 未提供，使用 fallback）**
+      actionHandlers.dynamicHandler(primaryAction.handler || 'defaultAction', node, {});
+      // 对于 connection，连接后加载 children
+      if (node.type === 'connection') {
+        connectDatabase(node).then((ok) => {
+          if (ok) loadNodeChildren(node).then((updated) => updateTreePath(node.id, () => updated));
+        });
       }
     }
   };
@@ -234,7 +204,7 @@ const TreeNode = memo(({
 
       {(isHovered || isActive || isDragOver) && (
         <span style={typeLabelStyles(isHovered || isActive || isDragOver, theme)}>
-          {node.type} {isConnected && '(已连接)'}
+          {node.type} {isConnected && '(已连接)'} {node.virtual && '(虚拟)'}
         </span>
       )}
 

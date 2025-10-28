@@ -1,5 +1,4 @@
-// 工具函数和配置（从原 sidebar/utils.js 迁移 + 扩展）
-
+// src/utils/treeUtils.js
 import fileGroupIcon from '../public/icons/left_tree/file_group_1.svg';
 import folderIcon from '../public/icons/left_tree/folder_1.svg';
 import folderOpenIcon from '../public/icons/left_tree/folder_open_1.svg';
@@ -14,113 +13,136 @@ import mysqlIcon from '../public/icons/db/mysql_icon_2.svg';
 import oracleIcon from '../public/icons/db/oracle_icon_3.svg';
 import sqlserverIcon from '../public/icons/db/sqlserver_icon_1.svg';
 
-// 获取节点图标 - 加 connected 变体（这里模拟，实际可换 SVG）
+// 新增：从 store 导入（全局使用）
+const treeConfigStore = window.treeConfigStore || { getState: () => ({ getConfig: () => ({}), getNextLevelConfig: () => ({}), getGroupByConfigs: () => ({}), getExtraLevels: () => [], buildVirtualGroupNode: () => ({}) }) };
+
+// 图标：优先节点 config.icon，后备旧逻辑
 export const getNodeIcon = (node) => {
-  if (node.type === 'connection' && node.connected) {
-    // 模拟 connected 图标：实际用不同文件
-    return pgsqlIcon; // 或 pgsqlIconConnected
-  }
-  if (node.type === 'connection') {
-    switch (node.dbType) {
-      case 'POSTGRESQL': return pgsqlIcon;
-      case 'MYSQL': return mysqlIcon;
-      case 'ORACLE': return oracleIcon;
-      case 'SQLSERVER': return sqlserverIcon;
-      default: return dbIcon;
+  return node.config?.icon || (() => {
+    if (node.type === 'connection') {
+      switch (node.dbType) {
+        case 'POSTGRESQL': return pgsqlIcon;
+        case 'MYSQL': return mysqlIcon;
+        case 'ORACLE': return oracleIcon;
+        case 'SQLSERVER': return sqlserverIcon;
+        default: return dbIcon;
+      }
     }
-  }
-  if (node.type === 'folder') {
-    return node.expanded ? folderOpenIcon : folderIcon;
-  }
-  if (node.type === 'database') return dbIcon;
-  if (node.type === 'schema') return schemaIcon;
-  if (node.type === 'table') return tableIcon;
-  if (node.type === 'view') return viewIcon;
-  if (node.type === 'function') return functionIcon;
-  return fileGroupIcon;
+    if (node.type === 'folder') return node.expanded ? folderOpenIcon : folderIcon;
+    if (node.type === 'database') return dbIcon;
+    if (node.type === 'schema') return schemaIcon;
+    if (node.type === 'table') return tableIcon;
+    if (node.type === 'view') return viewIcon;
+    if (node.type === 'function') return functionIcon;
+    return fileGroupIcon;
+  })();
 };
 
-// 获取展开图标
+// 展开图标：不变，但检查 virtual 节点
 export const getExpandIcon = (node) => {
-  if (node.children && node.children.length > 0) {
-    if (node.type === 'folder' || node.type === 'connection' || node.type === 'database' || node.type === 'schema') {
+  if ((node.children && node.children.length > 0) || node.virtual) {  // 支持虚拟节点
+    if (node.type === 'folder' || node.type === 'connection' || node.type === 'database' || node.type === 'schema' || node.type.includes('_group')) {
       return node.expanded ? '▼' : '▶';
     }
   }
   return '';
 };
 
+// 通用加载子节点：根据 config.apiEndpoint/sqlQuery 构建（后端处理 sqlQuery）
 export const loadNodeChildren = async (node) => {
-  const q = async (url) => {
-    const r = await fetch(url);
-    if (!r.ok) throw new Error(await r.text());
-    return r.json();
-  };
-
-  if (node.type === 'connection') {
-    const data = await q(`/api/meta/${encodeURIComponent(node.id)}/databases`);
-    const children = data.data.items.map((name) => ({
-      id: `${node.id}::db::${name}`,
-      parentId: node.id,
-      name,
-      type: 'database',
-      connected: node.connected,
-      children: []
-    }));
-    return { ...node, expanded: true, children };
+  if (!node.connected) {
+    console.warn('节点未连接，无法加载子节点');
+    return { ...node, children: [] };
   }
 
-  if (node.type === 'database') {
-    const [_, __, ___, db] = node.id.split('::'); // connId::db::DBNAME
-    const data = await q(`/api/meta/${encodeURIComponent(node.parentId)}/databases/${encodeURIComponent(node.name)}/schemas`);
-    const children = data.data.items.map((name) => ({
-      id: `${node.id}::schema::${name}`,
-      parentId: node.id,
-      name,
-      type: 'schema',
-      connected: node.connected,
-      children: []
-    }));
-    return { ...node, expanded: true, children };
+  const config = node.config;
+  if (!config) {
+    console.warn('No config in node');
+    return { ...node, children: [] };
   }
 
-  if (node.type === 'schema') {
-    const [connId, dbToken, dbName] = node.parentId.split('::'); // parent = connId::db::DBNAME
-    const schema = node.name;
-    const data = await q(`/api/meta/${encodeURIComponent(connId)}/databases/${encodeURIComponent(dbName)}/schemas/${encodeURIComponent(schema)}/objects?types=tables,views,functions`);
-    const tables = data.data.tables.map((name) => ({
-      id: `${node.id}::table::${name}`,
-      parentId: node.id,
-      name,
-      type: 'table',
-      connected: node.connected,
-      children: []
-    }));
-    const views = data.data.views.map((name) => ({
-      id: `${node.id}::view::${name}`,
-      parentId: node.id,
-      name,
-      type: 'view',
-      connected: node.connected,
-      children: []
-    }));
-    const functions = data.data.functions.map((fn) => ({
-      id: `${node.id}::function::${fn.name}${fn.args ? `(${fn.args})` : ''}`,
-      parentId: node.id,
-      name: fn.name,
-      signature: fn.args,
-      type: 'function',
-      connected: node.connected,
-      children: []
-    }));
-    return { ...node, expanded: true, children: [...tables, ...views, ...functions] };
-  }
+  // 构建路径：从 node.id 解析 (e.g., "conn123::database::mydb::schema::public" -> "database/mydb/schema/public")
+  const pathSegments = node.id.split('::').slice(1);  // 去掉 connId
+  const path = pathSegments.join('/');
 
-  return { ...node, expanded: true };
+  // URL：使用通用接口，后端根据 path 和 config.sqlQuery 执行
+  const url = `/api/meta/${encodeURIComponent(node.parentId || node.id.split('::')[0])}/${path}/children`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(await response.text());
+    let { data: { items } } = await response.json();
+
+    // 处理聚合层：如果有 groupBy，创建虚拟 group 节点，并为其加载 children
+    const groupByConfigs = treeConfigStore.getState().getGroupByConfigs(config);
+    if (groupByConfigs && Object.keys(groupByConfigs).length > 0) {
+      items = [];  // 清空，替换为 group 节点
+      for (const groupKey of Object.keys(groupByConfigs)) {  // 改为 for...of 以支持 await
+        const groupNode = treeConfigStore.getState().buildVirtualGroupNode(groupKey, node, config);
+        if (groupNode) {
+          // 递归加载 group 的 children（使用 group sqlQuery）
+          const groupChildren = await loadNodeChildrenForGroup(groupNode, node);  // 内部函数
+          groupNode.children = groupChildren;
+          items.push(groupNode);
+        }
+      }
+    } else {
+      // 普通层：注入下一层 config
+      const nextConfig = treeConfigStore.getState().getNextLevelConfig(config, node.subType);
+      items = items.map((item) => ({
+        ...item,
+        parentId: node.id,
+        connected: node.connected,
+        config: nextConfig ? { ...nextConfig, ...item.config } : { type: item.type, icon: nextConfig?.icon }
+      }));
+    }
+
+    // 注入 extraLevels（仅 connection 层）
+    if (node.type === 'connection') {
+      const extraConfigs = treeConfigStore.getState().getExtraLevels(config);
+      const extraNodes = extraConfigs
+        .filter((extra) => extra.position === 'connection')
+        .map((extra) => ({
+          id: `${node.id}::extra::${extra.type}`,
+          parentId: node.id,
+          name: extra.label,
+          type: extra.type,
+          config: extra,
+          children: [],  // 懒加载
+          connected: node.connected
+        }));
+      items = [...items, ...extraNodes];
+    }
+
+    return { ...node, expanded: true, children: items };
+  } catch (error) {
+    console.error('加载子节点失败:', error);
+    return { ...node, children: [], expanded: false };
+  }
 };
 
+// 内部：为 group 加载 children（递归调用 loadNodeChildren，但路径调整）
+const loadNodeChildrenForGroup = async (groupNode, parentNode) => {
+  const groupPath = `${parentNode.id.split('::').slice(1).join('/')}/group/${groupNode.id.split('::').pop()}`;
+  const groupUrl = `/api/meta/${encodeURIComponent(parentNode.id.split('::')[0])}/${groupPath}/children`;
+  try {
+    const response = await fetch(groupUrl);
+    if (!response.ok) throw new Error(await response.text());
+    const { data: { items } } = await response.json();
+    const childConfig = groupNode.config.childConfig;
+    return items.map((item) => ({
+      ...item,
+      parentId: groupNode.id,
+      connected: parentNode.connected,
+      config: childConfig ? { ...childConfig, ...item.config } : { type: item.type }
+    }));
+  } catch (error) {
+    console.error('加载 group 子节点失败:', error);
+    return [];
+  }
+};
 
-// 其他工具函数（原有）
+// findNode, findConnectionId, updateTreePath 不变
 export const findNode = (nodes, id) => {
   if (!Array.isArray(nodes)) return null;
   for (let node of nodes) {

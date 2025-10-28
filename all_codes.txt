@@ -1,0 +1,5572 @@
+index.html
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Deego</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+
+// =========================================
+
+package.json
+
+{
+  "name": "nebula-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@codemirror/lang-sql": "^6.10.0",
+    "@uiw/react-codemirror": "^4.25.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hot-toast": "^2.6.0",
+    "sql-formatter": "^15.6.9",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.1.0",
+    "vite": "^5.1.0"
+  }
+}
+
+// =========================================
+
+src/actions/dbActions.js
+
+import toast from 'react-hot-toast';
+import { useTreeStore } from '../stores/useTreeStore';
+import { useTreeConfigStore } from '../stores/useTreeConfigStore';  // 新增
+import { findConnectionId, loadNodeChildren } from '../utils/treeUtils';  // 新增导入
+
+const treeConfigStore = window.treeConfigStore || { getState: () => ({ getConfig: () => ({}), getNextLevelConfig: () => ({}) }) };
+
+// 映射 handler 到函数（现有 + 新增模拟）
+const actionHandlers = {
+  // 现有
+  refreshDatabase: (node, setExpandedKeys) => {
+    if (!node.connected) return;
+    loadNodeChildren(node).then((updated) => {
+      useTreeStore.getState().updateTreePath(node.id, () => updated);
+      toast.success(`刷新数据库: ${node.name}`);
+      setExpandedKeys((prev) => new Map(prev).set(node.id, true));
+    });
+  },
+  createNewSchema: (node) => toast(`新建Schema在数据库: ${node.name}`),
+  exportDatabase: (node) => toast(`导出数据库: ${node.name}`),
+  refreshSchema: (node, setExpandedKeys) => {
+    if (!node.connected) return;
+    loadNodeChildren(node).then((updated) => {
+      useTreeStore.getState().updateTreePath(node.id, () => updated);
+      toast.success(`刷新 Schema: ${node.name}`);
+      setExpandedKeys((prev) => new Map(prev).set(node.id, true));
+    });
+  },
+  createNewTable: (node) => toast(`新建表在架构: ${node.name}`),
+  createNewView: (node) => toast(`新建视图在架构: ${node.name}`),
+  createNewFunction: (node) => toast(`新建函数在架构: ${node.name}`),
+  exportSchema: (node) => toast(`导出架构: ${node.name}`),
+  previewTable: (node) => toast(`预览表: ${node.name}`),
+  editTableStructure: (node) => toast(`编辑表结构: ${node.name}`),
+  generateTableSQL: (node) => toast(`生成SQL: ${node.name}`),
+  exportTableData: (node) => toast(`导出数据: ${node.name}`),
+  viewDefinition: (node) => toast(`查看定义: ${node.name}`),
+  editView: (node) => toast(`编辑视图: ${node.name}`),
+  generateViewSQL: (node) => toast(`生成视图SQL: ${node.name}`),
+  editFunction: (node) => toast(`编辑函数: ${node.name}`),
+  viewFunctionSource: (node) => toast(`查看源码: ${node.name}`),
+  testFunction: (node) => toast(`测试函数: ${node.name}`),
+  showProperties: (node) => toast(`节点属性:\nID: ${node.id}\n类型: ${node.type}\n名称: ${node.name}\n连接状态: ${node.connected ? '已连接' : '未连接'}`),
+  deleteDatabase: async (node, openModal) => {
+    if (typeof openModal !== 'function') {
+      toast.error('模态打开失败');
+      return;
+    }
+    const localOpenConfirm = (title, message, onConfirm, variant = 'danger') => {
+      openModal('confirm', {
+        title,
+        message,
+        onConfirm,
+        variant
+      });
+    };
+
+    localOpenConfirm(
+      `删除数据库`,
+      `确定要删除数据库 "${node.name}" 吗？此操作不可恢复。`,
+      async () => {
+        try {
+          const connectionId = findConnectionId(node.id, useTreeStore.getState().treeData);
+          const response = await fetch('/api/db/delete-database', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ connectionId, dbName: node.name })
+          });
+          if (!response.ok) throw new Error('Failed to delete database');
+          useTreeStore.getState().deleteNode(node.id);
+          toast.success(`数据库 "${node.name}" 已删除`);
+        } catch (error) {
+          toast.error('删除失败，请重试');
+        }
+      },
+      'danger'
+    );
+  },
+  deleteSchema: async (node, openModal) => {
+    if (typeof openModal !== 'function') {
+      toast.error('模态打开失败');
+      return;
+    }
+    const localOpenConfirm = (title, message, onConfirm, variant = 'danger') => {
+      openModal('confirm', {
+        title,
+        message,
+        onConfirm,
+        variant
+      });
+    };
+
+    localOpenConfirm(
+      `删除Schema`,
+      `确定要删除Schema "${node.name}" 吗？此操作不可恢复。`,
+      async () => {
+        try {
+          const connectionId = findConnectionId(node.id, useTreeStore.getState().treeData);
+          const dbName = node.dbName || 'default';
+          const response = await fetch('/api/db/delete-schema', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ connectionId, dbName, schemaName: node.name })
+          });
+          if (!response.ok) throw new Error('Failed to delete schema');
+          useTreeStore.getState().deleteNode(node.id);
+          toast.success(`Schema "${node.name}" 已删除`);
+        } catch (error) {
+          toast.error('删除失败，请重试');
+        }
+      },
+      'danger'
+    );
+  },
+  deleteTable: async (node, openModal) => {
+    if (typeof openModal !== 'function') {
+      toast.error('模态打开失败');
+      return;
+    }
+    const localOpenConfirm = (title, message, onConfirm, variant = 'danger') => {
+      openModal('confirm', {
+        title,
+        message,
+        onConfirm,
+        variant
+      });
+    };
+
+    localOpenConfirm(
+      `删除表`,
+      `确定要删除表 "${node.name}" 吗？此操作不可恢复。`,
+      async () => {
+        try {
+          const connectionId = findConnectionId(node.id, useTreeStore.getState().treeData);
+          const dbName = node.dbName || 'default';
+          const schemaName = node.schemaName || 'public';
+          const response = await fetch('/api/db/delete-object', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ connectionId, dbName, schemaName, objectName: node.name, objectType: 'table' })
+          });
+          if (!response.ok) throw new Error(`Failed to delete table`);
+          useTreeStore.getState().deleteNode(node.id);
+          toast.success(`表 "${node.name}" 已删除`);
+        } catch (error) {
+          toast.error('删除失败，请重试');
+        }
+      },
+      'danger'
+    );
+  },
+  deleteView: async (node, openModal) => {
+    if (typeof openModal !== 'function') {
+      toast.error('模态打开失败');
+      return;
+    }
+    const localOpenConfirm = (title, message, onConfirm, variant = 'danger') => {
+      openModal('confirm', {
+        title,
+        message,
+        onConfirm,
+        variant
+      });
+    };
+
+    localOpenConfirm(
+      `删除视图`,
+      `确定要删除视图 "${node.name}" 吗？此操作不可恢复。`,
+      async () => {
+        try {
+          const connectionId = findConnectionId(node.id, useTreeStore.getState().treeData);
+          const dbName = node.dbName || 'default';
+          const schemaName = node.schemaName || 'public';
+          const response = await fetch('/api/db/delete-object', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ connectionId, dbName, schemaName, objectName: node.name, objectType: 'view' })
+          });
+          if (!response.ok) throw new Error(`Failed to delete view`);
+          useTreeStore.getState().deleteNode(node.id);
+          toast.success(`视图 "${node.name}" 已删除`);
+        } catch (error) {
+          toast.error('删除失败，请重试');
+        }
+      },
+      'danger'
+    );
+  },
+  deleteFunction: async (node, openModal) => {
+    if (typeof openModal !== 'function') {
+      toast.error('模态打开失败');
+      return;
+    }
+    const localOpenConfirm = (title, message, onConfirm, variant = 'danger') => {
+      openModal('confirm', {
+        title,
+        message,
+        onConfirm,
+        variant
+      });
+    };
+
+    localOpenConfirm(
+      `删除函数`,
+      `确定要删除函数 "${node.name}" 吗？此操作不可恢复。`,
+      async () => {
+        try {
+          const connectionId = findConnectionId(node.id, useTreeStore.getState().treeData);
+          const dbName = node.dbName || 'default';
+          const schemaName = node.schemaName || 'public';
+          const response = await fetch('/api/db/delete-object', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ connectionId, dbName, schemaName, objectName: node.name, objectType: 'function' })
+          });
+          if (!response.ok) throw new Error(`Failed to delete function`);
+          useTreeStore.getState().deleteNode(node.id);
+          toast.success(`函数 "${node.name}" 已删除`);
+        } catch (error) {
+          toast.error('删除失败，请重试');
+        }
+      },
+      'danger'
+    );
+  },
+  // 新增 PostgreSQL 特定
+  refreshMaterializedView: (node) => toast(`刷新物化视图: ${node.name}`),
+  viewPublication: (node) => toast(`查看 Publication: ${node.name}`),
+  createPublication: (node) => toast(`新建 Publication 在连接: ${node.name}`),
+  deletePublication: async (node, openModal) => {
+    if (typeof openModal !== 'function') {
+      toast.error('模态打开失败');
+      return;
+    }
+    const localOpenConfirm = (title, message, onConfirm, variant = 'danger') => {
+      openModal('confirm', {
+        title,
+        message,
+        onConfirm,
+        variant
+      });
+    };
+
+    localOpenConfirm(
+      `删除 Publication`,
+      `确定要删除 Publication "${node.name}" 吗？此操作不可恢复。`,
+      async () => {
+        try {
+          const connectionId = findConnectionId(node.id, useTreeStore.getState().treeData);
+          const response = await fetch('/api/db/delete-publication', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ connectionId, pubName: node.name })
+          });
+          if (!response.ok) throw new Error('Failed to delete publication');
+          useTreeStore.getState().deleteNode(node.id);
+          toast.success(`Publication "${node.name}" 已删除`);
+        } catch (error) {
+          toast.error('删除失败，请重试');
+        }
+      },
+      'danger'
+    );
+  },
+  showRoleProperties: (node) => toast(`角色属性: ${node.name}`),
+  createRole: (node) => toast(`新建角色: ${node.name}`),
+  deleteRole: async (node, openModal) => {
+    if (typeof openModal !== 'function') {
+      toast.error('模态打开失败');
+      return;
+    }
+    const localOpenConfirm = (title, message, onConfirm, variant = 'danger') => {
+      openModal('confirm', {
+        title,
+        message,
+        onConfirm,
+        variant
+      });
+    };
+
+    localOpenConfirm(
+      `删除角色`,
+      `确定要删除角色 "${node.name}" 吗？此操作不可恢复。`,
+      async () => {
+        try {
+          const connectionId = findConnectionId(node.id, useTreeStore.getState().treeData);
+          const response = await fetch('/api/db/delete-role', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ connectionId, roleName: node.name })
+          });
+          if (!response.ok) throw new Error('Failed to delete role');
+          useTreeStore.getState().deleteNode(node.id);
+          toast.success(`角色 "${node.name}" 已删除`);
+        } catch (error) {
+          toast.error('删除失败，请重试');
+        }
+      },
+      'danger'
+    );
+  },
+  // 通用动态调用
+  dynamicHandler: async (handler, node, options = {}) => {
+    const { setExpandedKeys, openModal } = options;
+    if (actionHandlers[handler]) {
+      return actionHandlers[handler](node, openModal, setExpandedKeys);
+    } else {
+      // 后端 API fallback
+      try {
+        const response = await fetch(`/api/db/${handler}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodeId: node.id }),
+        });
+        if (!response.ok) throw new Error('Action failed');
+        toast.success(`${handler} 执行成功`);
+      } catch (error) {
+        toast.error(`${handler} 执行失败: ${error.message}`);
+      }
+    }
+  }
+};
+
+// getPrimaryAction：从 config.actions.primary 获取
+export const getPrimaryAction = (node) => {
+  const primary = node.config?.actions?.primary;
+  if (primary) {
+    return { icon: primary.icon, label: primary.label, handler: primary.handler };
+  }
+  // Fallback 旧逻辑
+  const actions = {
+    folder: { icon: '🔌', label: '新建连接' },
+    connection: { icon: '⚡', label: '连接' },
+    database: { icon: '🔄', label: '刷新' },
+    schema: { icon: '🔄', label: '刷新' },
+    table: { icon: '📊', label: '预览' },
+    view: { icon: '👁️', label: '查看' },
+    function: { icon: '⚙️', label: '编辑' },
+    // 新增 group 类型
+    table_group: { icon: '📊', label: '展开 Tables' },
+    view_group: { icon: '👁️', label: '展开 Views' },
+    function_group: { icon: '⚙️', label: '展开 Functions' },
+    mview_group: { icon: '📊', label: '展开 Materialized Views' },
+    publications: { icon: '👁️', label: '查看' },
+    roles: { icon: 'ℹ️', label: '属性' }
+  };
+  return actions[node.type] || null;
+};
+
+// getAllActions：动态从 config.actions.menu 生成，支持 fallback
+export const getAllActions = (
+  nodeType,
+  node,
+  setExpandedKeys,
+  openNewGroup,
+  openNewConnection,
+  openConfirm,
+  openRenameFolder,
+  openEditConnection,
+  refreshFolder,
+  deleteFolder,
+  refreshConnection,
+  connectDatabase,
+  disconnectDatabase,
+  refreshDatabase,
+  refreshSchema,
+  createNewSchema,
+  exportDatabase,
+  createNewTable,
+  exportSchema,
+  previewTable,
+  editTableStructure,
+  generateTableSQL,
+  exportTableData,
+  viewDefinition,
+  editView,
+  generateViewSQL,
+  editFunction,
+  viewFunctionSource,
+  testFunction,
+  showProperties,
+  deleteConnection,
+  deleteDatabase,
+  deleteSchema,
+  deleteTable,
+  deleteView,
+  deleteFunction
+) => {
+  const configActions = node.config?.actions?.menu || [];
+  const mappedActions = configActions.map((act) => ({
+    label: act.label,
+    icon: act.icon,
+    type: act.type || null,  // separator
+    variant: act.variant || null,
+    action: () => actionHandlers.dynamicHandler(act.handler, node, { setExpandedKeys, openModal: openConfirm })
+  }));
+
+  // Fallback 旧 actions[nodeType]，避免重复
+  const oldActionsMap = {
+    folder: [
+      { label: '新建文件夹', action: () => openNewGroup(node.id), icon: '📁' },
+      { label: '新建连接', action: () => openNewConnection(node.id), icon: '🔌' },
+      { type: 'separator' },
+      { label: '刷新', action: () => refreshFolder(node), icon: '🔄' },
+      { type: 'separator' },
+      { label: '删除文件夹', action: () => deleteFolder(node), icon: '🗑️' },
+      { label: '重命名', action: () => openRenameFolder(node), icon: '✏️' }
+    ],
+    connection: [
+      { label: '连接', action: () => connectDatabase(node), icon: '⚡' },
+      { label: '断开连接', action: () => disconnectDatabase(node), icon: '🔌' },
+      { type: 'separator' },
+      { label: '刷新', action: () => refreshConnection(node, setExpandedKeys), icon: '🔄' },
+      { label: '连接设置', action: () => openEditConnection(node), icon: '⚙️' },
+      { type: 'separator' },
+      { label: '删除连接', action: () => deleteConnection(node), icon: '🗑️' },
+      { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
+    ],
+    database: [
+      { label: '刷新', action: () => refreshDatabase(node, setExpandedKeys), icon: '🔄' },
+      { label: '新建Schema', action: () => createNewSchema(node), icon: '📁' },
+      { label: '导出结构', action: () => exportDatabase(node), icon: '📤' },
+      { type: 'separator' },
+      { label: '删除数据库', action: () => deleteDatabase(node), icon: '🗑️' },
+      { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
+    ],
+    schema: [
+      { label: '刷新', action: () => refreshSchema(node, setExpandedKeys), icon: '🔄' },
+      { label: '新建表', action: () => createNewTable(node), icon: '📊' },
+      { label: '导出结构', action: () => exportSchema(node), icon: '📤' },
+      { type: 'separator' },
+      { label: '删除Schema', action: () => deleteSchema(node), icon: '🗑️' },
+      { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
+    ],
+    table: [
+      { label: '预览数据', action: () => previewTable(node), icon: '📊' },
+      { label: '编辑结构', action: () => editTableStructure(node), icon: '✏️' },
+      { label: '生成SQL', action: () => generateTableSQL(node), icon: '💾' },
+      { label: '导出数据', action: () => exportTableData(node), icon: '📤' },
+      { type: 'separator' },
+      { label: '删除表', action: () => deleteTable(node), icon: '🗑️' },
+      { type: 'separator' },
+      { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
+    ],
+    view: [
+      { label: '查看定义', action: () => viewDefinition(node), icon: '👁️' },
+      { label: '编辑视图', action: () => editView(node), icon: '✏️' },
+      { label: '生成SQL', action: () => generateViewSQL(node), icon: '💾' },
+      { type: 'separator' },
+      { label: '删除视图', action: () => deleteView(node), icon: '🗑️' },
+      { type: 'separator' },
+      { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
+    ],
+    function: [
+      { label: '编辑函数', action: () => editFunction(node), icon: '✏️' },
+      { label: '查看源码', action: () => viewFunctionSource(node), icon: '👁️' },
+      { label: '执行测试', action: () => testFunction(node), icon: '🔬' },
+      { type: 'separator' },
+      { label: '删除函数', action: () => deleteFunction(node), icon: '🗑️' },
+      { type: 'separator' },
+      { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
+    ],
+    // 新增 group fallback (简单，继承 primary)
+    table_group: [
+      { label: '刷新', action: () => refreshSchema(node, setExpandedKeys), icon: '🔄' },
+      { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
+    ],
+    view_group: [
+      { label: '刷新', action: () => refreshSchema(node, setExpandedKeys), icon: '🔄' },
+      { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
+    ],
+    function_group: [
+      { label: '刷新', action: () => refreshSchema(node, setExpandedKeys), icon: '🔄' },
+      { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
+    ],
+    mview_group: [
+      { label: '刷新', action: () => refreshSchema(node, setExpandedKeys), icon: '🔄' },
+      { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
+    ],
+    publications: [
+      { label: '新建 Publication', action: () => actionHandlers.createPublication(node), icon: '➕' },
+      { type: 'separator' },
+      { label: '删除', action: () => actionHandlers.deletePublication(node, openConfirm), icon: '🗑️' },
+      { label: '属性', action: () => showProperties(node), icon: 'ℹ️' }
+    ],
+    roles: [
+      { label: '新建角色', action: () => actionHandlers.createRole(node), icon: '➕' },
+      { type: 'separator' },
+      { label: '删除角色', action: () => actionHandlers.deleteRole(node, openConfirm), icon: '🗑️' },
+      { label: '属性', action: () => actionHandlers.showRoleProperties(node), icon: 'ℹ️' }
+    ]
+  };
+  const fallback = oldActionsMap[nodeType] || [{ label: '属性', action: () => showProperties(node), icon: 'ℹ️' }];
+
+  // 合并，避免重复 label
+  const seenLabels = new Set(mappedActions.map(a => a.label));
+  const uniqueFallback = fallback.filter(a => !seenLabels.has(a.label));
+
+  return [...mappedActions, ...uniqueFallback];
+};
+
+// 更新连接（自动展示：加载中 → 成功/失败）
+export const updateConnection = async (payload) => {
+  const { updateTreePath } = useTreeStore.getState();
+  return toast.promise(
+      (async () => {
+        const response = await fetch(`/api/config/connections/${payload.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) throw new Error('Failed to update connection');
+
+        // 本地状态更新
+        updateTreePath(payload.id, (current) => ({
+          ...current,
+          name: payload.name,
+          dbType: payload.dbType,
+          host: payload.host,
+          port: payload.port,
+          database: payload.database,
+          username: payload.username,
+        }));
+
+        return true; // 成功分支
+      })(),
+      {
+        loading: '保存连接中...',
+        success: `连接 "${payload.name}" 已更新`,
+        error: '更新失败，请重试',
+      }
+  );
+};
+
+// 连接数据库（返回 Promise，便于后续自动展开）
+export const connectDatabase = (node) => {
+  const { updateTreePath, loadTreeConfig } = useTreeStore.getState();
+  if (node.connected) {
+    toast(`已连接: ${node.name}`);
+    return Promise.resolve(false);
+  }
+  return (async () => {
+    const r = await fetch(`/api/config/connections/${encodeURIComponent(node.id)}/test`, { method: 'GET' });
+    if (!r.ok) {
+      const msg = await r.text();
+      toast.error(msg || '连接失败');
+      return false;
+    }
+    updateTreePath(node.id, (cur) => ({ ...cur, connected: true, status: 'connected' }));
+    await loadTreeConfig(node.id);  // 新增：加载 YAML 配置
+    toast.success(`已连接: ${node.name}`);
+    return true;
+  })();
+};
+
+
+// 断开连接
+export const disconnectDatabase = (node) => {
+  const { updateTreePath } = useTreeStore.getState();
+  if (!node.connected) {
+    toast(`未连接: ${node.name}`);
+    return;
+  }
+  updateTreePath(node.id, (current) => ({
+    ...current,
+    connected: false,
+    status: 'disconnected',
+    children: [],
+    config: {}  // 清空配置
+  }));
+  toast.success(`断开连接: ${node.name}`);
+};
+
+// 刷新连接
+export const refreshConnection = (node, setExpandedKeys) => {
+  if (!node.connected) {
+    toast.error('请先连接');
+    return;
+  }
+  setTimeout(() => {
+    // 模拟刷新，实际调用 API
+    toast.success(`刷新成功: ${node.name}`);
+    setExpandedKeys((prev) => new Map(prev).set(node.id, true));
+  }, 300);
+};
+
+// 刷新数据库
+export const refreshDatabase = (node, setExpandedKeys) => {
+  actionHandlers.refreshDatabase(node, setExpandedKeys);
+};
+
+// 刷新 Schema
+export const refreshSchema = (node, setExpandedKeys) => {
+  actionHandlers.refreshSchema(node, setExpandedKeys);
+};
+
+// 删除连接
+export const deleteConnection = async (node, openModal) => {
+  if (typeof openModal !== 'function') {
+    toast.error('模态打开失败');
+    return;
+  }
+  const localOpenConfirm = (title, message, onConfirm, variant = 'danger') => {
+    openModal('confirm', {
+      title,
+      message,
+      onConfirm,
+      variant
+    });
+  };
+
+  localOpenConfirm(
+    `删除连接`,
+    `确定要删除连接 "${node.name}" 吗？此操作不可恢复。`,
+    async () => {
+      try {
+        const response = await fetch(`/api/config/connections/${node.id}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error('Failed to delete connection');
+        useTreeStore.getState().deleteNode(node.id);
+        toast.success(`连接 "${node.name}" 已删除`);
+      } catch (error) {
+        toast.error('删除失败，请重试');
+      }
+    },
+    'danger'
+  );
+};
+
+// 删除数据库
+export const deleteDatabase = async (node, openModal) => {
+  actionHandlers.deleteDatabase(node, openModal);
+};
+
+// 删除 Schema
+export const deleteSchema = async (node, openModal) => {
+  actionHandlers.deleteSchema(node, openModal);
+};
+
+// 通用删除 DB 对象
+const deleteDbObject = async (node, objectType, openModal) => {
+  if (typeof openModal !== 'function') {
+    toast.error('模态打开失败');
+    return;
+  }
+  const label = objectType === 'table' ? '表' : objectType === 'view' ? '视图' : '函数';
+  const localOpenConfirm = (title, message, onConfirm, variant = 'danger') => {
+    openModal('confirm', {
+      title,
+      message,
+      onConfirm,
+      variant
+    });
+  };
+
+  localOpenConfirm(
+    `删除${label}`,
+    `确定要删除${label} "${node.name}" 吗？此操作不可恢复。`,
+    async () => {
+      try {
+        const connectionId = findConnectionId(node.id, useTreeStore.getState().treeData);
+        const dbName = node.dbName || 'default';
+        const schemaName = node.schemaName || 'public';
+        const response = await fetch('/api/db/delete-object', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ connectionId, dbName, schemaName, objectName: node.name, objectType })
+        });
+        if (!response.ok) throw new Error(`Failed to delete ${objectType}`);
+        useTreeStore.getState().deleteNode(node.id);
+        toast.success(`${label} "${node.name}" 已删除`);
+      } catch (error) {
+        toast.error('删除失败，请重试');
+      }
+    },
+    'danger'
+  );
+};
+
+export const deleteTable = (node, openModal) => deleteDbObject(node, 'table', openModal);
+export const deleteView = (node, openModal) => deleteDbObject(node, 'view', openModal);
+export const deleteFunction = (node, openModal) => deleteDbObject(node, 'function', openModal);
+
+// 其他操作（模拟，添加 toast）
+export const createNewSchema = (node) => actionHandlers.createNewSchema(node);
+export const exportDatabase = (node) => actionHandlers.exportDatabase(node);
+export const createNewTable = (node) => actionHandlers.createNewTable(node);
+export const exportSchema = (node) => actionHandlers.exportSchema(node);
+export const previewTable = (node) => actionHandlers.previewTable(node);
+export const editTableStructure = (node) => actionHandlers.editTableStructure(node);
+export const generateTableSQL = (node) => actionHandlers.generateTableSQL(node);
+export const exportTableData = (node) => actionHandlers.exportTableData(node);
+export const viewDefinition = (node) => actionHandlers.viewDefinition(node);
+export const editView = (node) => actionHandlers.editView(node);
+export const generateViewSQL = (node) => actionHandlers.generateViewSQL(node);
+export const editFunction = (node) => actionHandlers.editFunction(node);
+export const viewFunctionSource = (node) => actionHandlers.viewFunctionSource(node);
+export const testFunction = (node) => actionHandlers.testFunction(node);
+export const showProperties = (node) => actionHandlers.showProperties(node);
+export const refreshFolder = (node) => toast(`刷新文件夹: ${node.name}`);
+
+// =========================================
+
+src/actions/treeActions.js
+
+import toast from 'react-hot-toast';
+import { findNode } from '../utils/treeUtils';
+import { useTreeStore } from '../stores/useTreeStore';
+import { useTreeConfigStore } from '../stores/useTreeConfigStore';  // 新增
+
+// handleNewGroupSubmit 和 handleNewConnectionSubmit 保持原样
+export const handleNewGroupSubmit = async (groupName, parentId) => {
+  try {
+    const response = await fetch('/api/config/folders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: groupName, type: 'folder', parentId }),
+    });
+    if (!response.ok) throw new Error('Failed to create group');
+    await response.json();
+    useTreeStore.getState().refreshTree();
+    toast.success('新建分组成功');
+  } catch (err) {
+    console.error('Error creating group:', err);
+    toast.error('创建分组失败');
+    throw err;
+  }
+};
+
+export const handleNewConnectionSubmit = async (connectionData, parentId) => {
+  try {
+    const response = await fetch('/api/config/connections', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...connectionData, type: 'connection', parentId }),
+    });
+    if (!response.ok) throw new Error('Failed to create connection');
+    await response.json();
+    useTreeStore.getState().refreshTree();
+    toast.success('新建连接成功');
+  } catch (err) {
+    console.error('Error creating connection:', err);
+    toast.error('创建连接失败');
+    throw err;
+  }
+};
+
+// 修复：moveNode 接收 openModal 参数，直接内部调用 openConfirm，使用 config.type
+export const moveNode = async (sourceId, targetParentId, updateTreePathFn, openModal, nodeType) => {
+  // nodeType 从 config.type fallback
+  const sourceNode = findNode(useTreeStore.getState().treeData, sourceId);
+  const actualType = sourceNode?.config?.type || nodeType || 'unknown';
+  if (typeof openModal !== 'function') {
+    console.error('openModal must be a function');
+    return;
+  }
+
+  // 内部构建 openConfirm，使用传入的 openModal
+  const localOpenConfirm = (title, message, onConfirm, variant = 'danger') => {
+    openModal('confirm', {
+      title,
+      message,
+      onConfirm: async () => {
+        try {
+          await onConfirm();
+        } catch (error) {
+          toast.error('操作失败');
+          console.error('Move confirm error:', error);
+        }
+      },
+      variant
+    });
+  };
+
+  localOpenConfirm(
+    `移动${actualType === 'folder' ? '文件夹' : '连接'}`,
+    `确定要将此${actualType === 'folder' ? '文件夹' : '连接'}移动到目标位置吗？`,
+    async () => {
+      try {
+        const response = await fetch('/api/config/move-node', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sourceId, targetParentId: targetParentId || null, type: actualType })
+        });
+        if (!response.ok) throw new Error(`Failed to move ${actualType}`);
+
+        // 更新树数据：移除源节点，添加到目标
+        const treeData = useTreeStore.getState().treeData;
+        const newTree = JSON.parse(JSON.stringify(treeData));
+        const removeNodeFromTree = (nodes, id) => {
+          if (!Array.isArray(nodes)) return null;
+          for (let i = 0; i < nodes.length; i++) {
+            if (nodes[i] && nodes[i].id === id) {
+              return nodes.splice(i, 1)[0];
+            }
+            if (nodes[i] && nodes[i].children) {
+              const removed = removeNodeFromTree(nodes[i].children, id);
+              if (removed !== null) {
+                return removed;
+              }
+            }
+          }
+          return null;
+        };
+        const removedNode = removeNodeFromTree(newTree, sourceId);
+        if (!removedNode) return;
+
+        removedNode.parentId = targetParentId || null;
+        if (!targetParentId) {
+          newTree.push(removedNode);
+        } else {
+          const targetNode = findNode(newTree, targetParentId);
+          if (targetNode && targetNode.children) {
+            targetNode.children.push(removedNode);
+          }
+        }
+        useTreeStore.getState().setTreeData(newTree);
+        toast.success(`${actualType} 已移动到新位置`);
+      } catch (error) {
+        console.error(`Move ${actualType} error:`, error);
+        toast.error('移动失败，请重试');
+      }
+    },
+    'warning'
+  );
+};
+
+// 切换展开：不变
+export const toggleExpand = (setExpandedKeys, nodeId, loadChildren = true) => {
+  setExpandedKeys((prev) => {
+    const newMap = new Map(prev);
+    newMap.set(nodeId, !newMap.get(nodeId));
+    return newMap;
+  });
+};
+
+// 删除节点（通用）：不变
+export const deleteNode = (treeData, nodeId) => {
+  const newTree = JSON.parse(JSON.stringify(treeData));
+  function deleteRecursive(nodes) {
+    if (!Array.isArray(nodes)) return false;
+    for (let i = 0; i < nodes.length; i++) {
+      if (nodes[i] && nodes[i].id === nodeId) {
+        nodes.splice(i, 1);
+        return true;
+      }
+      if (nodes[i] && nodes[i].children && deleteRecursive(nodes[i].children)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  deleteRecursive(newTree);
+  return newTree;
+};
+
+// 删除文件夹：不变
+export const deleteFolder = async (node, openModal) => {
+  if (typeof openModal !== 'function') {
+    console.error('openModal must be a function');
+    return;
+  }
+  const localOpenConfirm = (title, message, onConfirm, variant = 'danger') => {
+    openModal('confirm', {
+      title,
+      message,
+      onConfirm,
+      variant
+    });
+  };
+
+  localOpenConfirm(
+    `删除文件夹`,
+    `确定要删除文件夹 "${node.name}" 及其所有子项吗？此操作不可恢复。`,
+    async () => {
+      try {
+        const response = await fetch(`/api/config/folders/${node.id}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error('Failed to delete folder');
+        useTreeStore.getState().deleteNode(node.id);
+        toast.success(`文件夹 "${node.name}" 已删除`);
+      } catch (error) {
+        toast.error('删除失败，请重试');
+      }
+    },
+    'danger'
+  );
+};
+
+// 重命名文件夹：不变
+export const renameFolder = (node, openModal) => {
+  if (typeof openModal !== 'function') {
+    console.error('openModal must be a function');
+    return;
+  }
+  openModal('renameFolder', {
+    id: node.id,
+    name: node.name,
+    onSubmit: async (newName) => {
+      if (!newName || newName.trim() === '') {
+        throw new Error('文件夹名称不能为空');
+      }
+      try {
+        const response = await fetch(`/api/config/folders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName.trim(), id: node.id, type: 'folder' })
+        });
+        if (!response.ok) throw new Error('Failed to rename folder');
+        useTreeStore.getState().updateTreePath(node.id, (current) => ({
+          ...current,
+          name: newName.trim()
+        }));
+        toast.success(`文件夹已重命名为 "${newName}"`);
+      } catch (error) {
+        console.error('Rename folder error:', error);
+        throw error;
+      }
+    }
+  });
+};
+
+// 刷新文件夹：不变
+export const refreshFolder = (node) => {
+  toast(`刷新文件夹: ${node.name}`);
+  // 实际调用 API 刷新子项
+};
+
+// =========================================
+
+src/App.jsx
+
+import React, { useEffect } from 'react';
+import AppLayout from './components/layout/AppLayout';
+import { ModalProvider } from './components/modals/ModalProvider';
+import { Toaster } from 'react-hot-toast'; // 通知组件
+import { useTreeConfigStore } from './stores/useTreeConfigStore';  // 新增：初始化全局 store
+import './css/index.css';
+
+export default function App() {
+  // 移除 Zustand Provider：Zustand hooks 直接在组件中使用，无需全局包装
+  useEffect(() => {
+    // 初始化全局 treeConfigStore（供 utils/dbActions fallback 使用）
+    window.treeConfigStore = useTreeConfigStore;
+  }, []);
+
+  return (
+    <ModalProvider>
+      <AppLayout />
+      <Toaster position="top-right" />
+    </ModalProvider>
+  );
+}
+
+// =========================================
+
+src/components/editor/EditorPanel.jsx
+
+import React from 'react';
+import SqlEditor from './SqlEditor';
+import { useTabsStore } from '../../stores/useTabsStore';
+
+const EditorPanel = ({ query, results, updateQuery, executeQuery, editorHeight, handleEditorMouseDown }) => {
+  const { activeTabId } = useTabsStore();
+
+  return (
+    <div className="editor-and-result" style={{ height: `calc(100vh - 132px)` }}> {/* 调整高度以适应工具栏 */}
+      <div className="editor-area" style={{ height: editorHeight }}>
+        <SqlEditor query={query} setQuery={updateQuery} />
+      </div>
+      <div className="resizer editor-divider" onMouseDown={handleEditorMouseDown} />
+      <div className="result-area">
+        <div className="result-header">
+          <div className="left-controls">
+            <button className="icon-btn refresh-btn" onClick={executeQuery}>⟳</button>
+            <span className="limit-text">Limit 1000</span>
+          </div>
+          <div className="right-controls">
+            {results.length > 0 && <span className="row-count">{results.length} rows</span>}
+          </div>
+        </div>
+        <div className="result-content">
+          {results.length > 0 ? (
+            <div className="result-table">
+              <table>
+                <thead>
+                  <tr>
+                    {results[0] && Object.keys(results[0]).map((key) => <th key={key}>{key}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.map((row, idx) => (
+                    <tr key={idx}>
+                      {Object.values(row).map((value, i) => <td key={i}>{value}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <div className="empty-icon">📊</div>
+              <p>Execute a query above to see results</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default EditorPanel;
+
+// =========================================
+
+src/components/editor/SqlEditor.jsx
+
+import React from 'react';
+import CodeMirror from '@uiw/react-codemirror';
+import { sql } from '@codemirror/lang-sql';
+import '../../css/SqlEditor.css';
+
+export default function SqlEditor({ query, setQuery }) {
+  return (
+    <div className="sql-editor">
+      <CodeMirror
+        value={query}
+        onChange={setQuery}
+        extensions={[sql()]}
+        height="100%"
+        theme="light"
+        placeholder="Write your SQL here..."
+        basicSetup={{
+          lineNumbers: true,
+          highlightActiveLine: true,
+          tabSize: 2,
+          bracketMatching: true,
+        }}
+        className="codemirror-custom"
+        style={{ fontSize: '14px', fontFamily: "'Fira Code', 'SF Mono', Monaco, Consolas, monospace", fontWeight: 590 }}
+      />
+    </div>
+  );
+}
+
+// =========================================
+
+src/components/layout/AppLayout.jsx
+
+import React, { useRef, useEffect, useState } from 'react';
+import Sidebar from '../sidebar/Sidebar';
+import ToolbarTop from '../toptoolbar/ToolbarTop';
+import EditorPanel from '../editor/EditorPanel';
+import { useResize } from '../../hooks/useResize';
+import { useTreeStore } from '../../stores/useTreeStore';
+import { useTabsStore } from '../../stores/useTabsStore';
+import FormatIcon from '../../public/icons/toptoolbar/format_1.svg';
+import RunIcon from '../../public/icons/toptoolbar/run_1.svg';
+import StopIcon from '../../public/icons/toptoolbar/stop_1.svg';
+import { openNewGroup, openNewConnection } from '../modals/modalActions'; // 从模态 actions 导入
+
+const AppLayout = () => {
+  const sidebarRef = useRef(null); // 确保 ref 存在
+  const { sidebarWidth, editorHeight, handleSidebarMouseDown, handleEditorMouseDown } = useResize(undefined, undefined, sidebarRef); // 传入 sidebarRef
+  const { treeData, refreshTree } = useTreeStore();
+  const { tabs, activeTabId, updateQuery, executeQuery, formatQuery, addTab, closeTab, checkTabOverflow, handleTabScroll } = useTabsStore();
+  const tabsContainerRef = useRef(null);
+  const [showTabScroll, setShowTabScroll] = React.useState(false);
+  const activeTab = tabs.find((t) => t.id === activeTabId) || { query: '', results: [] };
+
+  useEffect(() => {
+    refreshTree(); // 初始化树数据
+  }, [refreshTree]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => setShowTabScroll(checkTabOverflow(tabsContainerRef)), 100);
+    return () => clearTimeout(timeoutId);
+  }, [tabs, checkTabOverflow]);
+
+  useEffect(() => {
+    const handleResize = () => setShowTabScroll(checkTabOverflow(tabsContainerRef));
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [checkTabOverflow]);
+
+  const handleFormat = () => formatQuery();
+  const handleRun = () => executeQuery(activeTab.query).then((results) => {
+    useTabsStore.setState((state) => ({
+      tabs: state.tabs.map((t) => (t.id === activeTabId ? { ...t, results } : t)),
+    }));
+  });
+
+  return (
+    <div className="app-container" style={{ gridTemplateColumns: `${sidebarWidth}px 1fr` }}>
+      <ToolbarTop addTab={addTab} refreshTree={refreshTree} openNewGroup={() => openNewGroup(null)} openNewConnection={() => openNewConnection(null)} />
+      <div ref={sidebarRef} className="sidebar" style={{ width: sidebarWidth }}>
+        <Sidebar treeData={treeData} />
+        <div className="resizer sidebar-resizer" onMouseDown={(e) => handleSidebarMouseDown(e)} />
+      </div>
+      <div className="main-panel">
+        <div className="toolbar">
+          <div className="toolbar-left">
+            <button className="btn btn-icon" title="美化sql" onClick={handleFormat}>
+              <img src={FormatIcon} alt="美化sql" className="icon" />
+            </button>
+            <button className="btn btn-icon" title="运行" onClick={handleRun}>
+              <img src={RunIcon} alt="运行" className="icon" />
+            </button>
+            <button className="btn btn-icon" title="停止" onClick={handleRun}>
+              <img src={StopIcon} alt="停止" className="icon" />
+            </button>
+          </div>
+        </div>
+        {tabs.length > 0 && (
+          <div className="tabs-container">
+            {showTabScroll && (
+              <button className="tab-scroll-btn tab-scroll-left" onClick={() => handleTabScroll('left', tabsContainerRef)}>
+                ‹
+              </button>
+            )}
+            <div className="tabs-header" ref={tabsContainerRef}>
+              {tabs.map((tab) => (
+                <div
+                  key={tab.id}
+                  className={`tab-item ${tab.id === activeTabId ? 'active' : ''}`}
+                  onClick={() => useTabsStore.getState().setActiveTabId(tab.id)}
+                >
+                  <span className="tab-title" title={tab.title}>{tab.title}</span>
+                  {tabs.length > 1 && (
+                    <button className="tab-close" onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}>
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {showTabScroll && (
+              <button className="tab-scroll-btn tab-scroll-right" onClick={() => handleTabScroll('right', tabsContainerRef)}>
+                ›
+              </button>
+            )}
+            {tabs.length > 1 && (
+              <div className="tab-counter">
+                Tab {tabs.findIndex((t) => t.id === activeTabId) + 1} of {tabs.length}
+              </div>
+            )}
+          </div>
+        )}
+        <EditorPanel
+          query={activeTab.query}
+          results={activeTab.results}
+          updateQuery={updateQuery}
+          executeQuery={handleRun}
+          editorHeight={editorHeight}
+          handleEditorMouseDown={handleEditorMouseDown}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default AppLayout;
+
+// =========================================
+
+src/components/modals/ConfirmModal.jsx
+
+import React from 'react';
+import { createPortal } from 'react-dom';
+
+const ConfirmModal = ({ isOpen, onClose, onConfirm, title = '确认操作', message = '您确定要执行此操作吗？此操作不可恢复。', confirmText = '确认', cancelText = '取消', variant = 'danger' }) => {
+  if (!isOpen) return null;
+
+  const handleConfirm = () => {
+    onConfirm();
+    onClose();
+  };
+
+  const handleCancel = onClose;
+
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape') onClose();
+    else if (e.key === 'Enter') handleConfirm();
+  };
+
+  const buttonVariant = variant === 'danger'
+    ? { bg: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%)', color: 'white' }
+    : { bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' };
+
+  return createPortal(
+    <div
+      className="confirm-modal-overlay"
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 1000, backdropFilter: 'blur(4px)'
+      }}
+      onClick={handleBackdropClick}
+      onKeyDown={handleKeyDown}
+      tabIndex={-1}
+    >
+      <div
+        className="confirm-modal"
+        style={{
+          background: 'white', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
+          width: 'min(90vw, 400px)', maxWidth: '400px', padding: '24px', fontFamily: 'var(--font)',
+          animation: 'modalSlideIn 0.3s ease-out'
+        }}
+      >
+        <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '600', color: '#333', lineHeight: '1.4' }}>
+          {title}
+        </h2>
+        <p style={{ margin: '0 0 24px 0', fontSize: '14px', color: '#666', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
+          {message}
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+          <button
+            onClick={handleCancel}
+            style={{
+              padding: '10px 20px', border: '1px solid #e0e0e0', background: 'white', borderRadius: '8px',
+              fontSize: '14px', fontWeight: '500', color: '#666', cursor: 'pointer', transition: 'all 0.2s ease',
+              minWidth: '80px'
+            }}
+            onMouseEnter={(e) => { e.target.style.background = '#f8f9fa'; e.target.style.borderColor = '#ccc'; }}
+            onMouseLeave={(e) => { e.target.style.background = 'white'; e.target.style.borderColor = '#e0e0e0'; }}
+          >
+            {cancelText}
+          </button>
+          <button
+            onClick={handleConfirm}
+            style={{
+              padding: '10px 20px', border: 'none', background: buttonVariant.bg, color: buttonVariant.color,
+              borderRadius: '8px', fontSize: '14px', fontWeight: '500', cursor: 'pointer', transition: 'all 0.2s ease',
+              minWidth: '80px', boxShadow: '0 4px 14px rgba(255, 107, 107, 0.3)'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.transform = 'translateY(-1px)';
+              e.target.style.boxShadow = '0 6px 20px rgba(255, 107, 107, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = '0 4px 14px rgba(255, 107, 107, 0.3)';
+            }}
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+export default ConfirmModal;
+
+// =========================================
+
+src/components/modals/EditConnectionModal.jsx
+
+import React, { useEffect, useMemo, useState } from "react";
+import "../../css/NewConnectionModal.css"; // 复用现有样式
+import toast from "react-hot-toast";
+
+const defaultPort = (dbType) => ({
+  POSTGRESQL: "5432",
+  MYSQL: "3306",
+  SQLSERVER: "1433",
+  ORACLE: "1521",
+}[dbType] || "");
+
+const rowStyle = { display: "flex", gap: 12, flexWrap: "wrap" };
+const colStyle = { flex: "1 1 240px", minWidth: 240 };
+const statusBox = (ok) => ({
+  marginTop: 12,
+  padding: "10px 12px",
+  borderRadius: 8,
+  fontSize: 13,
+  lineHeight: 1.5,
+  border: `1px solid ${ok ? "#16a34a30" : "#ef444430"}`,
+  background: ok ? "#16a34a15" : "#ef44441a",
+  color: ok ? "#065f46" : "#7f1d1d",
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 8,
+});
+const footerStyle = {
+  position: "sticky",
+  bottom: 0,
+  background: "#fff",
+  paddingTop: 12,
+  marginTop: 12,
+  borderTop: "1px solid #eee",
+  display: "flex",
+  gap: 8,
+  justifyContent: "flex-end",
+};
+
+const EditConnectionModal = ({ isOpen, onClose, connection, onSubmit }) => {
+  const [connectionData, setConnectionData] = useState({
+    name: "",
+    dbType: "POSTGRESQL",
+    host: "localhost",
+    port: "5432",
+    database: "postgres",
+    username: "",
+    password: "",
+    savePassword: false,
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState(null);
+  const [isTesting, setIsTesting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && connection) {
+      setConnectionData({
+        name: connection.name || "",
+        dbType: connection.dbType || "POSTGRESQL",
+        host: connection.host || "localhost",
+        port: String(connection.port || defaultPort(connection.dbType || "POSTGRESQL")),
+        database: connection.database || "postgres",
+        username: connection.username || "",
+        password: "",
+        savePassword: false,
+      });
+      setConnectionStatus(null);
+    }
+  }, [isOpen, connection]);
+
+  const requiredOk = useMemo(() => {
+    const { name, host, port, username } = connectionData;
+    return !!name && !!host && !!port && !!username;
+  }, [connectionData]);
+
+  if (!isOpen) return null;
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setConnectionData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const normalizeHost = (host) => (host === "localhost" ? "127.0.0.1" : host);
+
+  const handleTestConnection = async () => {
+    setIsTesting(true);
+    setConnectionStatus({ ok: null, msg: "Testing..." });
+    try {
+      const response = await fetch("/api/config/connections/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: connection.id,
+          ...connectionData,
+          host: normalizeHost(connectionData.host),
+          port: parseInt(connectionData.port, 10),
+          type: "connection",
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const msg =
+          result?.message ||
+          "Connection failed. Please check host/port and DB service.";
+        setConnectionStatus({ ok: false, msg });
+        return;
+      }
+      setConnectionStatus({ ok: true, msg: "Connected successfully!" });
+      toast.success("连接测试成功");
+    } catch (error) {
+      setConnectionStatus({
+        ok: false,
+        msg:
+          error?.message ||
+          "Connection failed. Check that the service is listening.",
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!requiredOk) return;
+    setIsSaving(true);
+    try {
+      const payload = {
+        id: connection.id,
+        ...connectionData,
+        host: normalizeHost(connectionData.host),
+        port: parseInt(connectionData.port, 10),
+        type: "connection",
+      };
+      await onSubmit(payload);
+      if (connectionData.savePassword) {
+        localStorage.setItem(`savedPassword_${connection.id}`, connectionData.password);
+      }
+      onClose();
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setConnectionStatus(null);
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={handleCancel}>
+      <div
+        className="modal-content"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 680, width: "92%", maxHeight: "82vh", overflow: "auto" }}
+      >
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            background: "#fff",
+            paddingBottom: 10,
+            marginBottom: 8,
+            zIndex: 1,
+          }}
+        >
+          <h2 className="modal-title" style={{ marginBottom: 0 }}>
+            编辑连接
+          </h2>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="form-section" style={{ paddingBottom: 0 }}>
+            <div className="form-group">
+              <label htmlFor="name">连接名称</label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={connectionData.name}
+                onChange={handleChange}
+                placeholder="e.g., 开发环境-deego"
+                className="modal-input"
+                autoFocus
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="dbType">数据库类型</label>
+              <select
+                id="dbType"
+                name="dbType"
+                value={connectionData.dbType}
+                onChange={handleChange}
+                className="modal-input"
+              >
+                <option value="POSTGRESQL">PostgreSQL</option>
+                <option value="MYSQL">MySQL</option>
+                <option value="SQLSERVER">SQL Server</option>
+                <option value="ORACLE">Oracle</option>
+              </select>
+            </div>
+
+            <div style={rowStyle}>
+              <div className="form-group" style={colStyle}>
+                <label htmlFor="host">主机</label>
+                <input
+                  type="text"
+                  id="host"
+                  name="host"
+                  value={connectionData.host}
+                  onChange={handleChange}
+                  placeholder="localhost / 127.0.0.1 / 192.168.x.x"
+                  className="modal-input"
+                />
+              </div>
+              <div className="form-group" style={{ ...colStyle, maxWidth: 200 }}>
+                <label htmlFor="port">端口</label>
+                <input
+                  type="number"
+                  id="port"
+                  name="port"
+                  value={connectionData.port}
+                  onChange={handleChange}
+                  placeholder={defaultPort(connectionData.dbType)}
+                  className="modal-input"
+                  min="1"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="database">数据库</label>
+              <input
+                type="text"
+                id="database"
+                name="database"
+                value={connectionData.database}
+                onChange={handleChange}
+                placeholder="postgres / db_name"
+                className="modal-input"
+              />
+            </div>
+
+            <div style={rowStyle}>
+              <div className="form-group" style={colStyle}>
+                <label htmlFor="username">用户名</label>
+                <input
+                  type="text"
+                  id="username"
+                  name="username"
+                  value={connectionData.username}
+                  onChange={handleChange}
+                  placeholder="输入用户名"
+                  className="modal-input"
+                />
+              </div>
+
+              <div className="form-group" style={colStyle}>
+                <label htmlFor="password">密码</label>
+                <div className="password-wrapper">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    id="password"
+                    name="password"
+                    value={connectionData.password}
+                    onChange={handleChange}
+                    placeholder="可留空"
+                    className="modal-input"
+                  />
+                  <button
+                    type="button"
+                    className="toggle-password"
+                    onClick={() => setShowPassword((v) => !v)}
+                  >
+                    {showPassword ? "隐藏" : "显示"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {connectionStatus && (
+              <div style={statusBox(!!connectionStatus.ok)}>
+                <span style={{ fontWeight: 700 }}>
+                  {connectionStatus.ok === true ? "✓" : connectionStatus.ok === false ? "!" : "…" }
+                </span>
+                <span>{connectionStatus.msg}</span>
+              </div>
+            )}
+          </div>
+
+          <div style={footerStyle}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleTestConnection}
+              disabled={isSaving || isTesting}
+            >
+              {isTesting ? "测试中…" : "测试连接"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-cancel"
+              onClick={handleCancel}
+              disabled={isSaving}
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={!requiredOk || isSaving || isTesting}
+            >
+              {isSaving ? "保存中…" : "保存"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default EditConnectionModal;
+
+// =========================================
+
+src/components/modals/modalActions.js
+
+import toast from 'react-hot-toast';
+import { updateConnection } from '../../actions/dbActions';
+import { useTreeStore } from '../../stores/useTreeStore';
+import { actionHandlers } from '../../actions/dbActions';  // 新增导入动态 handler
+
+// openNewGroup 接收 openModal 参数
+export const openNewGroup = (parentId = null, openModal) => {
+  if (typeof openModal !== 'function') {
+    console.error('openModal must be a function');
+    return;
+  }
+  openModal('newGroup', { parentId });
+};
+
+// openNewConnection 接收 openModal 参数
+export const openNewConnection = (parentId = null, openModal) => {
+  if (typeof openModal !== 'function') {
+    console.error('openModal must be a function');
+    return;
+  }
+  openModal('newConnection', { parentId });
+};
+
+// openConfirm 接收 openModal 参数
+export const openConfirm = (title, message, onConfirm, variant = 'danger', openModal) => {
+  if (typeof openModal !== 'function') {
+    console.error('openModal must be a function');
+    return;
+  }
+  openModal('confirm', {
+    title,
+    message,
+    onConfirm: async () => {
+      try {
+        await onConfirm();
+      } catch (error) {
+        toast.error('操作失败');
+        console.error('Confirm action error:', error);
+      }
+    },
+    variant
+  });
+};
+
+// openRenameFolder 接收 openModal 参数
+export const openRenameFolder = (node, openModal) => {
+  if (typeof openModal !== 'function') {
+    console.error('openModal must be a function');
+    return;
+  }
+  openModal('renameFolder', {
+    defaultName: node.name,
+    onSubmit: async (newName) => {
+      if (!newName || newName.trim() === '') {
+        throw new Error('文件夹名称不能为空');
+      }
+      try {
+        const response = await fetch(`/api/config/folders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName.trim(), id: node.id , type: 'folder'})
+        });
+        if (!response.ok) throw new Error('Failed to rename folder');
+        toast.success(`文件夹已重命名为 "${newName}"`);
+      } catch (error) {
+        toast.error('重命名失败，请重试');
+        throw error; // 让模态框处理错误
+      }
+    }
+  });
+};
+
+// openEditConnection 接收 openModal 参数，使用 config
+export const openEditConnection = (connection, openModal) => {
+  if (typeof openModal !== 'function') {
+    console.error('openModal must be a function');
+    return;
+  }
+  openModal('editConnection', {
+    connection,
+    onSubmit: async (payload) => {
+      const { updateTreePath } = useTreeStore.getState();
+      await updateConnection(payload);
+      // 新增：更新后重新加载 config
+      await useTreeStore.getState().loadTreeConfig(payload.id);
+    }
+  });
+};
+
+// handleNewGroupSubmit 和 handleNewConnectionSubmit 保持原样（纯 API）
+export const handleNewGroupSubmit = async (groupName, parentId) => {
+  try {
+    const response = await fetch('/api/config/folders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: groupName, type: 'folder', parentId }),
+    });
+    if (!response.ok) throw new Error('Failed to create group');
+    await response.json();
+    toast.success('新建分组成功');
+  } catch (err) {
+    console.error('Error creating group:', err);
+    toast.error('创建分组失败');
+    throw err;
+  }
+};
+
+export const handleNewConnectionSubmit = async (connectionData, parentId) => {
+  try {
+    const response = await fetch('/api/config/connections', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...connectionData, type: 'connection', parentId }),
+    });
+    if (!response.ok) throw new Error('Failed to create connection');
+    await response.json();
+    toast.success('新建连接成功');
+  } catch (err) {
+    console.error('Error creating connection:', err);
+    toast.error('创建连接失败');
+    throw err;
+  }
+};
+
+// =========================================
+
+src/components/modals/ModalProvider.jsx
+
+import React, { createContext, useContext, useState } from 'react';
+import { createPortal } from 'react-dom';
+import ConfirmModal from './ConfirmModal';
+import NewGroupModal from './NewGroupModal';
+import NewConnectionModal from './NewConnectionModal';
+import RenameFolderModal from './RenameFolderModal';
+import EditConnectionModal from './EditConnectionModal';
+import toast from 'react-hot-toast';
+
+const ModalContext = createContext();
+
+export const ModalProvider = ({ children }) => {
+  const [modals, setModals] = useState({});
+
+  const openModal = (type, config = {}) => {
+    setModals((prev) => ({ ...prev, [type]: { isOpen: true, ...config } }));
+  };
+
+  const closeModal = (type) => {
+    setModals((prev) => ({ ...prev, [type]: { ...prev[type], isOpen: false } }));
+    // 延迟关闭以动画
+    setTimeout(() => setModals((prev) => { const newModals = { ...prev }; delete newModals[type]; return newModals; }), 300);
+  };
+
+  const value = { openModal, closeModal };
+
+  return (
+    <ModalContext.Provider value={value}>
+      {children}
+      {createPortal(
+        <>
+          {modals.confirm && <ConfirmModal {...modals.confirm} onClose={() => closeModal('confirm')} />}
+          {modals.newGroup && <NewGroupModal {...modals.newGroup} onClose={() => closeModal('newGroup')} />}
+          {modals.newConnection && <NewConnectionModal {...modals.newConnection} onClose={() => closeModal('newConnection')} />}
+          {modals.renameFolder && <RenameFolderModal {...modals.renameFolder} onClose={() => closeModal('renameFolder')} />}
+          {modals.editConnection && <EditConnectionModal {...modals.editConnection} onClose={() => closeModal('editConnection')} />}
+        </>,
+        document.body
+      )}
+    </ModalContext.Provider>
+  );
+};
+
+export const useModal = () => useContext(ModalContext);
+
+// =========================================
+
+src/components/modals/NewConnectionModal.jsx
+
+import React, { useState, useEffect, useMemo } from "react";
+import "../../css/NewConnectionModal.css"; // 保留你现有样式
+import toast from "react-hot-toast";
+import { handleNewConnectionSubmit } from "../../actions/treeActions";
+
+// 小工具：根据 dbType 给出默认端口
+const defaultPort = (dbType) => ({
+  POSTGRESQL: "5432",
+  MYSQL: "3306",
+  SQLSERVER: "1433",
+  ORACLE: "1521",
+}[dbType] || "");
+
+const rowStyle = { display: "flex", gap: 12, flexWrap: "wrap" };
+const colStyle = { flex: "1 1 240px", minWidth: 240 };
+
+const statusBox = (ok) => ({
+  marginTop: 12,
+  padding: "10px 12px",
+  borderRadius: 8,
+  fontSize: 13,
+  lineHeight: 1.5,
+  border: `1px solid ${ok ? "#16a34a30" : "#ef444430"}`,
+  background: ok ? "#16a34a15" : "#ef44441a",
+  color: ok ? "#065f46" : "#7f1d1d",
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 8,
+});
+
+const footerStyle = {
+  position: "sticky",
+  bottom: 0,
+  background: "#fff",
+  paddingTop: 12,
+  marginTop: 12,
+  borderTop: "1px solid #eee",
+  display: "flex",
+  gap: 8,
+  justifyContent: "flex-end",
+};
+
+const NewConnectionModal = ({
+  isOpen,
+  onClose,
+  parentId,
+  onSubmit = handleNewConnectionSubmit,
+}) => {
+  const [connectionData, setConnectionData] = useState({
+    name: "",
+    dbType: "POSTGRESQL",
+    host: "localhost",
+    port: "5432",
+    database: "postgres",
+    username: "",
+    password: "",
+    savePassword: false,
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState(null); // { ok:boolean, msg:string }
+  const [isTesting, setIsTesting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) setConnectionStatus(null);
+  }, [isOpen]);
+
+  // 切换数据库类型时，智能填充端口（仅当当前端口是其他默认值或为空时）
+  useEffect(() => {
+    setConnectionData((prev) => {
+      const nextDefault = defaultPort(prev.dbType);
+      const knownDefaults = ["5432", "3306", "1433", "1521", ""];
+      if (knownDefaults.includes(prev.port)) {
+        return { ...prev, port: nextDefault };
+      }
+      return prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectionData.dbType]);
+
+  const requiredOk = useMemo(() => {
+    const { name, host, port, username } = connectionData;
+    return !!name && !!host && !!port && !!username;
+  }, [connectionData]);
+
+  if (!isOpen) return null;
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setConnectionData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const normalizeHost = (host) => (host === "localhost" ? "127.0.0.1" : host);
+
+  const handleTestConnection = async () => {
+    setIsTesting(true);
+    setConnectionStatus({ ok: null, msg: "Testing..." });
+    try {
+      const response = await fetch("/api/config/connections/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...connectionData,
+          host: normalizeHost(connectionData.host),
+          port: parseInt(connectionData.port, 10),
+          type: "connection",
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const msg =
+          result?.message ||
+          "Connection failed. Please check host/port and DB service.";
+        setConnectionStatus({ ok: false, msg });
+        return;
+      }
+      setConnectionStatus({ ok: true, msg: "Connected successfully!" });
+      toast.success("连接测试成功");
+    } catch (error) {
+      setConnectionStatus({
+        ok: false,
+        msg:
+          error?.message ||
+          "Connection failed. Check that the service is listening.",
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!requiredOk) return;
+    setIsSaving(true);
+    try {
+      const payload = {
+        ...connectionData,
+        host: normalizeHost(connectionData.host),
+        port: parseInt(connectionData.port, 10),
+        type: "connection",
+        parentId,
+      };
+      await onSubmit(payload, parentId);
+      if (connectionData.savePassword) {
+        // 仅示例，真实项目建议安全存储
+        localStorage.setItem("savedPassword", connectionData.password);
+      }
+      toast.success("新建连接成功");
+      onClose();
+    } catch (error) {
+      toast.error("新建连接失败");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setConnectionData({
+      name: "",
+      dbType: "POSTGRESQL",
+      host: "localhost",
+      port: "5432",
+      database: "postgres",
+      username: "",
+      password: "",
+      savePassword: false,
+    });
+    setConnectionStatus(null);
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={handleCancel}>
+      <div
+        className="modal-content"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 680, width: "92%", maxHeight: "82vh", overflow: "auto" }}
+      >
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            background: "#fff",
+            paddingBottom: 10,
+            marginBottom: 8,
+            zIndex: 1,
+          }}
+        >
+          <h2 className="modal-title" style={{ marginBottom: 0 }}>
+            新建连接
+          </h2>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="form-section" style={{ paddingBottom: 0 }}>
+            <div className="form-group">
+              <label htmlFor="name">连接名称</label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={connectionData.name}
+                onChange={handleChange}
+                placeholder="e.g., 开发环境-deego"
+                className="modal-input"
+                autoFocus
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="dbType">数据库类型</label>
+              <select
+                id="dbType"
+                name="dbType"
+                value={connectionData.dbType}
+                onChange={handleChange}
+                className="modal-input"
+              >
+                <option value="POSTGRESQL">PostgreSQL</option>
+                <option value="MYSQL">MySQL</option>
+                <option value="SQLSERVER">SQL Server</option>
+                <option value="ORACLE">Oracle</option>
+              </select>
+            </div>
+
+            <div style={rowStyle}>
+              <div className="form-group" style={colStyle}>
+                <label htmlFor="host">主机</label>
+                <input
+                  type="text"
+                  id="host"
+                  name="host"
+                  value={connectionData.host}
+                  onChange={handleChange}
+                  placeholder="localhost / 127.0.0.1 / 192.168.x.x"
+                  className="modal-input"
+                />
+              </div>
+              <div className="form-group" style={{ ...colStyle, maxWidth: 200 }}>
+                <label htmlFor="port">端口</label>
+                <input
+                  type="number"
+                  id="port"
+                  name="port"
+                  value={connectionData.port}
+                  onChange={handleChange}
+                  placeholder={defaultPort(connectionData.dbType)}
+                  className="modal-input"
+                  min="1"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="database">数据库</label>
+              <input
+                type="text"
+                id="database"
+                name="database"
+                value={connectionData.database}
+                onChange={handleChange}
+                placeholder="postgres / db_name"
+                className="modal-input"
+              />
+            </div>
+
+            <div style={rowStyle}>
+              <div className="form-group" style={colStyle}>
+                <label htmlFor="username">用户名</label>
+                <input
+                  type="text"
+                  id="username"
+                  name="username"
+                  value={connectionData.username}
+                  onChange={handleChange}
+                  placeholder="输入用户名"
+                  className="modal-input"
+                />
+              </div>
+
+              <div className="form-group" style={colStyle}>
+                <label htmlFor="password">密码</label>
+                <div className="password-wrapper">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    id="password"
+                    name="password"
+                    value={connectionData.password}
+                    onChange={handleChange}
+                    placeholder="可留空"
+                    className="modal-input"
+                  />
+                  <button
+                    type="button"
+                    className="toggle-password"
+                    onClick={() => setShowPassword((v) => !v)}
+                  >
+                    {showPassword ? "隐藏" : "显示"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {connectionStatus && (
+              <div style={statusBox(!!connectionStatus.ok)}>
+                <span style={{ fontWeight: 700 }}>
+                  {connectionStatus.ok === true ? "✓" : connectionStatus.ok === false ? "!" : "…" }
+                </span>
+                <span>{connectionStatus.msg}</span>
+              </div>
+            )}
+          </div>
+
+          <div style={footerStyle}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleTestConnection}
+              disabled={isSaving || isTesting}
+            >
+              {isTesting ? "测试中…" : "测试连接"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-cancel"
+              onClick={handleCancel}
+              disabled={isSaving}
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={!requiredOk || isSaving || isTesting}
+            >
+              {isSaving ? "保存中…" : "保存"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default NewConnectionModal;
+
+// =========================================
+
+src/components/modals/NewGroupModal.jsx
+
+import React, { useState, useEffect } from "react";
+import toast from 'react-hot-toast';
+import { handleNewGroupSubmit } from '../../actions/treeActions'; // 移到 actions
+
+const NewGroupModal = ({ isOpen, onClose, parentId, onSubmit = handleNewGroupSubmit }) => {
+  const [groupName, setGroupName] = useState("");
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setGroupName("");
+      setError(null);
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!groupName.trim()) {
+      setError("文件夹名称不能为空");
+      return;
+    }
+    try {
+      await onSubmit(groupName, parentId);
+      toast.success('新建分组成功');
+      onClose();
+    } catch (err) {
+      setError("创建分组失败，请重试。");
+      toast.error('创建失败');
+    }
+  };
+
+  const handleCancel = () => {
+    setGroupName("");
+    setError(null);
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={handleCancel}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <h2 className="modal-title">新建分组</h2>
+        {error && <div className="error-message">{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="groupName">分组名称</label>
+            <input
+              type="text"
+              id="groupName"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              placeholder="输入分组名称"
+              className="modal-input"
+              autoFocus
+            />
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn btn-cancel" onClick={handleCancel}>取消</button>
+            <button type="submit" className="btn btn-primary" disabled={!groupName.trim()}>确认</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default NewGroupModal;
+
+// =========================================
+
+src/components/modals/RenameFolderModal.jsx
+
+import React, { useState, useEffect } from "react";
+import '../../css/NewGroupModal.css'; // 复用样式
+import toast from 'react-hot-toast';
+
+const RenameFolderModal = ({ isOpen, onClose, parentId, defaultName = "", onSubmit }) => {
+  const [groupName, setGroupName] = useState(defaultName || "");
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setGroupName(defaultName || "");
+      setError(null);
+    }
+  }, [defaultName, isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!groupName.trim()) {
+      setError("文件夹名称不能为空");
+      return;
+    }
+
+    try {
+      await onSubmit(groupName, parentId);
+      toast.success("重命名成功");
+      setGroupName("");
+      onClose();
+    } catch (err) {
+      console.error("Error renaming folder:", err);
+      setError("重命名文件夹失败，请重试。");
+      toast.error("重命名失败");
+    }
+  };
+
+  const handleCancel = () => {
+    setGroupName(defaultName || "");
+    setError(null);
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <h2 className="modal-title">重命名文件夹</h2>
+        {error && <div className="error-message">{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="groupName">文件夹名称</label>
+            <input
+              type="text"
+              id="groupName"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              placeholder="输入文件夹名称"
+              className="modal-input"
+              autoFocus
+            />
+          </div>
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="btn btn-cancel"
+              onClick={handleCancel}
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={!groupName.trim()}
+            >
+              确认
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default RenameFolderModal;
+
+// =========================================
+
+src/components/ResultTable.jsx
+
+// \frontend\src\components\ResultTable.jsx
+import React from 'react'
+
+export default function ResultTable({ data }) {
+  if (!data || data.length === 0) {
+    return <div className="result-table">No results</div>
+  }
+  const cols = Object.keys(data[0])
+  return (
+    <div className="result-table">
+      <table>
+        <thead>
+          <tr>
+            {cols.map(c => <th key={c}>{c}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((row, i) => (
+            <tr key={i}>
+              {cols.map(col => <td key={col + i}>{String(row[col] ?? '')}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// =========================================
+
+src/components/sidebar/hooks/useDragDrop.js
+
+import { useState, useEffect } from 'react';
+import { moveNode } from '../../../actions/treeActions';
+
+export const useDragDrop = () => {
+  const [dragSourceId, setDragSourceId] = useState(null);
+  const [dragOverNodeId, setDragOverNodeId] = useState(null);
+  const [isDragOverRoot, setIsDragOverRoot] = useState(false);
+
+  useEffect(() => {
+    const handleDragEnd = () => {
+      setTimeout(() => {
+        setDragSourceId(null);
+        setDragOverNodeId(null);
+        setIsDragOverRoot(false);
+      }, 100);
+    };
+    document.addEventListener('dragend', handleDragEnd);
+    return () => document.removeEventListener('dragend', handleDragEnd);
+  }, []);
+
+  return {
+    dragSourceId, setDragSourceId, dragOverNodeId, setDragOverNodeId, isDragOverRoot, setIsDragOverRoot
+  };
+};
+
+// =========================================
+
+src/components/sidebar/MoreActionsMenu.jsx
+
+import React, { useState } from 'react';
+import { getAllActions } from '../../actions/dbActions';
+import toast from 'react-hot-toast';
+
+const MoreActionsMenu = ({
+  node,
+  position,
+  onClose,
+  setExpandedKeys,
+  openNewGroup,
+  openNewConnection,
+  openConfirm,
+  openRenameFolder,
+  openEditConnection,
+  refreshFolder,
+  deleteFolder,
+  refreshConnection,
+  connectDatabase,
+  disconnectDatabase,
+  refreshDatabase,
+  refreshSchema,
+  createNewSchema,
+  exportDatabase,
+  createNewTable,
+  exportSchema,
+  previewTable,
+  editTableStructure,
+  generateTableSQL,
+  exportTableData,
+  viewDefinition,
+  editView,
+  generateViewSQL,
+  editFunction,
+  viewFunctionSource,
+  testFunction,
+  showProperties,
+  deleteConnection,
+  deleteDatabase,
+  deleteSchema,
+  deleteTable,
+  deleteView,
+  deleteFunction
+}) => {
+  const [hoveredItem, setHoveredItem] = useState(null);
+  // 修复：传入所有必要 props 到 getAllActions
+  const actions = getAllActions(node.type, node, setExpandedKeys, openNewGroup, openNewConnection, openConfirm, openRenameFolder, openEditConnection, refreshFolder, deleteFolder, refreshConnection, connectDatabase, disconnectDatabase, refreshDatabase, refreshSchema, createNewSchema, exportDatabase, createNewTable, exportSchema, previewTable, editTableStructure, generateTableSQL, exportTableData, viewDefinition, editView, generateViewSQL, editFunction, viewFunctionSource, testFunction, showProperties, deleteConnection, deleteDatabase, deleteSchema, deleteTable, deleteView, deleteFunction);
+
+  const handleAction = (action) => {
+    try {
+      if (typeof action === 'function') {
+        action();
+      } else {
+        toast.error('无效操作');
+      }
+    } catch (error) {
+      console.error('Action error:', error);
+      toast.error('操作执行失败');
+    }
+    onClose();
+  };
+
+  const flipStyle = position.flip ? {
+    borderTop: '2px solid #e0e0e0',
+    borderBottom: '1px solid #e0e0e0'
+  } : {};
+
+  return (
+    <div
+      className="more-actions-menu"
+      style={{
+        position: 'fixed',
+        left: position.x,
+        top: position.y,
+        background: 'white',
+        border: '1px solid #e0e0e0',
+        borderRadius: '8px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+        zIndex: 1000,
+        minWidth: '180px',
+        maxHeight: '300px',
+        overflowY: 'auto',
+        fontSize: '13px',
+        fontFamily: 'var(--font)',
+        ...flipStyle
+      }}
+    >
+      {actions.map((item, index) => {
+        if (item.type === 'separator') {
+          return (
+            <div
+              key={`sep-${index}`}
+              style={{
+                height: '1px',
+                background: '#e0e0e0',
+                margin: '4px 0'
+              }}
+            />
+          );
+        }
+
+        const isHovered = hoveredItem === index;
+        return (
+          <div
+            key={item.label}
+            style={{
+              padding: '10px 16px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              color: isHovered ? '#0b69ff' : '#333',
+              background: isHovered ? '#f8f9fa' : 'transparent',
+              transition: 'all 0.2s ease',
+              borderRadius: '6px',
+              margin: '2px 4px'
+            }}
+            onMouseEnter={() => setHoveredItem(index)}
+            onMouseLeave={() => setHoveredItem(null)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAction(item.action);
+            }}
+          >
+            <span style={{ fontSize: '14px', width: '16px' }}>{item.icon}</span>
+            <span style={{ flex: 1 }}>{item.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+export default MoreActionsMenu;
+
+// =========================================
+
+src/components/sidebar/Sidebar.jsx
+
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import TreeContainer from './TreeContainer';
+import MoreActionsMenu from './MoreActionsMenu';
+import deegoLogo from '../../public/icons/deego_1.svg';
+import { useTreeStore } from '../../stores/useTreeStore';
+import { useModal } from '../modals/ModalProvider';
+import { openNewGroup, openNewConnection, openConfirm, openRenameFolder, openEditConnection } from '../modals/modalActions';
+import { refreshFolder, deleteFolder } from '../../actions/treeActions';
+import { connectDatabase, disconnectDatabase, refreshConnection, deleteConnection, refreshDatabase, refreshSchema, createNewSchema, exportDatabase, createNewTable, exportSchema, previewTable, editTableStructure, generateTableSQL, exportTableData, viewDefinition, editView, generateViewSQL, editFunction, viewFunctionSource, testFunction, showProperties, deleteDatabase, deleteSchema, deleteTable, deleteView, deleteFunction } from '../../actions/dbActions';
+import { useDragDrop } from './hooks/useDragDrop';
+import { findNode } from '../../utils/treeUtils';
+
+const Sidebar = ({ treeData }) => {
+  const [expandedKeys, setExpandedKeys] = useState(new Map());
+  const [showMoreMenu, setShowMoreMenu] = useState(null);
+  const [moreMenuPosition, setMoreMenuPosition] = useState({ x: 0, y: 0, flip: false });
+  const [activeMoreMenuNode, setActiveMoreMenuNode] = useState(null);
+  const [hoveredNode, setHoveredNode] = useState(null);
+  const { openModal } = useModal();
+  const { dragSourceId, setDragSourceId, dragOverNodeId, setDragOverNodeId, isDragOverRoot, setIsDragOverRoot } = useDragDrop();
+  const updateTreePath = useTreeStore((state) => state.updateTreePath);
+
+  // 外部点击关闭菜单：不变
+  useEffect(() => {
+    if (!showMoreMenu) return;
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.more-actions-menu') && !event.target.closest('.tree-node')) {
+        setShowMoreMenu(null);
+        setMoreMenuPosition({ x: 0, y: 0, flip: false });
+        setActiveMoreMenuNode(null);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showMoreMenu]);
+
+  useEffect(() => {
+    if (!showMoreMenu) return;
+    const onKey = (e) => { if (e.key === 'Escape') { setShowMoreMenu(null); setActiveMoreMenuNode(null); setMoreMenuPosition({ x: 0, y: 0, flip: false });} };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showMoreMenu]);
+
+  useEffect(() => {
+    if (!showMoreMenu) return;
+    const close = () => { setShowMoreMenu(null); setActiveMoreMenuNode(null); setMoreMenuPosition({ x: 0, y: 0, flip: false });};
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [showMoreMenu]);
+
+  const handleMoreMenu = (e, node) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const baseY = rect.bottom;
+    const estimatedMenuHeight = 200;
+    const viewportHeight = window.innerHeight;
+    const spaceBelow = viewportHeight - baseY;
+    const minTop = 20;
+    const bottomMargin = 20;
+
+    let flip = false;
+    let adjustedY = baseY + 10;
+
+    if (spaceBelow >= estimatedMenuHeight) {
+      adjustedY = baseY + 10;
+    } else {
+      flip = true;
+      adjustedY = rect.top - estimatedMenuHeight;
+      if (adjustedY < minTop) {
+        adjustedY = minTop;
+      }
+    }
+
+    if (adjustedY + estimatedMenuHeight > viewportHeight - bottomMargin) {
+      adjustedY = viewportHeight - estimatedMenuHeight - bottomMargin;
+      flip = adjustedY < rect.top;
+    }
+
+    setMoreMenuPosition({ x: e.clientX + 5, y: adjustedY, flip });
+    setShowMoreMenu(node.id);
+    setActiveMoreMenuNode(node.id);
+  };
+
+  const openRenameFolderModal = (node) => openRenameFolder(node, openModal);
+  const openEditConnectionModal = (connection) => openEditConnection(connection, openModal);
+
+  const renderMoreMenuPortal = () => {
+    if (!showMoreMenu || !treeData) return null;
+    const node = findNode(treeData, showMoreMenu);
+    if (!node) return null;
+    return createPortal(
+      <MoreActionsMenu
+        node={node}
+        position={moreMenuPosition}
+        onClose={() => { setShowMoreMenu(null); setActiveMoreMenuNode(null); }}
+        setExpandedKeys={setExpandedKeys}
+        openNewGroup={(parentId) => openNewGroup(parentId, openModal)}
+        openNewConnection={(parentId) => openNewConnection(parentId, openModal)}
+        openConfirm={(title, message, onConfirm, variant) => openConfirm(title, message, onConfirm, variant, openModal)}
+        openRenameFolder={openRenameFolderModal}
+        openEditConnection={openEditConnectionModal}
+        refreshFolder={(node) => refreshFolder(node)}
+        deleteFolder={(node) => deleteFolder(node, openModal)}
+        refreshConnection={(node, setExpandedKeys) => refreshConnection(node, setExpandedKeys)}
+        connectDatabase={(node) => connectDatabase(node)}  // 已集成配置加载
+        disconnectDatabase={(node) => disconnectDatabase(node)}
+        refreshDatabase={(node, setExpandedKeys) => refreshDatabase(node, setExpandedKeys)}
+        refreshSchema={(node, setExpandedKeys) => refreshSchema(node, setExpandedKeys)}
+        createNewSchema={(node) => createNewSchema(node)}
+        exportDatabase={(node) => exportDatabase(node)}
+        createNewTable={(node) => createNewTable(node)}
+        exportSchema={(node) => exportSchema(node)}
+        previewTable={(node) => previewTable(node)}
+        editTableStructure={(node) => editTableStructure(node)}
+        generateTableSQL={(node) => generateTableSQL(node)}
+        exportTableData={(node) => exportTableData(node)}
+        viewDefinition={(node) => viewDefinition(node)}
+        editView={(node) => editView(node)}
+        generateViewSQL={(node) => generateViewSQL(node)}
+        editFunction={(node) => editFunction(node)}
+        viewFunctionSource={(node) => viewFunctionSource(node)}
+        testFunction={(node) => testFunction(node)}
+        showProperties={(node) => showProperties(node)}
+        deleteConnection={(node) => deleteConnection(node, openModal)}
+        deleteDatabase={(node) => deleteDatabase(node, openModal)}
+        deleteSchema={(node) => deleteSchema(node, openModal)}
+        deleteTable={(node) => deleteTable(node, openModal)}
+        deleteView={(node) => deleteView(node, openModal)}
+        deleteFunction={(node) => deleteFunction(node, openModal)}
+      />,
+      document.body
+    );
+  };
+
+  return (
+    <>
+      <div className="sidebar-tree">
+        <div style={{ padding: '0 16px', marginBottom: '20px' }}>
+          <div
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '10px',
+              boxShadow: '0 4px 14px rgba(102, 126, 234, 0.2)', marginBottom: '16px', color: 'white',
+              transition: 'all 0.3s ease', cursor: 'pointer'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(102, 126, 234, 0.2)';
+            }}
+            onClick={() => console.log('打开数据库设置')}
+          >
+            <img src={deegoLogo} alt="Deego" style={{ width: 25, height: 25, filter: 'brightness(0) invert(1)' }} />
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '600' }}>Deego</div>
+              <div style={{ fontSize: '11px', opacity: 0.9, marginTop: '2px' }}>Your Data Buddy</div>
+            </div>
+          </div>
+        </div>
+        <TreeContainer
+          treeData={treeData}
+          expandedKeys={expandedKeys}
+          setExpandedKeys={setExpandedKeys}
+          hoveredNode={hoveredNode}
+          setHoveredNode={setHoveredNode}
+          onMoreMenu={handleMoreMenu}
+          activeMoreMenuNode={activeMoreMenuNode}
+          setActiveMoreMenuNode={setActiveMoreMenuNode}
+          dragSourceId={dragSourceId}
+          setDragSourceId={setDragSourceId}
+          dragOverNodeId={dragOverNodeId}
+          setDragOverNodeId={setDragOverNodeId}
+          isDragOverRoot={isDragOverRoot}
+          setIsDragOverRoot={setIsDragOverRoot}
+          openNewGroup={(parentId) => openNewGroup(parentId, openModal)}
+          openNewConnection={(parentId) => openNewConnection(parentId, openModal)}
+          openRenameFolder={(node) => openRenameFolder(node, openModal)}
+          openEditConnection={(connection) => openEditConnection(connection, openModal)}
+          openModal={openModal}
+        />
+      </div>
+      {renderMoreMenuPortal()}
+    </>
+  );
+};
+
+export default Sidebar;
+
+// =========================================
+
+src/components/sidebar/styles.js
+
+// components/sidebar/styles.js
+// 样式和主题配置
+
+const ACCENT_COLOR = '#0b69ff';
+
+// 新增：拖拽高亮样式
+export const dragOverStyles = (theme) => ({
+  background: `${theme.hoverBg} !important`,
+  border: `2px dashed ${theme.accentColor} !important`,
+  opacity: 0.8,
+  transform: 'scale(1.02)',
+  boxShadow: `0 2px 8px ${theme.accentColor}20 !important`
+});
+
+// 新增：拖拽源样式
+export const dragSourceStyles = {
+  opacity: 0.5,
+  transform: 'rotate(5deg)',
+  boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+};
+
+// 节点主题配置
+export const getThemeColors = (nodeType) => {
+  switch (nodeType) {
+    case 'folder':
+      return {
+        hoverBg: 'linear-gradient(90deg, #f8f9ff 0%, #f0f2ff 100%)',
+        textColor: '#5b6d8f',
+        iconColor: '#667eea',
+        accentColor: ACCENT_COLOR
+      };
+    case 'connection':
+      return {
+        hoverBg: `linear-gradient(90deg, rgba(11, 105, 255, 0.05) 0%, rgba(11, 105, 255, 0.1) 100%)`,
+        textColor: '#2e7d32',
+        iconColor: '#4caf50',
+        accentColor: ACCENT_COLOR
+      };
+    case 'database': // 新增：database 专属主题（蓝色调）
+        return {
+          hoverBg: 'linear-gradient(90deg, #e3f2fd 0%, #bbdefb 100%)',
+          textColor: '#1976d2',
+          iconColor: '#2196f3',
+          accentColor: ACCENT_COLOR
+        };
+    case 'schema':
+      return {
+        hoverBg: 'linear-gradient(90deg, #fff3e0 0%, #ffecb3 100%)',
+        textColor: '#e65100',
+        iconColor: '#ff9800',
+        accentColor: ACCENT_COLOR
+      };
+    case 'table':
+      return {
+        hoverBg: 'linear-gradient(90deg, #f3e5f5 0%, #f1e8fd 100%)',
+        textColor: '#6a1b9a',
+        iconColor: '#9c27b0',
+        accentColor: ACCENT_COLOR
+      };
+    default:
+      return {
+        hoverBg: '#f5f5f5',
+        textColor: '#333',
+        iconColor: '#666',
+        accentColor: ACCENT_COLOR
+      };
+  }
+};
+
+// 节点基础样式
+export const nodeBaseStyles = {
+  padding: '6px 8px',
+  margin: '1px 0',
+  display: 'flex',
+  alignItems: 'center',
+  borderRadius: '6px',
+  cursor: 'pointer',
+  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, transform 0.3s ease',
+  fontFamily: 'var(--font)',
+  fontSize: '13px'
+};
+
+// 悬浮时的基础样式
+export const nodeHoverStyles = (theme) => ({
+  background: theme.hoverBg,
+  border: `1px solid ${theme.accentColor}20`,
+  transform: 'translateX(1px)',
+  boxShadow: `0 1px 4px ${theme.accentColor}10`,
+  paddingRight: '4px'
+});
+
+// 展开图标样式
+export const expandIconStyles = (isHovered, theme) => ({
+  width: 12,
+  height: 12,
+  marginRight: 4,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  transition: 'all 0.2s ease',
+  transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+  color: isHovered ? theme.accentColor : '#999'
+});
+
+// 节点图标样式
+export const nodeIconStyles = (isHovered, theme) => ({
+  width: 14,
+  height: 14,
+  marginRight: 4,
+  flexShrink: 0,
+  filter: isHovered ? `drop-shadow(0 0 1px ${theme.accentColor}30)` : 'none',
+  transition: 'all 0.2s ease',
+  transform: isHovered ? 'scale(1.02)' : 'scale(1)'
+});
+
+// 节点名称样式
+export const nodeNameStyles = (isHovered) => ({
+  flex: 1,
+  fontSize: isHovered ? '13.2px' : '13px',
+  fontWeight: isHovered ? '500' : '400',
+  color: isHovered ? '#333' : '#333', // 这里可以根据theme.textColor动态设置
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  transition: 'all 0.2s ease',
+  letterSpacing: isHovered ? '0.1px' : '0px',
+  marginRight: isHovered ? '8px' : '0'
+});
+
+// 类型标签样式
+export const typeLabelStyles = (isHovered, theme) => ({
+  fontSize: '10px',
+  color: isHovered ? theme.accentColor : '#999',
+  background: isHovered ? `${theme.accentColor}10` : '#f0f0f0',
+  padding: isHovered ? '2px 6px' : '1px 4px',
+  borderRadius: '10px',
+  border: isHovered ? `1px solid ${theme.accentColor}20` : 'none',
+  transition: 'all 0.2s ease',
+  transform: isHovered ? 'scale(1.02)' : 'scale(1)',
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
+  marginLeft: '4px'
+});
+
+// 功能按钮样式
+export const actionButtonStyles = (theme) => ({
+  width: 20,
+  height: 20,
+  border: 'none',
+  background: 'rgba(255, 255, 255, 0.8)',
+  borderRadius: '4px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+  color: theme.accentColor,
+  fontSize: '12px',
+  transition: 'all 0.2s ease',
+  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+  flexShrink: 0
+});
+
+// 更多按钮样式
+export const moreButtonStyles = (isHovered, theme) => ({
+  ...actionButtonStyles(theme),
+  color: isHovered ? theme.accentColor : '#666',
+  background: isHovered ? 'white' : 'rgba(255, 255, 255, 0.8)',
+  transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+  boxShadow: isHovered ? '0 2px 6px rgba(0, 0, 0, 0.15)' : '0 1px 3px rgba(0, 0, 0, 0.1)'
+});
+
+// 左侧指示条样式
+export const indicatorBarStyles = (theme) => ({
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  bottom: 0,
+  width: '2px',
+  background: `linear-gradient(to bottom, ${theme.accentColor}, ${theme.accentColor}80)`,
+  borderRadius: '0 2px 2px 0'
+});
+
+// 子项指示器样式
+export const childIndicatorStyles = (theme) => ({
+  position: 'absolute',
+  right: 6,
+  top: '50%',
+  transform: 'translateY(-50%)',
+  width: 3,
+  height: 3,
+  background: theme.accentColor,
+  borderRadius: '50%',
+  opacity: 0.6
+});
+
+// 按钮容器样式
+export const actionContainerStyles = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '2px',
+  marginLeft: '4px',
+  paddingLeft: '2px'
+};
+
+// =========================================
+
+src/components/sidebar/TreeContainer.jsx
+
+import React, { useMemo } from 'react';
+import TreeNode from './TreeNode';
+import { findNode } from '../../utils/treeUtils';
+import { moveNode } from '../../actions/treeActions';
+import { useTreeStore } from '../../stores/useTreeStore';
+
+const TreeContainer = ({
+  treeData, expandedKeys, setExpandedKeys, hoveredNode, setHoveredNode,
+  onMoreMenu, activeMoreMenuNode, setActiveMoreMenuNode,
+  dragSourceId, setDragSourceId, dragOverNodeId, setDragOverNodeId,
+  isDragOverRoot, setIsDragOverRoot,
+  openNewGroup, openNewConnection, openRenameFolder, openEditConnection,
+  openModal  // 接收 openModal
+}) => {
+  const { updateTreePath } = useTreeStore();
+
+  const handleMoveNode = (sourceId, targetId) => {
+    const sourceNode = findNode(treeData, sourceId);
+    const actualType = sourceNode?.config?.type || sourceNode?.type || 'unknown';  // config fallback
+    if (sourceNode && (actualType === 'folder' || actualType === 'connection')) {
+      moveNode(sourceId, targetId, updateTreePath, openModal, actualType);
+    }
+  };
+
+  const renderTreeNodes = useMemo(() => (nodes, level = 0) => {
+    if (!nodes || nodes.length === 0) {
+      return <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '14px' }}>无数据</div>;
+    }
+    return nodes.map((node) => {
+      const isExpanded = expandedKeys.get(node.id) || false;
+      const renderedNode = (
+        <TreeNode
+          key={node.id}
+          node={{ ...node, expanded: isExpanded }}
+          level={level}
+          hoveredNode={hoveredNode}
+          setHoveredNode={setHoveredNode}
+          expandedKeys={expandedKeys}
+          setExpandedKeys={setExpandedKeys}
+          onMoreMenu={onMoreMenu}
+          activeMoreMenuNode={activeMoreMenuNode}
+          setActiveMoreMenuNode={setActiveMoreMenuNode}
+          dragSourceId={dragSourceId}
+          setDragSourceId={setDragSourceId}
+          dragOverNodeId={dragOverNodeId}
+          setDragOverNodeId={setDragOverNodeId}
+          moveNode={handleMoveNode}
+          openNewGroup={openNewGroup}
+          openNewConnection={openNewConnection}
+          openRenameFolder={openRenameFolder}
+          openEditConnection={openEditConnection}
+        />
+      );
+
+      if (isExpanded && node.children && node.children.length > 0) {
+        return (
+          <React.Fragment key={node.id}>
+            {renderedNode}
+            <div
+              style={{ marginLeft: '2px', paddingLeft: '1px', borderLeft: '1px solid #e0e7ff', marginTop: '1px' }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (dragSourceId && dragSourceId !== node.id && (node.type === 'folder' || node.config?.allowDrop)) setDragOverNodeId(node.id);
+              }}
+              onDragLeave={() => setDragOverNodeId(null)}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (dragSourceId && dragSourceId !== node.id && (node.type === 'folder' || node.config?.allowDrop)) handleMoveNode(dragSourceId, node.id);
+                setDragOverNodeId(null);
+              }}
+            >
+              {renderTreeNodes(node.children, level + 1)}
+            </div>
+          </React.Fragment>
+        );
+      }
+      return renderedNode;
+    });
+  }, [treeData, expandedKeys, hoveredNode, activeMoreMenuNode, dragSourceId, dragOverNodeId, handleMoveNode, openNewGroup, openNewConnection, openRenameFolder, openEditConnection]);
+
+  const handleRootDrop = (e) => {
+    e.preventDefault();
+    setIsDragOverRoot(false);
+    if (dragSourceId) handleMoveNode(dragSourceId, null);
+  };
+
+  const handleRootDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setIsDragOverRoot(true);
+  };
+
+  const rootContainerStyle = {
+    minHeight: '20px', padding: '0 16px', transition: 'all 0.2s ease',
+    border: isDragOverRoot ? '2px dashed #0b69ff' : 'none',
+    background: isDragOverRoot ? '#f8f9fa' : 'transparent',
+    borderRadius: '4px', margin: '0 4px'
+  };
+
+  return (
+    <div
+      className="tree-container"
+      style={rootContainerStyle}
+      onDragOver={handleRootDragOver}
+      onDragLeave={() => setIsDragOverRoot(false)}
+      onDrop={handleRootDrop}
+    >
+      {renderTreeNodes(treeData)}
+    </div>
+  );
+};
+
+export default TreeContainer;
+
+// =========================================
+
+src/components/sidebar/TreeNode.jsx
+
+import React, { useState, memo, useMemo } from 'react';
+import { useTreeStore } from '../../stores/useTreeStore';
+import {
+  getExpandIcon,
+  getNodeIcon,
+  loadNodeChildren
+} from '../../utils/treeUtils';
+import { getPrimaryAction } from '../../actions/dbActions';
+import {
+  getThemeColors,
+  nodeBaseStyles,
+  nodeHoverStyles,
+  expandIconStyles,
+  nodeIconStyles,
+  nodeNameStyles,
+  typeLabelStyles,
+  actionButtonStyles,
+  indicatorBarStyles,
+  childIndicatorStyles,
+  actionContainerStyles,
+  dragOverStyles,
+  dragSourceStyles
+} from './styles';
+
+const TreeNode = memo(({
+  node,
+  level = 0,
+  hoveredNode,
+  setHoveredNode,
+  expandedKeys,
+  setExpandedKeys,
+  onMoreMenu,
+  activeMoreMenuNode,
+  setActiveMoreMenuNode,
+  dragSourceId,
+  setDragSourceId,
+  dragOverNodeId,
+  setDragOverNodeId,
+  moveNode,
+  openNewGroup,
+  openNewConnection,
+  openRenameFolder,
+  openEditConnection
+}) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const isHovered = hoveredNode === node.id;
+  const isActive = activeMoreMenuNode === node.id;
+  const isDragging = dragSourceId === node.id;
+  const isDragOver = dragOverNodeId === node.id;
+  const hasChildren = node.children && node.children.length > 0;
+  const isExpandable = hasChildren || node.config?.nextLevel || node.virtual || node.type === 'connection' || node.type === 'database' || node.type === 'schema' || node.type.includes('_group');
+  const isDraggable = node.type === 'folder' || node.type === 'connection';
+  const isDropTarget = node.type === 'folder' || node.config?.allowDrop;  // config 支持
+  const primaryAction = getPrimaryAction(node);  // 使用 config
+  const theme = getThemeColors(node.type || node.config?.type);  // config.type fallback
+  const { updateTreePath } = useTreeStore();
+  const isExpanded = node.expanded;
+  const isConnected = node.connected;
+  if (isConnected) theme.accentColor = '#10b981';
+
+  // useMemo 优化：仅在必要时重新计算样式
+  const combinedStyles = useMemo(() => ({
+    ...nodeBaseStyles,
+    ...(isDragging && dragSourceStyles),
+    ...(isDragOver && dragOverStyles(theme)),
+    paddingLeft: `${12 + level * 12}px`,
+    cursor: isDraggable ? 'grab' : (isExpandable ? 'pointer' : (isLoading ? 'wait' : 'default')),
+    background: (isDragging ? 'transparent' : ((isHovered || isActive) ? theme.hoverBg : 'transparent')),
+    border: (isDragOver ? `2px dashed ${theme.accentColor}` : ((isHovered || isActive) ? `1px solid ${theme.accentColor}20` : (isConnected ? `1px solid ${theme.accentColor}10` : '1px solid transparent'))),
+    transform: (isDragging ? 'rotate(5deg)' : ((isHovered || isActive) ? 'translateX(1px)' : 'translateX(0)')),
+    boxShadow: (isDragging ? '0 4px 12px rgba(0,0,0,0.2)' : ((isHovered || isActive) ? `0 1px 4px ${theme.accentColor}10` : 'none')),
+    opacity: isDragging ? 0.5 : 1,
+    paddingRight: (isHovered || isActive) ? '4px' : '8px'
+  }), [isDragging, isDragOver, isHovered, isActive, level, theme, isConnected]);
+
+  // 拖拽事件：不变
+  const handleDragStart = (e) => {
+    if (isDraggable) {
+      setDragSourceId(node.id);
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', node.id);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    if (isDropTarget && dragSourceId && dragSourceId !== node.id) {
+      setDragOverNodeId(node.id);
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    e.stopPropagation();
+    if (isDropTarget && dragOverNodeId === node.id) {
+      setDragOverNodeId(null);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isDropTarget && dragSourceId && dragSourceId !== node.id) {
+      moveNode(dragSourceId, node.id);
+    }
+    setDragOverNodeId(null);
+  };
+
+  const handleClick = async (e) => {
+    e.stopPropagation();
+    if (isExpandable) {
+      if (!hasChildren && !node.virtual) {  // 虚拟节点已加载
+        setIsLoading(true);
+        try {
+          const updatedNode = await loadNodeChildren(node);
+          if (updatedNode && updatedNode.children) {
+            updateTreePath(node.id, (current) => ({
+              ...current,
+              children: updatedNode.children,
+              expanded: true
+            }));
+          }
+          setExpandedKeys((prev) => new Map(prev).set(node.id, true));
+        } catch (error) {
+          console.error('加载失败:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        setExpandedKeys((prev) => new Map(prev).set(node.id, !prev.get(node.id)));
+      }
+    }
+  };
+
+  const handlePrimaryAction = (e) => {
+    e.stopPropagation();
+    if (primaryAction && !activeMoreMenuNode) {
+      // 使用 dynamicHandler 调用
+      actionHandlers.dynamicHandler(primaryAction.handler || 'defaultAction', node);
+      // 对于 connection，连接后加载 children
+      if (node.type === 'connection') {
+        connectDatabase(node).then((ok) => {
+          if (ok) loadNodeChildren(node).then((updated) => updateTreePath(node.id, () => updated));
+        });
+      }
+    }
+  };
+
+  const handleMoreMenu = (e) => {
+    e.stopPropagation();
+    if (!activeMoreMenuNode) {
+      setActiveMoreMenuNode(node.id);
+      onMoreMenu(e, node);
+    }
+  };
+
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleMoreMenu(e);
+  };
+
+  return (
+    <div
+      className={`tree-node ${node.type} ${isExpanded ? 'expanded' : ''} ${isHovered || isActive ? 'hovered' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
+      style={combinedStyles}
+      draggable={isDraggable}
+      onMouseEnter={() => !isDragging && setHoveredNode(node.id)}
+      onMouseLeave={() => !isDragging && setHoveredNode(null)}
+      onClick={handleClick}
+      onContextMenu={handleContextMenu}
+      onKeyDown={(e) => { if (e.key === 'Enter') handleClick(e); }}
+      tabIndex={0}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {(isHovered || isActive || isDragOver) && <div style={indicatorBarStyles(theme)} />}
+
+      <div style={expandIconStyles(isHovered || isActive || isDragOver, theme)}>
+        {isLoading ? (
+          <span style={{ fontSize: 9 }}>⟳</span>
+        ) : getExpandIcon(node) ? (
+          <span style={{ fontSize: 9, fontWeight: 'bold' }}>
+            {getExpandIcon(node)}
+          </span>
+        ) : (
+          <div style={{ width: 10, height: 10 }} />
+        )}
+      </div>
+
+      <img
+        src={getNodeIcon(node)}
+        alt={node.type + (isConnected ? ' (connected)' : '')}
+        style={nodeIconStyles(isHovered || isActive || isDragOver, theme)}
+      />
+
+      <span style={{ ...nodeNameStyles(isHovered || isActive || isDragOver), color: (isHovered || isActive || isDragOver) ? theme.textColor : '#333' }}>
+        {node.name}
+      </span>
+
+      {(isHovered || isActive || isDragOver) && (
+        <span style={typeLabelStyles(isHovered || isActive || isDragOver, theme)}>
+          {node.type} {isConnected && '(已连接)'} {node.virtual && '(虚拟)'}
+        </span>
+      )}
+
+      {(isHovered || isActive) && !isLoading && !isDragging && (
+        <div style={actionContainerStyles}>
+          {primaryAction && (
+            <button
+              onClick={handlePrimaryAction}
+              style={actionButtonStyles(theme)}
+              disabled={!!activeMoreMenuNode}
+              onMouseEnter={(e) => {
+                if (!activeMoreMenuNode) {
+                  e.target.style.background = 'white';
+                  e.target.style.transform = 'scale(1.05)';
+                  e.target.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.15)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!activeMoreMenuNode) {
+                  e.target.style.background = 'rgba(255, 255, 255, 0.8)';
+                  e.target.style.transform = 'scale(1)';
+                  e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                }
+              }}
+            >
+              {primaryAction.icon}
+            </button>
+          )}
+
+          <button
+            onClick={handleMoreMenu}
+            style={{
+              ...actionButtonStyles(theme),
+              color: '#666',
+              fontSize: '14px'
+            }}
+            disabled={!!activeMoreMenuNode && activeMoreMenuNode !== node.id}
+            onMouseEnter={(e) => {
+              if (!activeMoreMenuNode || activeMoreMenuNode === node.id) {
+                e.target.style.background = 'white';
+                e.target.style.transform = 'scale(1.05)';
+                e.target.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.15)';
+                e.target.style.color = theme.accentColor;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!activeMoreMenuNode || activeMoreMenuNode === node.id) {
+                e.target.style.background = 'rgba(255, 255, 255, 0.8)';
+                e.target.style.transform = 'scale(1)';
+                e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                e.target.style.color = '#666';
+              }
+            }}
+          >
+            ⋯
+          </button>
+        </div>
+      )}
+
+      {(isHovered || isActive || isDragOver) && hasChildren && !primaryAction && !isLoading && (
+        <div style={childIndicatorStyles(theme)} />
+      )}
+    </div>
+  );
+});
+
+TreeNode.displayName = 'TreeNode';
+
+export default TreeNode;
+
+// =========================================
+
+src/components/toptoolbar/ToolbarTop.jsx
+
+import React from 'react';
+import '../../css/ToolbarTop.css';
+import NewFileIcon from '../../public/icons/toptoolbar/new_folder_2_color.svg';
+import ConnectIcon from '../../public/icons/toptoolbar/new_connection_3_color.svg';
+import QueryIcon from '../../public/icons/toptoolbar/query_3.svg';
+import SearchIcon from '../../public/icons/toptoolbar/new_folder_1.svg'; // 假设图标
+import ExecuteIcon from '../../public/icons/toptoolbar/new_folder_1.svg'; // 假设图标
+import RefreshIcon from '../../public/icons/toptoolbar/refresh.svg'; // 假设刷新图标
+import { useTabsStore } from '../../stores/useTabsStore';
+import { useTreeStore } from '../../stores/useTreeStore';
+import { openNewGroup, openNewConnection } from '../modals/modalActions'; // 导入 actions
+import { useModal } from '../modals/ModalProvider'; // 修复：导入 useModal Hook
+
+const ToolbarTop = () => {
+  const addTab = useTabsStore((state) => state.addTab);
+  const refreshTree = useTreeStore((state) => state.refreshTree);
+  const { openModal } = useModal(); // 修复：获取 openModal
+
+  return (
+    <div className="toolbar-top">
+      <div className="toolbar-top-left">
+        <button
+          className="btn btn-icon"
+          title="新建分组"
+          onClick={() => openNewGroup(null, openModal)} // 修复：传递 openModal 参数
+        >
+          <img src={NewFileIcon} alt="新建分组" className="icon" />
+        </button>
+        <button
+          className="btn btn-icon"
+          title="新建连接"
+          onClick={() => openNewConnection(null, openModal)} // 修复：传递 openModal 参数
+        >
+          <img src={ConnectIcon} alt="新建连接" className="icon" />
+        </button>
+        <button className="btn btn-icon" title="新建查询" onClick={addTab}>
+          <img src={QueryIcon} alt="新建查询" className="icon" />
+        </button>
+        <select className="toolbar-dropdown" title="操作菜单">
+          <option>操作</option>
+          <option>连接</option>
+          <option>导出</option>
+        </select>
+      </div>
+      <div className="toolbar-top-right">
+        <button className="btn btn-icon" title="搜索">
+          <img src={SearchIcon} alt="搜索" className="icon" />
+        </button>
+        <button className="btn btn-icon" title="执行">
+          <img src={ExecuteIcon} alt="执行" className="icon" />
+        </button>
+        <button className="btn btn-icon" title="刷新树" onClick={refreshTree}>
+          <img src={RefreshIcon} alt="刷新" className="icon" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default ToolbarTop;
+
+// =========================================
+
+src/css/appLoading.css
+
+:root {
+  --loading-bg: #f8f9fa;
+  --loading-primary: #0b69ff;
+  --loading-secondary: #e9ecef;
+  --loading-text: #6c757d;
+  --loading-glow: rgba(11, 105, 255, 0.1);
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  font-family: var(--font);
+  overflow: hidden;
+  /* 确保覆盖Electron标题栏 */
+  -webkit-app-region: no-drag;
+}
+
+/* Electron窗口标题栏适配 */
+.loading-overlay::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px; /* Electron标题栏高度 */
+  background: linear-gradient(135deg, rgba(248, 249, 250, 0.95) 0%, rgba(233, 236, 239, 0.95) 100%);
+  z-index: 10001;
+  pointer-events: none;
+}
+
+.loading-overlay::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 80%, rgba(11, 105, 255, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(11, 105, 255, 0.05) 0%, transparent 50%),
+    linear-gradient(45deg, transparent 30%, rgba(11, 105, 255, 0.02) 50%, transparent 70%);
+  animation: shimmer 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes shimmer {
+  0%, 100% { opacity: 0.3; transform: translateX(-100%) translateY(-100%); }
+  50% { opacity: 0.6; transform: translateX(100%) translateY(100%); }
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  max-width: 400px;
+  padding: 0 24px;
+  text-align: center;
+  position: relative;
+  z-index: 10002;
+  /* 给标题栏留出空间 */
+  margin-top: 32px;
+}
+
+.loading-logo {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, var(--loading-primary) 0%, #4299e1 100%);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: 0 8px 32px rgba(11, 105, 255, 0.15);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.loading-logo::before {
+  content: '⚡';
+  font-size: 28px;
+  color: white;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 8px 32px rgba(11, 105, 255, 0.15);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 12px 48px rgba(11, 105, 255, 0.25);
+  }
+}
+
+.loading-title {
+  font-size: 24px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--loading-primary) 0%, #4299e1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0;
+  letter-spacing: -0.025em;
+  animation: slideInDown 1s ease-out 0.5s both;
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.loading-subtitle {
+  font-size: 14px;
+  color: var(--loading-text);
+  margin: 0;
+  opacity: 0.8;
+  animation: slideInUp 1s ease-out 0.7s both;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.loading-progress {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+  animation: slideInUp 1s ease-out 0.9s both;
+}
+
+.loading-progress::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--loading-primary) 0%, #4299e1 50%, var(--loading-primary) 100%);
+  border-radius: 2px;
+  animation: progress 2s ease-in-out infinite;
+  box-shadow: 0 0 10px var(--loading-glow);
+}
+
+@keyframes progress {
+  0% { width: 0%; }
+  50% { width: 70%; }
+  100% { width: 100%; }
+}
+
+.loading-dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  animation: slideInUp 1s ease-out 1.1s both;
+}
+
+.loading-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--loading-primary);
+  opacity: 0.3;
+  animation: dotPulse 1.4s ease-in-out infinite both;
+}
+
+.loading-dot:nth-child(1) { animation-delay: 0s; }
+.loading-dot:nth-child(2) { animation-delay: 0.2s; }
+.loading-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes dotPulse {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.3;
+  }
+  40% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+}
+
+/* 加载完成时的淡出动画 */
+.loading-overlay.fade-out {
+  animation: fadeOut 0.5s ease-out forwards;
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 480px) {
+  .loading-content {
+    gap: 24px;
+    padding: 0 16px;
+    margin-top: 24px;
+  }
+  
+  .loading-logo {
+    width: 48px;
+    height: 48px;
+  }
+  
+  .loading-logo::before {
+    font-size: 20px;
+  }
+  
+  .loading-title {
+    font-size: 20px;
+  }
+  
+  .loading-subtitle {
+    font-size: 13px;
+  }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .loading-overlay {
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+  }
+  
+  .loading-overlay::after {
+    background: linear-gradient(135deg, rgba(26, 26, 26, 0.95) 0%, rgba(45, 45, 45, 0.95) 100%);
+  }
+  
+  .loading-progress {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  .loading-subtitle {
+    color: rgba(255, 255, 255, 0.7);
+  }
+}
+
+// =========================================
+
+src/css/index.css
+
+/** css/index.css */
+:root {
+  --sidebar-bg: #fafafa;
+  --border: #e6e6e6;
+  --toolbar-bg: #f5f5f7;
+  --accent: #0b69ff;
+  --muted: #999;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+  /* 尺寸变量 - 通过 JS 动态设置 */
+  --sidebar-width: 260px;
+  --editor-height: 300px; /* 增加默认高度 */
+
+  /* 统一的拖拽器样式 */
+  --resizer-default-bg: #f8f9fa;
+  --resizer-border: #e9ecef;
+  --resizer-hover-bg: #e9ecef;
+  --resizer-dragging-bg: rgba(11, 105, 255, 0.1);
+  --resizer-indicator-size: 20px;
+  --resizer-indicator-color: var(--muted);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body,
+html,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font);
+  font-size: 13px;
+  color: #222;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 防止右键菜单和系统UI凸出 */
+body,
+html {
+  position: relative;
+  z-index: 1;
+}
+
+/* 主容器 - 使用 CSS Grid 布局 */
+.app-container {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  grid-template-rows: 50px 1fr; /* 全局顶部工具栏高度 */
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  position: relative;
+  z-index: 2;
+  background: white;
+}
+
+/* Sidebar */
+.sidebar {
+  grid-column: 1;
+  grid-row: 2;
+  background: var(--sidebar-bg);
+  padding: 12px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  z-index: 5;
+  overflow: hidden;
+  transition: width 0.2s ease;
+  min-width: 180px;
+  max-width: 500px;
+}
+
+.sidebar h3 {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.sidebar ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+  color: #222;
+}
+
+.sidebar li {
+  padding: 6px 0;
+  cursor: default;
+}
+
+.sidebar .folder {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.sidebar .sub {
+  margin-left: 12px;
+  color: var(--muted);
+}
+
+/* 拖拽时禁用过渡 */
+.sidebar.dragging-parent,
+.sidebar.dragging-parent * {
+  transition: none !important;
+}
+
+/* 统一的拖拽器样式 - 垂直分隔器（侧边栏）*/
+.resizer.sidebar-resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  background: var(--resizer-default-bg);
+  border-top: 1px solid var(--resizer-border);
+  border-bottom: 1px solid var(--resizer-border);
+  z-index: 5;
+  transition: all 0.2s ease;
+  cursor: ew-resize;
+  flex-shrink: 0;
+}
+
+.resizer.sidebar-resizer::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px;
+  height: var(--resizer-indicator-size);
+  background: var(--resizer-indicator-color);
+  border-radius: 2px;
+  opacity: 0.3;
+}
+
+.resizer.sidebar-resizer:hover {
+  background: var(--resizer-hover-bg);
+}
+
+.resizer.sidebar-resizer.dragging {
+  background: var(--resizer-dragging-bg);
+}
+
+.resizer.sidebar-resizer.dragging::before {
+  opacity: 0.5;
+  background: var(--accent);
+}
+
+/* Main Panel */
+.main-panel {
+  grid-column: 2;
+  grid-row: 2;
+  display: grid;
+  grid-template-rows: 40px 42px 1fr;
+  background: white;
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+}
+
+/* Top Toolbar */
+.toolbar-top {
+  grid-column: 1 / -1; /* 跨越整个宽度 */
+  grid-row: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 16px;
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 6;
+}
+
+.toolbar-top-left,
+.toolbar-top-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-icon {
+  padding: 6px;
+  border-radius: 4px;
+  background: white;
+  border: 1px solid #e9e9e9;
+  cursor: pointer;
+  font-size: 16px;
+  color: #333;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+}
+
+.btn-icon:hover {
+  background: #f8f9fa;
+  border-color: #ccc;
+  box-shadow: var(--shadow-sm);
+}
+
+.toolbar-dropdown {
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid #e9e9e9;
+  background: white;
+  cursor: pointer;
+  font-size: 13px;
+  color: #333;
+  transition: all 0.2s ease;
+}
+
+.toolbar-dropdown:hover {
+  background: #f8f9fa;
+  border-color: #ccc;
+}
+
+/* Toolbar */
+.toolbar {
+  grid-row: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 16px;
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 6;
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toolbar .btn {
+  padding: 4px 8px; /* Reduced padding */
+  border-radius: 6px; /* Slightly smaller radius */
+  background: white;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 12px; /* Smaller font size */
+  color: #333;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px; /* Reduced gap */
+  text-decoration: none;
+  outline: none;
+  position: relative;
+  z-index: 7;
+  box-shadow: none;
+  width: 25px; /* Reduced width */
+  height: 25px; /* Reduced height */
+}
+
+.toolbar .btn:hover {
+  background: #f8f9fa;
+  border-color: #ccc;
+  box-shadow: var(--shadow-sm);
+}
+
+.toolbar .btn:active {
+  transform: translateY(1px);
+}
+
+.toolbar .btn-execute {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(11, 105, 255, 0.05);
+}
+
+.toolbar .btn-execute:hover {
+  background: rgba(11, 105, 255, 0.1);
+}
+
+/* Tabs Container */
+.tabs-container {
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  position: relative;
+  z-index: 6;
+}
+
+.tabs-header {
+  flex: 1;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-behavior: smooth;
+  background: white;
+  position: relative;
+  z-index: 7;
+}
+
+.tabs-header::-webkit-scrollbar {
+  display: none;
+}
+
+/* Tab滚动按钮 */
+.tab-scroll-btn {
+  background: rgba(11, 105, 255, 0.8);
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 4px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 8;
+}
+
+.tab-scroll-btn:hover {
+  background: var(--accent);
+  box-shadow: var(--shadow-sm);
+  transform: scale(1.05);
+}
+
+.tab-scroll-btn:active {
+  transform: scale(0.95);
+}
+
+.tab-scroll-left {
+  margin-left: 8px;
+}
+
+.tab-scroll-right {
+  margin-right: 8px;
+}
+
+.tab-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  min-width: 120px;
+  max-width: 180px;
+  background: white;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: all 0.2s ease;
+  min-height: 42px;
+  position: relative;
+  z-index: 8;
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.tab-item:hover {
+  background: #f8f9fa;
+}
+
+
+.tab-item.active {
+  background: #f5f7fa;            /* 柔和的浅色背景 */
+  color: #0078d7;                 /* 主色调文字 */
+  font-weight: 500;               /* 字体稍加粗 */
+  border-bottom: 2px solid #0078d7; /* 用底边线来突出 */
+}
+
+.tab-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  font-size: 13px;
+  text-align: center;
+}
+
+.tab-close {
+  background: none;
+  border: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.2s ease;
+  position: relative;
+  z-index: 9;
+  flex-shrink: 0;
+}
+
+.tab-item:hover .tab-close,
+.tab-item.active .tab-close {
+  opacity: 1;
+}
+
+.tab-close:hover {
+  background: #f0f0f0;
+  color: #666;
+}
+
+.tab-close:active {
+  transform: scale(0.9);
+}
+
+/* Tab计数器 */
+.tab-counter {
+  background: rgba(11, 105, 255, 0.1);
+  color: var(--muted);
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  margin: 0 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  border: 1px solid rgba(11, 105, 255, 0.2);
+  font-weight: 500;
+}
+
+/* 鼠标滚轮滚动tab */
+.tabs-header {
+  scroll-snap-type: x mandatory;
+}
+
+.tab-item {
+  scroll-snap-align: start;
+}
+
+/* Editor and Result Area */
+.editor-and-result {
+  grid-row: 3;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: white;
+  position: relative;
+  z-index: 4;
+}
+
+/* Editor Area */
+.editor-area {
+  height: var(--editor-height, 300px);
+  min-height: 150px; /* 增加最小高度 */
+  max-height: 80vh; /* 增加最大高度 */
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 5;
+  background: white;
+  transition: height 0.2s ease;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* SQL Editor */
+.sql-editor {
+  flex: 1;
+  padding: 2px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 3;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 拖拽时禁用过渡 */
+.editor-area.dragging,
+.editor-area.dragging * {
+  transition: none !important;
+}
+
+/* 统一的拖拽器样式 - 水平分隔器（编辑器）*/
+.resizer.editor-divider {
+  height: 6px;
+  background: var(--resizer-default-bg);
+  border-top: 1px solid var(--resizer-border);
+  border-bottom: 1px solid var(--resizer-border);
+  cursor: row-resize;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 6;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.resizer.editor-divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: var(--resizer-indicator-size);
+  height: 3px;
+  background: var(--resizer-indicator-color);
+  border-radius: 2px;
+  opacity: 0.3;
+}
+
+.resizer.editor-divider:hover {
+  background: var(--resizer-hover-bg);
+}
+
+.resizer.editor-divider.dragging {
+  background: var(--resizer-dragging-bg);
+}
+
+.resizer.editor-divider.dragging::before {
+  opacity: 0.5;
+  background: var(--accent);
+}
+
+/* Result Area */
+.result-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  z-index: 4;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: #fafbfc;
+  flex-shrink: 0;
+  min-height: 40px;
+  position: relative;
+  z-index: 5;
+}
+
+.left-controls,
+.right-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #e1e5e9;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 14px;
+  transition: all 0.2s ease;
+  outline: none;
+  position: relative;
+  z-index: 6;
+  box-shadow: none;
+}
+
+.icon-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(11, 105, 255, 0.05);
+}
+
+.icon-btn:active {
+  transform: scale(0.95);
+}
+
+.limit-text,
+.row-count {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  font-weight: 500;
+}
+
+.result-content {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  z-index: 4;
+  background: white;
+}
+
+/* Result Table */
+.result-table {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  z-index: 5;
+}
+
+.result-table table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 400px;
+  position: relative;
+  z-index: 6;
+}
+
+.result-table th,
+.result-table td {
+  border: 1px solid #f0f0f0;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 13px;
+  vertical-align: top;
+  word-break: break-word;
+  position: relative;
+  z-index: 7;
+}
+
+.result-table th {
+  background: #fafbfc;
+  font-weight: 600;
+  color: #333;
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  box-shadow: none;
+}
+
+.result-table tr:nth-child(even) {
+  background: #fdfdfd;
+}
+
+.result-table tr:hover {
+  background: #f8f9fa;
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--muted);
+  text-align: center;
+  padding: 40px 20px;
+  position: relative;
+  z-index: 5;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.3;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* 滚动条样式 */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  :root {
+    --resizer-indicator-size: 16px;
+  }
+
+  .app-container {
+    grid-template-columns: 200px 1fr;
+  }
+
+  .sidebar {
+    min-width: 150px;
+  }
+
+  .toolbar-top {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .toolbar-top .btn-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+
+  .toolbar {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .toolbar .btn {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+
+  .result-header {
+    padding: 8px 12px;
+  }
+
+  .resizer.sidebar-resizer {
+    width: 4px;
+  }
+
+  .resizer.sidebar-resizer::before {
+    height: 16px;
+  }
+
+  .resizer.editor-divider::before {
+    width: 16px;
+  }
+
+  .tab-item {
+    min-width: 100px;
+    max-width: 140px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .tab-title {
+    font-size: 12px;
+  }
+
+  .tab-scroll-btn {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+    margin: 0 2px;
+  }
+
+  .tab-counter {
+    font-size: 11px;
+    padding: 2px 6px;
+    margin: 0 4px;
+  }
+
+  .tabs-header {
+    height: 38px;
+  }
+
+  .tabs-container {
+    height: 38px;
+  }
+}
+
+/* 修复macOS窗口标题栏问题 */
+@media (-webkit-app-region: no-drag) {
+  .app-container {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+  }
+}
+
+/* 防止Electron或其他框架的菜单栏影响 */
+body > :first-child {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+/* 拖拽时的全局样式 */
+body.dragging * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+body.dragging {
+  cursor: ew-resize !important;
+}
+
+/* 拖拽过程中禁用所有动画 */
+body.dragging * {
+  transition: none !important;
+  transform: none !important;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+// =========================================
+
+src/css/NewConnectionModal.css
+
+/* src/css/NewConnectionModal.css */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  width: 400px;
+  max-width: 90%;
+  box-shadow: var(--shadow-md);
+  position: relative;
+}
+
+.modal-title {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.form-section {
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.checkbox-group {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  color: #1a1a1a;
+  background: #fdfdfd;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.modal-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(11, 105, 255, 0.1);
+}
+
+.password-wrapper {
+  position: relative;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 6px;
+}
+
+.status-message {
+  margin: 8px 0;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.status-message.success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.status-message.error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--border);
+}
+
+.btn-secondary {
+  background: white;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn-secondary:hover {
+  background: rgba(11, 105, 255, 0.1);
+}
+
+.btn-cancel {
+  background: white;
+  color: #333;
+}
+
+.btn-cancel:hover {
+  background: #f8f9fa;
+  border-color: #ccc;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.btn-primary:hover {
+  background: rgba(11, 105, 255, 0.9);
+}
+
+.btn-primary:disabled {
+  background: #ccc;
+  border-color: #ccc;
+  cursor: not-allowed;
+}
+
+// =========================================
+
+src/css/NewGroupModal.css
+
+/* src/css/NewGroupModal.css */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  width: 400px;
+  max-width: 90%;
+  box-shadow: var(--shadow-md);
+  position: relative;
+}
+
+.modal-title {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  color: #1a1a1a;
+  background: #fdfdfd;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.modal-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(11, 105, 255, 0.1);
+}
+
+.modal-input::placeholder {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--border);
+}
+
+.btn-cancel {
+  background: white;
+  color: #333;
+}
+
+.btn-cancel:hover {
+  background: #f8f9fa;
+  border-color: #ccc;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.btn-primary:hover {
+  background: rgba(11, 105, 255, 0.9);
+}
+
+.btn-primary:disabled {
+  background: #ccc;
+  border-color: #ccc;
+  cursor: not-allowed;
+}
+
+// =========================================
+
+src/css/SqlEditor.css
+
+/** SqlEditor.css **/
+.sql-editor {
+  flex: 1;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 6;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.codemirror-custom {
+  width: 100%;
+  height: 100%;
+  min-height: 80px;
+  border: 1px solid #e1e5e9;
+  border-radius: 6px;
+  font-family: 'Fira Code', 'SF Mono', Monaco, Consolas, monospace; /* 优化字体栈 */
+  font-size: 14px; /* 增加字体大小，提升可读性 */
+  line-height: 1.6; /* 调整行高，增加间距 */
+  color: #1a1a1a;
+  background: #fdfdfd;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: none;
+}
+
+.codemirror-custom .cm-scroller {
+  overflow-y: auto;
+  overflow-x: auto;
+  box-sizing: border-box;
+}
+
+.codemirror-custom .cm-content {
+  padding: 12px;
+}
+
+/* 聚焦时的样式 */
+.codemirror-custom.cm-focused {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(11, 105, 255, 0.1);
+}
+
+/* 占位符样式 */
+.codemirror-custom .cm-placeholder {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* 拖拽时禁用指针事件 */
+.editor-area.dragging .codemirror-custom {
+  pointer-events: none;
+}
+
+/* 拖拽时禁用过渡 */
+.editor-area.dragging,
+.editor-area.dragging * {
+  transition: none !important;
+}
+
+// =========================================
+
+src/css/ToolbarTop.css
+
+/* ToolbarTop.css */
+.toolbar-top {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 16px;
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 6;
+}
+
+.toolbar-top-left,
+.toolbar-top-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-icon {
+  padding: 6px;
+  border-radius: 4px;
+  background: white;
+  border: 1px solid #e9e9e9;
+  cursor: pointer;
+  font-size: 16px;
+  color: #333;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+}
+
+.btn-icon:hover {
+  background: #f8f9fa;
+  border-color: #ccc;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Add styles for the icon images */
+.btn-icon .icon {
+  width: 20px; /* Adjust size as needed */
+  height: 20px;
+  object-fit: contain; /* Ensure icons scale properly */
+}
+
+.toolbar-dropdown {
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid #e9e9e9;
+  background: white;
+  cursor: pointer;
+  font-size: 13px;
+  color: #333;
+  transition: all 0.2s ease;
+}
+
+.toolbar-dropdown:hover {
+  background: #f8f9fa;
+  border-color: #ccc;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .toolbar-top {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .toolbar-top .btn-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+
+  .toolbar-top .btn-icon .icon {
+    width: 18px; /* Adjust size for smaller screens */
+    height: 18px;
+  }
+}
+
+// =========================================
+
+src/hooks/useResize.js
+
+import { useState, useRef, useEffect, useCallback } from 'react';
+
+export const useResize = (initialSidebarWidth = 260, initialEditorHeight = 300, sidebarRef) => { // 修复：接收 sidebarRef 参数
+  const [sidebarWidth, setSidebarWidth] = useState(initialSidebarWidth);
+  const [editorHeight, setEditorHeight] = useState(initialEditorHeight);
+  const isResizingSidebar = useRef(false);
+  const isResizingEditor = useRef({ active: false }); // 修复：用对象管理状态，避免布尔混淆
+
+  const handleSidebarMouseDown = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isResizingSidebar.current = true;
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+    document.body.classList.add('dragging');
+  }, []);
+
+  const handleEditorMouseDown = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const initialMouseY = e.clientY;
+    const initialEditorHeightState = editorHeight;
+    isResizingEditor.current = { active: true, initialMouseY, initialEditorHeight: initialEditorHeightState };
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    document.body.classList.add('dragging');
+  }, [editorHeight]);
+
+  const handleMouseMoveOptimized = useCallback((e) => {
+    if (isResizingSidebar.current && sidebarRef?.current) { // 修复：安全检查 sidebarRef
+      const newWidth = Math.min(Math.max(e.clientX, 180), 500);
+      sidebarRef.current.style.width = `${newWidth}px`;
+      document.documentElement.style.setProperty('--sidebar-width', `${newWidth}px`);
+      setSidebarWidth(newWidth);
+    }
+
+    if (isResizingEditor.current.active) { // 修复：用对象.active 检查
+      const resizeState = isResizingEditor.current;
+      const currentMouseY = e.clientY;
+      const newHeight = resizeState.initialEditorHeight + (currentMouseY - resizeState.initialMouseY);
+
+      const minHeight = 150;
+      const maxHeight = window.innerHeight * 0.8;
+      const clampedHeight = Math.min(Math.max(newHeight, minHeight), maxHeight);
+
+      if (document.documentElement) { // 安全设置 CSS 变量
+        document.documentElement.style.setProperty('--editor-height', `${clampedHeight}px`);
+      }
+      setEditorHeight(clampedHeight);
+    }
+  }, [sidebarRef]); // 依赖：添加 sidebarRef
+
+  const handleMouseUp = useCallback(() => {
+    if (isResizingSidebar.current || isResizingEditor.current.active) {
+      isResizingSidebar.current = false;
+      isResizingEditor.current = { active: false };
+      document.body.style.cursor = 'default';
+      document.body.style.userSelect = 'auto';
+      document.body.classList.remove('dragging');
+    }
+  }, []);
+
+  useEffect(() => {
+    let rafId;
+    const handleGlobalMouseMove = (e) => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => handleMouseMoveOptimized(e));
+    };
+    const handleGlobalMouseUp = handleMouseUp;
+
+    window.addEventListener('mousemove', handleGlobalMouseMove, { passive: true });
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [handleMouseMoveOptimized, handleMouseUp]); // 修复：依赖正确
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--sidebar-width', `${sidebarWidth}px`);
+    document.documentElement.style.setProperty('--editor-height', `${editorHeight}px`);
+  }, [sidebarWidth, editorHeight]);
+
+  return {
+    sidebarWidth,
+    editorHeight,
+    handleSidebarMouseDown,
+    handleEditorMouseDown,
+  };
+};
+
+// =========================================
+
+src/main.jsx
+
+import React from 'react'
+import { createRoot } from 'react-dom/client'
+import App from './App.jsx'
+import './css/index.css'
+
+createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+)
+
+// =========================================
+
+src/stores/useResize.js
+
+import { useState, useRef, useEffect, useCallback } from 'react';
+
+export const useResize = (initialSidebarWidth = 260, initialEditorHeight = 300) => {
+  const [sidebarWidth, setSidebarWidth] = useState(initialSidebarWidth);
+  const [editorHeight, setEditorHeight] = useState(initialEditorHeight);
+  const isResizingSidebar = useRef(false);
+  const isResizingEditor = useRef(false);
+
+  const handleSidebarMouseDown = useCallback((e, sidebarRef) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isResizingSidebar.current = true;
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+    document.body.classList.add('dragging');
+  }, []);
+
+  const handleEditorMouseDown = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isResizingEditor.current = true;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    document.body.classList.add('dragging');
+  }, []);
+
+  const handleMouseMoveOptimized = useCallback((e) => {
+    if (isResizingSidebar.current && sidebarRef.current) { // 假设 sidebarRef 从组件传入
+      const newWidth = Math.min(Math.max(e.clientX, 180), 500);
+      sidebarRef.current.style.width = `${newWidth}px`;
+      document.documentElement.style.setProperty('--sidebar-width', `${newWidth}px`);
+      setSidebarWidth(newWidth);
+    }
+
+    if (isResizingEditor.current) {
+      const newHeight = isResizingEditor.current.initialEditorHeight + (e.clientY - isResizingEditor.current.initialMouseY);
+      const minHeight = 150;
+      const maxHeight = window.innerHeight * 0.8;
+      const clampedHeight = Math.min(Math.max(newHeight, minHeight), maxHeight);
+      document.documentElement.style.setProperty('--editor-height', `${clampedHeight}px`);
+      setEditorHeight(clampedHeight);
+    }
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    if (isResizingSidebar.current || isResizingEditor.current) {
+      isResizingSidebar.current = false;
+      isResizingEditor.current = false;
+      document.body.style.cursor = 'default';
+      document.body.style.userSelect = 'auto';
+      document.body.classList.remove('dragging');
+    }
+  }, []);
+
+  useEffect(() => {
+    let rafId;
+    const handleGlobalMouseMove = (e) => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => handleMouseMoveOptimized(e));
+    };
+    window.addEventListener('mousemove', handleGlobalMouseMove, { passive: true });
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [handleMouseMoveOptimized, handleMouseUp]);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--sidebar-width', `${sidebarWidth}px`);
+    document.documentElement.style.setProperty('--editor-height', `${editorHeight}px`);
+  }, [sidebarWidth, editorHeight]);
+
+  return {
+    sidebarWidth,
+    editorHeight,
+    handleSidebarMouseDown,
+    handleEditorMouseDown,
+  };
+};
+
+// =========================================
+
+src/stores/useTabsStore.js
+
+import { create } from 'zustand';
+import { format } from 'sql-formatter';
+import toast from 'react-hot-toast';
+
+export const useTabsStore = create((set, get) => ({
+  tabs: [{ id: 1, title: 'Query 1', query: '', results: [] }],
+  activeTabId: 1,
+  setTabs: (tabs) => set({ tabs }),
+  setActiveTabId: (id) => set({ activeTabId: id }),
+  updateQuery: (newQuery) => {
+    set((state) => ({
+      tabs: state.tabs.map((t) => (t.id === state.activeTabId ? { ...t, query: newQuery } : t)),
+    }));
+  },
+  executeQuery: async (query) => {
+    if (!query.trim()) return [];
+    try {
+      // 未来替换为真实 API: const res = await fetch('/api/query/execute', { body: JSON.stringify({ query }) });
+      // return res.json().results;
+      toast.loading('执行查询中...');
+      // Mock 延迟
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      toast.success('查询执行成功');
+      return [
+        { id: 1, name: 'Alice', age: 20, email: 'alice@example.com' },
+        { id: 2, name: 'Bob', age: 25, email: 'bob@example.com' },
+        { id: 3, name: 'Charlie', age: 30, email: 'charlie@example.com' },
+      ];
+    } catch (error) {
+      toast.error('查询执行失败');
+      return [];
+    }
+  },
+  addTab: () => {
+    const newId = Date.now();
+    set((state) => ({
+      tabs: [
+        ...state.tabs,
+        { id: newId, title: `Query ${state.tabs.length + 1}`, query: '', results: [] },
+      ],
+      activeTabId: newId,
+    }));
+  },
+  closeTab: (id) => {
+    set((state) => {
+      const newTabs = state.tabs.filter((t) => t.id !== id);
+      let nextId = state.activeTabId;
+      if (state.activeTabId === id) {
+        nextId = newTabs.length > 0 ? newTabs[0].id : null;
+      }
+      return { tabs: newTabs, activeTabId: nextId };
+    });
+  },
+  formatQuery: () => {
+    set((state) => ({
+      tabs: state.tabs.map((t) =>
+        t.id === state.activeTabId
+          ? {
+              ...t,
+              query: format(t.query, {
+                language: 'sql',
+                tabWidth: 2,
+                linesBetweenQueries: 2,
+              }),
+            }
+          : t
+      ),
+    }));
+  },
+  checkTabOverflow: (containerRef) => {
+    if (containerRef.current) {
+      const { scrollWidth, clientWidth } = containerRef.current;
+      return scrollWidth > clientWidth;
+    }
+    return false;
+  },
+  handleTabScroll: (direction, containerRef) => {
+    if (containerRef.current) {
+      const container = containerRef.current;
+      const scrollAmount = 200;
+      if (direction === 'left') {
+        container.scrollLeft = Math.max(0, container.scrollLeft - scrollAmount);
+      } else {
+        container.scrollLeft = Math.min(
+          container.scrollWidth - container.clientWidth,
+          container.scrollLeft + scrollAmount
+        );
+      }
+    }
+  },
+}));
+
+// =========================================
+
+src/stores/useTreeConfigStore.js
+
+import { create } from 'zustand';
+
+export const useTreeConfigStore = create((set, get) => ({
+  configs: {},  // { dbType: configJson }
+  getConfig: (dbType) => get().configs[dbType],
+  setConfig: (dbType, config) => set((state) => ({
+    configs: { ...state.configs, [dbType]: config }
+  })),
+  // 加载配置（在连接创建/测试时调用）
+  loadConfigForConnection: async (connId) => {
+    try {
+      const response = await fetch(`/api/config/connections/${connId}/config`);
+      if (!response.ok) throw new Error('Failed to load tree config');
+      const config = await response.json();
+      set((state) => ({
+        configs: { ...state.configs, [config.dbType]: config }
+      }));
+      return config;
+    } catch (error) {
+      console.error('Error loading tree config:', error);
+      return null;
+    }
+  },
+  // 通用：根据节点 config 获取下一层配置
+  getNextLevelConfig: (currentConfig, subType) => {
+    if (!currentConfig.nextLevel) return null;
+    const next = currentConfig.nextLevel;
+    if (subType && next.subTypes) {  // YAML 中 nextLevel 可有 subTypes
+      return next.subTypes[subType] || next;
+    }
+    return next;
+  },
+  // 获取聚合分组配置
+  getGroupByConfigs: (config) => config.groupBy || {},
+  // 获取 extraLevels（并行层）
+  getExtraLevels: (config) => config.extraLevels || [],
+  // 构建虚拟聚合节点
+  buildVirtualGroupNode: (groupKey, parentNode, treeConfig) => {
+    const groupConfigs = get().getGroupByConfigs(treeConfig);
+    const groupConfig = groupConfigs[groupKey];
+    if (!groupConfig) return null;
+    return {
+      id: `${parentNode.id}::group::${groupKey}`,
+      parentId: parentNode.id,
+      name: groupConfig.label,
+      type: groupConfig.type,  // e.g., "table_group"
+      config: {
+        ...groupConfig,
+        actions: groupConfig.actions || parentNode.config.actions,
+        icon: groupConfig.icon
+      },
+      virtual: true,  // 标记虚拟节点
+      children: [],  // 懒加载
+      connected: parentNode.connected
+    };
+  }
+}));
+
+// =========================================
+
+src/stores/useTreeStore.js
+
+import { create } from 'zustand';
+import { findNode } from '../utils/treeUtils';  // 导入辅助函数
+
+export const useTreeStore = create((set, get) => ({
+  treeData: [],
+  setTreeData: (data) => set({ treeData: data }),
+  refreshTree: async () => {
+    try {
+      const response = await fetch('/api/config/tree');
+      if (!response.ok) throw new Error('Failed to fetch tree data');
+      const { data } = await response.json();
+      // data 中的节点已带 config（后端注入）
+      set({ treeData: data || [] });
+    } catch (error) {
+      console.error('Error fetching tree data:', error);
+      set({ treeData: [] });
+    }
+  },
+  // 新增：为连接加载配置（在 connectDatabase 时调用）
+  loadTreeConfig: async (connId) => {
+    const treeConfigStore = window.treeConfigStore || { getState: () => ({ loadConfigForConnection: async () => {} }) };  // 全局 fallback
+    await treeConfigStore.getState().loadConfigForConnection(connId);
+  },
+  updateTreePath: (targetId, updaterFn) => {
+    set((state) => {
+      const newTree = JSON.parse(JSON.stringify(state.treeData));
+      const targetNode = findNode(newTree, targetId);
+      if (targetNode) {
+        const updated = updaterFn({ ...targetNode });
+        Object.assign(targetNode, updated);
+      }
+      return { treeData: newTree };
+    });
+  },
+  deleteNode: (nodeId) => {
+    set((state) => {
+      const newTree = JSON.parse(JSON.stringify(state.treeData));
+      function deleteRecursive(nodes) {
+        if (!Array.isArray(nodes)) return false;
+        for (let i = 0; i < nodes.length; i++) {
+          if (nodes[i] && nodes[i].id === nodeId) {
+            nodes.splice(i, 1);
+            return true;
+          }
+          if (nodes[i] && nodes[i].children && deleteRecursive(nodes[i].children)) {
+            return true;
+          }
+        }
+        return false;
+      }
+      deleteRecursive(newTree);
+      return { treeData: newTree };
+    });
+  },
+}));
+
+// =========================================
+
+src/utils/treeUtils.js
+
+// src/utils/treeUtils.js
+import fileGroupIcon from '../public/icons/left_tree/file_group_1.svg';
+import folderIcon from '../public/icons/left_tree/folder_1.svg';
+import folderOpenIcon from '../public/icons/left_tree/folder_open_1.svg';
+import dbIcon from '../public/icons/left_tree/db_1.svg';
+import schemaIcon from '../public/icons/left_tree/schema_1.svg';
+import tableIcon from '../public/icons/left_tree/table_1.svg';
+import viewIcon from '../public/icons/left_tree/view_1.svg';
+import functionIcon from '../public/icons/left_tree/function_1.svg';
+
+import pgsqlIcon from '../public/icons/db/postgresql_icon_3.svg';
+import mysqlIcon from '../public/icons/db/mysql_icon_2.svg';
+import oracleIcon from '../public/icons/db/oracle_icon_3.svg';
+import sqlserverIcon from '../public/icons/db/sqlserver_icon_1.svg';
+
+// 新增：从 store 导入（全局使用）
+const treeConfigStore = window.treeConfigStore || { getState: () => ({ getConfig: () => ({}), getNextLevelConfig: () => ({}), getGroupByConfigs: () => ({}), getExtraLevels: () => [], buildVirtualGroupNode: () => ({}) }) };
+
+// 图标：优先节点 config.icon，后备旧逻辑
+export const getNodeIcon = (node) => {
+  return node.config?.icon || (() => {
+    if (node.type === 'connection') {
+      switch (node.dbType) {
+        case 'POSTGRESQL': return pgsqlIcon;
+        case 'MYSQL': return mysqlIcon;
+        case 'ORACLE': return oracleIcon;
+        case 'SQLSERVER': return sqlserverIcon;
+        default: return dbIcon;
+      }
+    }
+    if (node.type === 'folder') return node.expanded ? folderOpenIcon : folderIcon;
+    if (node.type === 'database') return dbIcon;
+    if (node.type === 'schema') return schemaIcon;
+    if (node.type === 'table') return tableIcon;
+    if (node.type === 'view') return viewIcon;
+    if (node.type === 'function') return functionIcon;
+    return fileGroupIcon;
+  })();
+};
+
+// 展开图标：不变，但检查 virtual 节点
+export const getExpandIcon = (node) => {
+  if ((node.children && node.children.length > 0) || node.virtual) {  // 支持虚拟节点
+    if (node.type === 'folder' || node.type === 'connection' || node.type === 'database' || node.type === 'schema' || node.type.includes('_group')) {
+      return node.expanded ? '▼' : '▶';
+    }
+  }
+  return '';
+};
+
+// 通用加载子节点：根据 config.apiEndpoint/sqlQuery 构建（后端处理 sqlQuery）
+export const loadNodeChildren = async (node) => {
+  if (!node.connected) {
+    console.warn('节点未连接，无法加载子节点');
+    return { ...node, children: [] };
+  }
+
+  const config = node.config;
+  if (!config) {
+    console.warn('No config in node');
+    return { ...node, children: [] };
+  }
+
+  // 构建路径：从 node.id 解析 (e.g., "conn123::database::mydb::schema::public" -> "database/mydb/schema/public")
+  const pathSegments = node.id.split('::').slice(1);  // 去掉 connId
+  const path = pathSegments.join('/');
+
+  // URL：使用通用接口，后端根据 path 和 config.sqlQuery 执行
+  const url = `/api/meta/${encodeURIComponent(node.parentId || node.id.split('::')[0])}/${path}/children`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(await response.text());
+    let { data: { items } } = await response.json();
+
+    // 处理聚合层：如果有 groupBy，创建虚拟 group 节点，并为其加载 children
+    const groupByConfigs = treeConfigStore.getState().getGroupByConfigs(config);
+    if (groupByConfigs && Object.keys(groupByConfigs).length > 0) {
+      items = [];  // 清空，替换为 group 节点
+      for (const groupKey of Object.keys(groupByConfigs)) {  // 改为 for...of 以支持 await
+        const groupNode = treeConfigStore.getState().buildVirtualGroupNode(groupKey, node, config);
+        if (groupNode) {
+          // 递归加载 group 的 children（使用 group sqlQuery）
+          const groupChildren = await loadNodeChildrenForGroup(groupNode, node);  // 内部函数
+          groupNode.children = groupChildren;
+          items.push(groupNode);
+        }
+      }
+    } else {
+      // 普通层：注入下一层 config
+      const nextConfig = treeConfigStore.getState().getNextLevelConfig(config, node.subType);
+      items = items.map((item) => ({
+        ...item,
+        parentId: node.id,
+        connected: node.connected,
+        config: nextConfig ? { ...nextConfig, ...item.config } : { type: item.type, icon: nextConfig?.icon }
+      }));
+    }
+
+    // 注入 extraLevels（仅 connection 层）
+    if (node.type === 'connection') {
+      const extraConfigs = treeConfigStore.getState().getExtraLevels(config);
+      const extraNodes = extraConfigs
+        .filter((extra) => extra.position === 'connection')
+        .map((extra) => ({
+          id: `${node.id}::extra::${extra.type}`,
+          parentId: node.id,
+          name: extra.label,
+          type: extra.type,
+          config: extra,
+          children: [],  // 懒加载
+          connected: node.connected
+        }));
+      items = [...items, ...extraNodes];
+    }
+
+    return { ...node, expanded: true, children: items };
+  } catch (error) {
+    console.error('加载子节点失败:', error);
+    return { ...node, children: [], expanded: false };
+  }
+};
+
+// 内部：为 group 加载 children（递归调用 loadNodeChildren，但路径调整）
+const loadNodeChildrenForGroup = async (groupNode, parentNode) => {
+  const groupPath = `${parentNode.id.split('::').slice(1).join('/')}/group/${groupNode.id.split('::').pop()}`;
+  const groupUrl = `/api/meta/${encodeURIComponent(parentNode.id.split('::')[0])}/${groupPath}/children`;
+  try {
+    const response = await fetch(groupUrl);
+    if (!response.ok) throw new Error(await response.text());
+    const { data: { items } } = await response.json();
+    const childConfig = groupNode.config.childConfig;
+    return items.map((item) => ({
+      ...item,
+      parentId: groupNode.id,
+      connected: parentNode.connected,
+      config: childConfig ? { ...childConfig, ...item.config } : { type: item.type }
+    }));
+  } catch (error) {
+    console.error('加载 group 子节点失败:', error);
+    return [];
+  }
+};
+
+// findNode, findConnectionId, updateTreePath 不变
+export const findNode = (nodes, id) => {
+  if (!Array.isArray(nodes)) return null;
+  for (let node of nodes) {
+    if (node && node.id === id) return node;
+    if (node && node.children) {
+      const found = findNode(node.children, id);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
+export const findConnectionId = (nodeId, treeData) => {
+  const findAncestor = (nodes, targetId) => {
+    for (let node of nodes) {
+      if (node.id === targetId && node.type === 'connection') return node.id;
+      if (node.children) {
+        const found = findAncestor(node.children, targetId);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  return findAncestor(treeData, nodeId) || null;
+};
+
+export const updateTreePath = (treeData, targetId, updaterFn) => {
+  const newTree = JSON.parse(JSON.stringify(treeData));
+  const targetNode = findNode(newTree, targetId);
+  if (targetNode) Object.assign(targetNode, updaterFn({ ...targetNode }));
+  return newTree;
+};
+
+// =========================================
+
+vite.config.js
+
+// vite.config.js
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8080';
+
+export default defineConfig({
+  plugins: [react()],
+  define: {
+    'import.meta.env.API_BASE_URL': JSON.stringify('/api'), // 开发模式使用 /api
+  },
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: API_BASE_URL,
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''), // 去掉 /api 前缀
+      },
+    },
+  },
+});
+
+
+// =========================================
+

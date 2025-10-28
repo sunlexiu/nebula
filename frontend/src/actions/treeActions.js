@@ -1,6 +1,7 @@
 import toast from 'react-hot-toast';
 import { findNode } from '../utils/treeUtils';
 import { useTreeStore } from '../stores/useTreeStore';
+import { useTreeConfigStore } from '../stores/useTreeConfigStore';  // 新增
 
 // handleNewGroupSubmit 和 handleNewConnectionSubmit 保持原样
 export const handleNewGroupSubmit = async (groupName, parentId) => {
@@ -39,8 +40,11 @@ export const handleNewConnectionSubmit = async (connectionData, parentId) => {
   }
 };
 
-// 修复：moveNode 接收 openModal 参数，直接内部调用 openConfirm
+// 修复：moveNode 接收 openModal 参数，直接内部调用 openConfirm，使用 config.type
 export const moveNode = async (sourceId, targetParentId, updateTreePathFn, openModal, nodeType) => {
+  // nodeType 从 config.type fallback
+  const sourceNode = findNode(useTreeStore.getState().treeData, sourceId);
+  const actualType = sourceNode?.config?.type || nodeType || 'unknown';
   if (typeof openModal !== 'function') {
     console.error('openModal must be a function');
     return;
@@ -64,16 +68,16 @@ export const moveNode = async (sourceId, targetParentId, updateTreePathFn, openM
   };
 
   localOpenConfirm(
-    `移动${nodeType === 'folder' ? '文件夹' : '连接'}`,
-    `确定要将此${nodeType === 'folder' ? '文件夹' : '连接'}移动到目标位置吗？`,
+    `移动${actualType === 'folder' ? '文件夹' : '连接'}`,
+    `确定要将此${actualType === 'folder' ? '文件夹' : '连接'}移动到目标位置吗？`,
     async () => {
       try {
         const response = await fetch('/api/config/move-node', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sourceId, targetParentId: targetParentId || null, type: nodeType })
+          body: JSON.stringify({ sourceId, targetParentId: targetParentId || null, type: actualType })
         });
-        if (!response.ok) throw new Error(`Failed to move ${nodeType}`);
+        if (!response.ok) throw new Error(`Failed to move ${actualType}`);
 
         // 更新树数据：移除源节点，添加到目标
         const treeData = useTreeStore.getState().treeData;
@@ -106,9 +110,9 @@ export const moveNode = async (sourceId, targetParentId, updateTreePathFn, openM
           }
         }
         useTreeStore.getState().setTreeData(newTree);
-        toast.success(`${nodeType} 已移动到新位置`);
+        toast.success(`${actualType} 已移动到新位置`);
       } catch (error) {
-        console.error(`Move ${nodeType} error:`, error);
+        console.error(`Move ${actualType} error:`, error);
         toast.error('移动失败，请重试');
       }
     },
@@ -116,7 +120,7 @@ export const moveNode = async (sourceId, targetParentId, updateTreePathFn, openM
   );
 };
 
-// 切换展开
+// 切换展开：不变
 export const toggleExpand = (setExpandedKeys, nodeId, loadChildren = true) => {
   setExpandedKeys((prev) => {
     const newMap = new Map(prev);
@@ -125,7 +129,7 @@ export const toggleExpand = (setExpandedKeys, nodeId, loadChildren = true) => {
   });
 };
 
-// 删除节点（通用）
+// 删除节点（通用）：不变
 export const deleteNode = (treeData, nodeId) => {
   const newTree = JSON.parse(JSON.stringify(treeData));
   function deleteRecursive(nodes) {
@@ -145,7 +149,7 @@ export const deleteNode = (treeData, nodeId) => {
   return newTree;
 };
 
-// 删除文件夹
+// 删除文件夹：不变
 export const deleteFolder = async (node, openModal) => {
   if (typeof openModal !== 'function') {
     console.error('openModal must be a function');
@@ -177,7 +181,7 @@ export const deleteFolder = async (node, openModal) => {
   );
 };
 
-// 重命名文件夹
+// 重命名文件夹：不变
 export const renameFolder = (node, openModal) => {
   if (typeof openModal !== 'function') {
     console.error('openModal must be a function');
@@ -210,7 +214,7 @@ export const renameFolder = (node, openModal) => {
   });
 };
 
-// 刷新文件夹
+// 刷新文件夹：不变
 export const refreshFolder = (node) => {
   toast(`刷新文件夹: ${node.name}`);
   // 实际调用 API 刷新子项

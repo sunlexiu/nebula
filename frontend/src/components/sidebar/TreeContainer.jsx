@@ -10,14 +10,15 @@ const TreeContainer = ({
   dragSourceId, setDragSourceId, dragOverNodeId, setDragOverNodeId,
   isDragOverRoot, setIsDragOverRoot,
   openNewGroup, openNewConnection, openRenameFolder, openEditConnection,
-  openModal // 修复：接收 openModal 参数
+  openModal  // 接收 openModal
 }) => {
   const { updateTreePath } = useTreeStore();
 
   const handleMoveNode = (sourceId, targetId) => {
     const sourceNode = findNode(treeData, sourceId);
-    if (sourceNode && (sourceNode.type === 'folder' || sourceNode.type === 'connection')) {
-      moveNode(sourceId, targetId, updateTreePath, openModal, sourceNode.type); // 修复：传入 openModal
+    const actualType = sourceNode?.config?.type || sourceNode?.type || 'unknown';  // config fallback
+    if (sourceNode && (actualType === 'folder' || actualType === 'connection')) {
+      moveNode(sourceId, targetId, updateTreePath, openModal, actualType);
     }
   };
 
@@ -59,12 +60,12 @@ const TreeContainer = ({
               style={{ marginLeft: '2px', paddingLeft: '1px', borderLeft: '1px solid #e0e7ff', marginTop: '1px' }}
               onDragOver={(e) => {
                 e.preventDefault();
-                if (dragSourceId && dragSourceId !== node.id && node.type === 'folder') setDragOverNodeId(node.id);
+                if (dragSourceId && dragSourceId !== node.id && (node.type === 'folder' || node.config?.allowDrop)) setDragOverNodeId(node.id);
               }}
               onDragLeave={() => setDragOverNodeId(null)}
               onDrop={(e) => {
                 e.preventDefault();
-                if (dragSourceId && dragSourceId !== node.id && node.type === 'folder') handleMoveNode(dragSourceId, node.id);
+                if (dragSourceId && dragSourceId !== node.id && (node.type === 'folder' || node.config?.allowDrop)) handleMoveNode(dragSourceId, node.id);
                 setDragOverNodeId(null);
               }}
             >
