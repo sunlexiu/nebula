@@ -6,8 +6,8 @@ import deegoLogo from '../../public/icons/deego_1.svg';
 import { useTreeStore } from '../../stores/useTreeStore';
 import { useModal } from '../modals/ModalProvider';
 import { openNewGroup, openNewConnection, openConfirm, openRenameFolder, openEditConnection } from '../modals/modalActions';
-import { refreshFolder, deleteFolder } from '../../actions/treeActions'; // 修复：从 treeActions 导入树函数
-import { connectDatabase, disconnectDatabase, refreshConnection, deleteConnection, refreshDatabase, refreshSchema, createNewSchema, exportDatabase, createNewTable, exportSchema, previewTable, editTableStructure, generateTableSQL, exportTableData, viewDefinition, editView, generateViewSQL, editFunction, viewFunctionSource, testFunction, showProperties, deleteDatabase, deleteSchema, deleteTable, deleteView, deleteFunction } from '../../actions/dbActions'; // 修复：从 dbActions 导入 DB 函数
+import { refreshFolder, deleteFolder } from '../../actions/treeActions';
+import { connectDatabase, disconnectDatabase, refreshConnection, deleteConnection, refreshDatabase, refreshSchema, createNewSchema, exportDatabase, createNewTable, exportSchema, previewTable, editTableStructure, generateTableSQL, exportTableData, viewDefinition, editView, generateViewSQL, editFunction, viewFunctionSource, testFunction, showProperties, deleteDatabase, deleteSchema, deleteTable, deleteView, deleteFunction } from '../../actions/dbActions';
 import { useDragDrop } from './hooks/useDragDrop';
 import { findNode } from '../../utils/treeUtils';
 
@@ -19,9 +19,9 @@ const Sidebar = ({ treeData }) => {
   const [hoveredNode, setHoveredNode] = useState(null);
   const { openModal } = useModal();
   const { dragSourceId, setDragSourceId, dragOverNodeId, setDragOverNodeId, isDragOverRoot, setIsDragOverRoot } = useDragDrop();
-  const updateTreePath = useTreeStore((state) => state.updateTreePath); // 从 store 获取 updateTreePath
+  const updateTreePath = useTreeStore((state) => state.updateTreePath);
 
-  // 外部点击关闭菜单
+  // 外部点击关闭菜单：不变
   useEffect(() => {
     if (!showMoreMenu) return;
     const handleClickOutside = (event) => {
@@ -45,13 +45,12 @@ const Sidebar = ({ treeData }) => {
   useEffect(() => {
     if (!showMoreMenu) return;
     const close = () => { setShowMoreMenu(null); setActiveMoreMenuNode(null); setMoreMenuPosition({ x: 0, y: 0, flip: false });};
-    window.addEventListener('scroll', close, true); // 捕获所有滚动容器
+    window.addEventListener('scroll', close, true);
     window.addEventListener('resize', close);
     return () => {
       window.removeEventListener('scroll', close, true);
       window.removeEventListener('resize', close);
     };
-
   }, [showMoreMenu]);
 
   const handleMoreMenu = (e, node) => {
@@ -108,8 +107,8 @@ const Sidebar = ({ treeData }) => {
         refreshFolder={(node) => refreshFolder(node)}
         deleteFolder={(node) => deleteFolder(node, openModal)}
         refreshConnection={(node, setExpandedKeys) => refreshConnection(node, setExpandedKeys)}
-        connectDatabase={(node) => connectDatabase(node, updateTreePath)}
-        disconnectDatabase={(node) => disconnectDatabase(node, updateTreePath)}
+        connectDatabase={(node) => connectDatabase(node)}  // 已集成配置加载
+        disconnectDatabase={(node) => disconnectDatabase(node)}
         refreshDatabase={(node, setExpandedKeys) => refreshDatabase(node, setExpandedKeys)}
         refreshSchema={(node, setExpandedKeys) => refreshSchema(node, setExpandedKeys)}
         createNewSchema={(node) => createNewSchema(node)}

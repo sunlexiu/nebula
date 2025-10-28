@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { findNode } from '../utils/treeUtils';  // 导入辅助函数
 
 export const useTreeStore = create((set, get) => ({
   treeData: [],
@@ -8,11 +9,17 @@ export const useTreeStore = create((set, get) => ({
       const response = await fetch('/api/config/tree');
       if (!response.ok) throw new Error('Failed to fetch tree data');
       const { data } = await response.json();
+      // data 中的节点已带 config（后端注入）
       set({ treeData: data || [] });
     } catch (error) {
       console.error('Error fetching tree data:', error);
       set({ treeData: [] });
     }
+  },
+  // 新增：为连接加载配置（在 connectDatabase 时调用）
+  loadTreeConfig: async (connId) => {
+    const treeConfigStore = window.treeConfigStore || { getState: () => ({ loadConfigForConnection: async () => {} }) };  // 全局 fallback
+    await treeConfigStore.getState().loadConfigForConnection(connId);
   },
   updateTreePath: (targetId, updaterFn) => {
     set((state) => {
@@ -46,16 +53,3 @@ export const useTreeStore = create((set, get) => ({
     });
   },
 }));
-
-// 辅助函数（从 utils 导入）
-const findNode = (nodes, id) => {
-  if (!Array.isArray(nodes)) return null;
-  for (let node of nodes) {
-    if (node && node.id === id) return node;
-    if (node && node.children) {
-      const found = findNode(node.children, id);
-      if (found) return found;
-    }
-  }
-  return null;
-};

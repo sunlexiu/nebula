@@ -1,6 +1,7 @@
 import toast from 'react-hot-toast';
 import { updateConnection } from '../../actions/dbActions';
 import { useTreeStore } from '../../stores/useTreeStore';
+import { actionHandlers } from '../../actions/dbActions';  // 新增导入动态 handler
 
 // openNewGroup 接收 openModal 参数
 export const openNewGroup = (parentId = null, openModal) => {
@@ -69,7 +70,7 @@ export const openRenameFolder = (node, openModal) => {
   });
 };
 
-// openEditConnection 接收 openModal 参数
+// openEditConnection 接收 openModal 参数，使用 config
 export const openEditConnection = (connection, openModal) => {
   if (typeof openModal !== 'function') {
     console.error('openModal must be a function');
@@ -79,7 +80,9 @@ export const openEditConnection = (connection, openModal) => {
     connection,
     onSubmit: async (payload) => {
       const { updateTreePath } = useTreeStore.getState();
-      await updateConnection(payload, updateTreePath);
+      await updateConnection(payload);
+      // 新增：更新后重新加载 config
+      await useTreeStore.getState().loadTreeConfig(payload.id);
     }
   });
 };

@@ -1,78 +1,276 @@
-// src/components/sidebar/TreeNode.jsx
-import React from 'react';
+import React, { useState, memo, useMemo } from 'react';
+import { useTreeStore } from '../../stores/useTreeStore';
+import { actionHandlers, connectDatabase } from '../../actions/dbActions';  // **修复：添加导入**
+import {
+  getExpandIcon,
+  getNodeIcon,
+  loadNodeChildren
+} from '../../utils/treeUtils';
+import { getPrimaryAction } from '../../actions/dbActions';
+import {
+  getThemeColors,
+  nodeBaseStyles,
+  nodeHoverStyles,
+  expandIconStyles,
+  nodeIconStyles,
+  nodeNameStyles,
+  typeLabelStyles,
+  actionButtonStyles,
+  indicatorBarStyles,
+  childIndicatorStyles,
+  actionContainerStyles,
+  dragOverStyles,
+  dragSourceStyles
+} from './styles';
 
-/**
- * props:
- * - node: { id,name,type,icon,hasChildren,_ctx,actions,badges }
- * - selected: boolean
- * - onToggle(node): 展开/收起
- * - onClick(node): 选中
- * - onAction(node, action): 执行后端返回的动作（可在父组件统一处理）
- */
-export default function TreeNode({
-                                   node,
-                                   selected,
-                                   onToggle,
-                                   onClick,
-                                   onAction
-                                 }) {
-  // 图标类名：已在 adapter 里映射为最终类名
-  const iconClass = node.icon || 'icon-default';
+const TreeNode = memo(({
+  node,
+  level = 0,
+  hoveredNode,
+  setHoveredNode,
+  expandedKeys,
+  setExpandedKeys,
+  onMoreMenu,
+  activeMoreMenuNode,
+  setActiveMoreMenuNode,
+  dragSourceId,
+  setDragSourceId,
+  dragOverNodeId,
+  setDragOverNodeId,
+  moveNode,
+  openNewGroup,
+  openNewConnection,
+  openRenameFolder,
+  openEditConnection
+}) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const isHovered = hoveredNode === node.id;
+  const isActive = activeMoreMenuNode === node.id;
+  const isDragging = dragSourceId === node.id;
+  const isDragOver = dragOverNodeId === node.id;
+  const hasChildren = node.children && node.children.length > 0;
+  const isExpandable = hasChildren || node.config?.nextLevel || node.virtual || node.type === 'connection' || node.type === 'database' || node.type === 'schema' || node.type.includes('_group');
+  const isDraggable = node.type === 'folder' || node.type === 'connection';
+  const isDropTarget = node.type === 'folder' || node.config?.allowDrop;  // config 支持
+  const primaryAction = getPrimaryAction(node);  // 使用 config
+  const theme = getThemeColors(node.type || node.config?.type);  // config.type fallback
+  const { updateTreePath } = useTreeStore();
+  const isExpanded = node.expanded;
+  const isConnected = node.connected;
+  if (isConnected) theme.accentColor = '#10b981';
 
-  // 节点文本
-  const label = node.name || node.id;
+  // useMemo 优化：仅在必要时重新计算样式
+  const combinedStyles = useMemo(() => ({
+    ...nodeBaseStyles,
+    ...(isDragging && dragSourceStyles),
+    ...(isDragOver && dragOverStyles(theme)),
+    paddingLeft: `${12 + level * 12}px`,
+    cursor: isDraggable ? 'grab' : (isExpandable ? 'pointer' : (isLoading ? 'wait' : 'default')),
+    background: (isDragging ? 'transparent' : ((isHovered || isActive) ? theme.hoverBg : 'transparent')),
+    border: (isDragOver ? `2px dashed ${theme.accentColor}` : ((isHovered || isActive) ? `1px solid ${theme.accentColor}20` : (isConnected ? `1px solid ${theme.accentColor}10` : '1px solid transparent'))),
+    transform: (isDragging ? 'rotate(5deg)' : ((isHovered || isActive) ? 'translateX(1px)' : 'translateX(0)')),
+    boxShadow: (isDragging ? '0 4px 12px rgba(0,0,0,0.2)' : ((isHovered || isActive) ? `0 1px 4px ${theme.accentColor}10` : 'none')),
+    opacity: isDragging ? 0.5 : 1,
+    paddingRight: (isHovered || isActive) ? '4px' : '8px'
+  }), [isDragging, isDragOver, isHovered, isActive, level, theme, isConnected]);
 
-  // 动作（来自后端 YAML），在 hover 时显示
-  const actions = Array.isArray(node.actions) ? node.actions : [];
+  // 拖拽事件：不变
+  const handleDragStart = (e) => {
+    if (isDraggable) {
+      setDragSourceId(node.id);
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', node.id);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    if (isDropTarget && dragSourceId && dragSourceId !== node.id) {
+      setDragOverNodeId(node.id);
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    e.stopPropagation();
+    if (isDropTarget && dragOverNodeId === node.id) {
+      setDragOverNodeId(null);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isDropTarget && dragSourceId && dragSourceId !== node.id) {
+      moveNode(dragSourceId, node.id);
+    }
+    setDragOverNodeId(null);
+  };
+
+  const handleClick = async (e) => {
+    e.stopPropagation();
+    if (isExpandable) {
+      if (!hasChildren && !node.virtual) {  // 虚拟节点已加载
+        setIsLoading(true);
+        try {
+          const updatedNode = await loadNodeChildren(node);
+          if (updatedNode && updatedNode.children) {
+            updateTreePath(node.id, (current) => ({
+              ...current,
+              children: updatedNode.children,
+              expanded: true
+            }));
+          }
+          setExpandedKeys((prev) => new Map(prev).set(node.id, true));
+        } catch (error) {
+          console.error('加载失败:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        setExpandedKeys((prev) => new Map(prev).set(node.id, !prev.get(node.id)));
+      }
+    }
+  };
+
+  const handlePrimaryAction = (e) => {
+    e.stopPropagation();
+    if (primaryAction && !activeMoreMenuNode) {
+      // **修复：传递空 options（openModal 未提供，使用 fallback）**
+      actionHandlers.dynamicHandler(primaryAction.handler || 'defaultAction', node, {});
+      // 对于 connection，连接后加载 children
+      if (node.type === 'connection') {
+        connectDatabase(node).then((ok) => {
+          if (ok) loadNodeChildren(node).then((updated) => updateTreePath(node.id, () => updated));
+        });
+      }
+    }
+  };
+
+  const handleMoreMenu = (e) => {
+    e.stopPropagation();
+    if (!activeMoreMenuNode) {
+      setActiveMoreMenuNode(node.id);
+      onMoreMenu(e, node);
+    }
+  };
+
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleMoreMenu(e);
+  };
 
   return (
-      <div
-          className={`tree-node ${selected ? 'is-selected' : ''}`}
-          data-node-id={node.id}
-          onClick={(e) => {
-            e.stopPropagation();
-            onClick && onClick(node);
-          }}
-      >
-        {/* 展开/收起箭头（如果你原来有），可按需切换 class */}
-        {node.hasChildren ? (
-            <span
-                className={`tree-node-toggle ${node.__expanded ? 'is-open' : ''}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggle && onToggle(node);
-                }}
-            />
+    <div
+      className={`tree-node ${node.type} ${isExpanded ? 'expanded' : ''} ${isHovered || isActive ? 'hovered' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
+      style={combinedStyles}
+      draggable={isDraggable}
+      onMouseEnter={() => !isDragging && setHoveredNode(node.id)}
+      onMouseLeave={() => !isDragging && setHoveredNode(null)}
+      onClick={handleClick}
+      onContextMenu={handleContextMenu}
+      onKeyDown={(e) => { if (e.key === 'Enter') handleClick(e); }}
+      tabIndex={0}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {(isHovered || isActive || isDragOver) && <div style={indicatorBarStyles(theme)} />}
+
+      <div style={expandIconStyles(isHovered || isActive || isDragOver, theme)}>
+        {isLoading ? (
+          <span style={{ fontSize: 9 }}>⟳</span>
+        ) : getExpandIcon(node) ? (
+          <span style={{ fontSize: 9, fontWeight: 'bold' }}>
+            {getExpandIcon(node)}
+          </span>
         ) : (
-            <span className="tree-node-toggle is-leaf" />
+          <div style={{ width: 10, height: 10 }} />
         )}
+      </div>
 
-        {/* 图标：使用映射后的 icon class，不破坏你原有样式 */}
-        <i className={`tree-node-icon ${iconClass}`} aria-hidden="true" />
+      <img
+        src={getNodeIcon(node)}
+        alt={node.type + (isConnected ? ' (connected)' : '')}
+        style={nodeIconStyles(isHovered || isActive || isDragOver, theme)}
+      />
 
-        {/* 文本 */}
-        <span className="tree-node-label" title={label}>
-        {label}
+      <span style={{ ...nodeNameStyles(isHovered || isActive || isDragOver), color: (isHovered || isActive || isDragOver) ? theme.textColor : '#333' }}>
+        {node.name}
       </span>
 
-        {/* Actions：hover 时展示（保持容器类名） */}
-        <div className="tree-node-actions">
-          {actions.map((act) => (
-              <button
-                  key={act.id}
-                  className={`tree-node-action ${act.danger ? 'is-danger' : ''}`}
-                  title={act.label}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (act.confirm && !window.confirm(act.label || 'Confirm')) return;
-                    onAction && onAction(node, act);
-                  }}
-              >
-                {/* 如果你有动作图标类名，可加在这里 */}
-                {act.iconClass ? <i className={`action-icon ${act.iconClass}`} /> : null}
-              </button>
-          ))}
+      {(isHovered || isActive || isDragOver) && (
+        <span style={typeLabelStyles(isHovered || isActive || isDragOver, theme)}>
+          {node.type} {isConnected && '(已连接)'} {node.virtual && '(虚拟)'}
+        </span>
+      )}
+
+      {(isHovered || isActive) && !isLoading && !isDragging && (
+        <div style={actionContainerStyles}>
+          {primaryAction && (
+            <button
+              onClick={handlePrimaryAction}
+              style={actionButtonStyles(theme)}
+              disabled={!!activeMoreMenuNode}
+              onMouseEnter={(e) => {
+                if (!activeMoreMenuNode) {
+                  e.target.style.background = 'white';
+                  e.target.style.transform = 'scale(1.05)';
+                  e.target.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.15)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!activeMoreMenuNode) {
+                  e.target.style.background = 'rgba(255, 255, 255, 0.8)';
+                  e.target.style.transform = 'scale(1)';
+                  e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                }
+              }}
+            >
+              {primaryAction.icon}
+            </button>
+          )}
+
+          <button
+            onClick={handleMoreMenu}
+            style={{
+              ...actionButtonStyles(theme),
+              color: '#666',
+              fontSize: '14px'
+            }}
+            disabled={!!activeMoreMenuNode && activeMoreMenuNode !== node.id}
+            onMouseEnter={(e) => {
+              if (!activeMoreMenuNode || activeMoreMenuNode === node.id) {
+                e.target.style.background = 'white';
+                e.target.style.transform = 'scale(1.05)';
+                e.target.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.15)';
+                e.target.style.color = theme.accentColor;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!activeMoreMenuNode || activeMoreMenuNode === node.id) {
+                e.target.style.background = 'rgba(255, 255, 255, 0.8)';
+                e.target.style.transform = 'scale(1)';
+                e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                e.target.style.color = '#666';
+              }
+            }}
+          >
+            ⋯
+          </button>
         </div>
-      </div>
+      )}
+
+      {(isHovered || isActive || isDragOver) && hasChildren && !primaryAction && !isLoading && (
+        <div style={childIndicatorStyles(theme)} />
+      )}
+    </div>
   );
-}
+});
+
+TreeNode.displayName = 'TreeNode';
+
+export default TreeNode;
