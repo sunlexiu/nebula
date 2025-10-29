@@ -15,7 +15,7 @@ public class TreeNode {
 	private Integer port;
 	private String database;
 	private String username;
-	private Long parentId;
+	private String parentId;
 	private Boolean connected;
 	private Boolean expanded;
 	private Boolean virtual;

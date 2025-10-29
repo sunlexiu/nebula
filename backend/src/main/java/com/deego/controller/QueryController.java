@@ -22,7 +22,7 @@ public class QueryController {
 	 */
 	@PostMapping("/execute")
 	public ResponseEntity<Map<String, Object>> executeQuery(@RequestBody Map<String, Object> request) {
-		Long connId = Long.parseLong((String) request.get("connId"));
+		String connId = (String) request.get("connId");
 		String query = (String) request.get("query");
 
 		try {

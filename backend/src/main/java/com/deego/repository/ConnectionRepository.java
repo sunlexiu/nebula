@@ -6,7 +6,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface ConnectionRepository extends JpaRepository<Connection, Long> {
-	List<Connection> findByParentId(Long parentId);
-	List<Connection> findByParentIdIsNull(); // 根连接
+public interface ConnectionRepository extends JpaRepository<Connection, String> {
+	List<Connection> findByParentId(String parentId);
+	List<Connection> findByParentIdIsNull();
 }

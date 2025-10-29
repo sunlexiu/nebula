@@ -24,23 +24,22 @@ public class MoveController {
 	@PostMapping("/move-node")
 	public ResponseEntity<String> moveNode(@RequestBody Map<String, Object> request) {
 		String sourceId = (String) request.get("sourceId");
-		Long targetParentId = request.get("targetParentId") != null ? Long.parseLong((String) request.get("targetParentId")) : null;
+		String targetParentId = request.get("targetParentId") != null ? (String) request.get("targetParentId") : null;
 		String type = (String) request.get("type");
 
 		try {
 			if ("folder".equals(type)) {
 				// 更新 Folder parentId
-				Long sourceFolderId = Long.parseLong(sourceId.replace("folder_", ""));
+				String sourceFolderId =sourceId.replace("folder_", "");
 				folderService.getFolder(sourceFolderId).ifPresent(folder -> {
 					folder.setParentId(targetParentId);
 					folderService.createOrUpdateFolder(folder);
 				});
 			} else if ("connection".equals(type)) {
 				// 更新 Connection parentId
-				Long sourceConnId = Long.parseLong(sourceId);
-				connectionService.getConnection(sourceConnId).ifPresent(conn -> {
+				connectionService.getConnection(sourceId).ifPresent(conn -> {
 					conn.setParentId(targetParentId);
-					connectionService.updateConnection(sourceConnId, conn);  // 复用更新
+					connectionService.updateConnection(sourceId, conn);  // 复用更新
 				});
 			}
 			return ResponseEntity.ok("Node moved successfully");

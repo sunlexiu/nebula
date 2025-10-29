@@ -33,7 +33,7 @@ public class ConfigController {
 
 	@PostMapping("/folders")
 	public ResponseEntity<Folder> createOrUpdateFolder(@RequestBody Folder folder) {
-		if (folder.getId() != null && folder.getId() > 0) {
+		if (folder.getId() != null) {
 			// 重命名：更新 name
 			Optional<Folder> existing = folderService.getFolder(folder.getId());
 			if (existing.isPresent()) {
@@ -47,7 +47,7 @@ public class ConfigController {
 
 	// 新增：/api/config/folders/{id} (DELETE)
 	@DeleteMapping("/folders/{id}")
-	public ResponseEntity<Void> deleteFolder(@PathVariable Long id) {
+	public ResponseEntity<Void> deleteFolder(@PathVariable String id) {
 		folderService.deleteFolder(id);
 		return ResponseEntity.noContent().build();
 	}
@@ -69,13 +69,13 @@ public class ConfigController {
 	}
 
 	@PutMapping("/connections/{id}")
-	public ResponseEntity<Connection> updateConnection(@PathVariable Long id, @RequestBody Connection update) {
+	public ResponseEntity<Connection> updateConnection(@PathVariable String id, @RequestBody Connection update) {
 		Connection updated = connectionService.updateConnection(id, update);
 		return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.notFound().build();
 	}
 
 	@DeleteMapping("/connections/{id}")
-	public ResponseEntity<Void> deleteConnection(@PathVariable Long id) {
+	public ResponseEntity<Void> deleteConnection(@PathVariable String id) {
 		connectionService.deleteConnection(id);
 		return ResponseEntity.noContent().build();
 	}
@@ -85,8 +85,14 @@ public class ConfigController {
 		return ResponseEntity.ok(connectionService.testConnection(conn));
 	}
 
+	@GetMapping("/connections/{id}/test")
+	public ResponseEntity<String> testConnection(@PathVariable String id) {
+		Optional<Connection> conn = connectionService.getConnection(id);
+		return conn.map(connection -> ResponseEntity.ok(connectionService.testConnection(connection))).orElseGet(() -> ResponseEntity.notFound().build());
+	}
+
 	@GetMapping("/connections/{id}/config")
-	public ResponseEntity<Map<String, Object>> getConfig(@PathVariable Long id) {
+	public ResponseEntity<Map<String, Object>> getConfig(@PathVariable String id) {
 		// 返回 YAML config for conn (简化，返回全 POSTGRESQL config)
 		Map<String, Object> config = Map.of("dbType", "POSTGRESQL", "actions", Map.of()); // 从 loader
 		return ResponseEntity.ok(config);

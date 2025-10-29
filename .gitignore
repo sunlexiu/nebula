@@ -41,3 +41,4 @@ build/
 /frontend/dist-electron/
 /.nebula/
 /frontend/dist/
+/data/

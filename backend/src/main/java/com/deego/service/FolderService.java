@@ -2,6 +2,7 @@ package com.deego.service;
 
 import com.deego.model.Folder;
 import com.deego.repository.FolderRepository;
+import com.deego.utils.IdWorker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -17,15 +18,17 @@ public class FolderService {
 	}
 
 	public Folder createOrUpdateFolder(Folder folder) {
-		// 如果有 id，则更新；否则新建
+		if (folder.getId() == null || folder.getId().isEmpty()) {
+			folder.setId(IdWorker.getIdStr());
+		}
 		return folderRepository.save(folder);
 	}
 
-	public Optional<Folder> getFolder(Long id) {
+	public Optional<Folder> getFolder(String id) {
 		return folderRepository.findById(id);
 	}
 
-	public void deleteFolder(Long id) {
+	public void deleteFolder(String id) {
 		folderRepository.deleteById(id);
 	}
 
@@ -33,7 +36,7 @@ public class FolderService {
 		return folderRepository.findByParentIdIsNull();
 	}
 
-	public List<Folder> getChildFolders(Long parentId) {
+	public List<Folder> getChildFolders(String parentId) {
 		return folderRepository.findByParentId(parentId);
 	}
 }

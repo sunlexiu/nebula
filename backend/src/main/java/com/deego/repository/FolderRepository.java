@@ -6,7 +6,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface FolderRepository extends JpaRepository<Folder, Long> {
-	List<Folder> findByParentId(Long parentId);
-	List<Folder> findByParentIdIsNull();  // 根文件夹
+public interface FolderRepository extends JpaRepository<Folder, String> {
+	List<Folder> findByParentId(String parentId);
+	List<Folder> findByParentIdIsNull();
 }

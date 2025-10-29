@@ -9,19 +9,19 @@ public class CodeFileCollectorWithExclude {
 
 	// 支持的代码文件扩展名
 	private static final String[] CODE_EXTENSIONS = {
-			".java", ".xml", ".yml"
+			".java", ".xml", ".yml", ".xml"
 	};
 
 	// 要排除的文件夹名称
 	private static final Set<String> EXCLUDED_DIRS = new HashSet<>(Arrays.asList(
-			"dist", "dist-electron", "node_modules"
+			"dist", "dist-electron", "node_modules", "target"
 	));
 	private static final Set<String> EXCLUDED_FILES = new HashSet<>(Arrays.asList(
-			"package-lock.json"
+			"package-lock.json", "CodeFileCollectorWithExclude.java"
 	));
 
 	public static void main(String[] args) {
-		String sourceFolder = "D:\\workspace\\nebula_db\\frontend";  // 要扫描的源代码文件夹
+		String sourceFolder = "E:\\workspace\\deego\\nebula\\backend";  // 要扫描的源代码文件夹
 		String outputFile = "all_codes.txt";  // 输出文件
 
 

@@ -110,7 +110,7 @@ public class ActionService {
 
 	// /api/db/{handler}
 	public String executeAction(String handler, Map<String, Object> params) {
-		Long connId = (Long) params.get("connectionId");
+		String connId = (String) params.get("connectionId");
 		JdbcTemplate jdbc = connectionService.getJdbcTemplate(connId);
 		BiConsumer<JdbcTemplate, Map<String, Object>> action = handlers.get(handler);
 		if (action != null) {
