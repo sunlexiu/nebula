@@ -1,7 +1,10 @@
 package com.deego.service;
 
 import com.deego.config.*;
-import com.deego.enums.TreePathType;
+import com.deego.enums.DatabaseType;
+import com.deego.enums.NodeType;
+import com.deego.enums.PlaceholderType;
+import com.deego.model.Folder;
 import com.deego.model.TreeNode;
 import com.deego.utils.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +16,7 @@ import java.util.stream.Collectors;
 
 /**
  * 树结构服务：基于 YAML 配置动态构建树节点，支持懒加载和聚合组。
- * 使用 BeanUtils 处理 Bean-to-Map 转换。
+ * 所有操作使用真实数据库（H2），无模拟。
  */
 @Service
 public class TreeService {
@@ -27,24 +30,29 @@ public class TreeService {
 	@Autowired
 	private BeanUtils beanUtils;
 
+	@Autowired
+	private FolderService folderService;  // 新增：真实文件夹服务
+
 	/**
-	 * /api/config/tree: 返回根树数据（文件夹 + 连接）。
+	 * /api/config/tree: 返回根树数据（真实文件夹 + 连接）。
+	 * 递归加载文件夹树，并为每个文件夹添加子连接。
 	 * 返回 List<Map<String, Object>>，使用 BeanUtils 转换。
 	 */
 	public List<Map<String, Object>> getTreeData() {
+		// 加载根文件夹（parentId = null）
 		List<TreeNode> rootNodes = new ArrayList<>();
+		List<Folder> rootFolders = folderService.getRootFolders();
+		for (Folder folder : rootFolders) {
+			TreeNode folderNode = buildFolderTree(folder);
+			rootNodes.add(folderNode);
+		}
 
-		// 示例：根文件夹（暂静态，实际可从 DB 加载）
-		TreeNode rootFolder = createFolder("根", null);
-		rootNodes.add(rootFolder);
-
-		// 添加根级连接（parentId 为 null）
-		List<com.deego.model.Connection> conns = connectionService.getAllConnections().stream()
-																  .filter(c -> c.getParentId() == null)
-																  .collect(Collectors.toList());
-		for (com.deego.model.Connection conn : conns) {
+		// 添加无父文件夹的根连接（parentId = null）
+		List<com.deego.model.Connection> rootConns = connectionService.getAllConnections().stream()
+																	  .filter(c -> c.getParentId() == null)
+																	  .collect(Collectors.toList());
+		for (com.deego.model.Connection conn : rootConns) {
 			TreeNode connNode = toTreeNode(conn);
-			// 为连接加载 extraLevels（使用 TreeNode 列表设置 children）
 			List<TreeNode> extraTreeNodes = loadExtraLevelsAsTreeNodes(conn.getId());
 			connNode.setChildren(extraTreeNodes);
 			rootNodes.add(connNode);
@@ -57,7 +65,33 @@ public class TreeService {
 	}
 
 	/**
-	 * /api/meta/{connId}/{path}/children: 动态加载子节点。
+	 * 递归构建文件夹树节点（真实 DB，加载子文件夹 + 子连接）。
+	 */
+	private TreeNode buildFolderTree(Folder folder) {
+		TreeNode folderNode = toTreeNodeFromFolder(folder);
+		// 加载子文件夹（递归）
+		List<Folder> childFolders = folderService.getChildFolders(folder.getId());
+		List<TreeNode> childNodes = new ArrayList<>();
+		for (Folder childFolder : childFolders) {
+			TreeNode childFolderNode = buildFolderTree(childFolder);
+			childNodes.add(childFolderNode);
+		}
+		// 加载该文件夹下的连接
+		List<com.deego.model.Connection> childConns = connectionService.getAllConnections().stream()
+																	   .filter(c -> c.getParentId() != null && c.getParentId().equals(folder.getId()))
+																	   .toList();
+		for (com.deego.model.Connection conn : childConns) {
+			TreeNode connNode = toTreeNode(conn);
+			List<TreeNode> extraTreeNodes = loadExtraLevelsAsTreeNodes(conn.getId());
+			connNode.setChildren(extraTreeNodes);
+			childNodes.add(connNode);
+		}
+		folderNode.setChildren(childNodes);
+		return folderNode;
+	}
+
+	/**
+	 * /api/meta/{connId}/{path}/children: 动态加载子节点（真实 SQL 执行）。
 	 * path 示例: "database/mydb"（数据库层）、"database/mydb/schema/public"（schema 层）。
 	 * 返回 List<Map<String, Object>>。
 	 */
@@ -82,7 +116,7 @@ public class TreeService {
 					children.add(groupNode);
 				}
 			} else {
-				// 普通层：执行 SQL 查询
+				// 普通层：执行真实 SQL 查询
 				String sql = replacePlaceholders(currentLevel.getSqlQuery(), path, segments);
 				List<Map<String, Object>> rows = jdbc.queryForList(sql);
 				for (Map<String, Object> row : rows) {
@@ -91,9 +125,9 @@ public class TreeService {
 				}
 			}
 
-			// **修复：使用枚举替换魔法字符串**
-			TreePathType pathType = TreePathType.fromPath(path);
-			if (pathType == TreePathType.CONNECTION) {
+			// 使用枚举替换魔法字符串
+			NodeType pathType = NodeType.fromPath(path);
+			if (pathType == NodeType.CONNECTION) {
 				List<TreeNode> extras = loadExtraLevelsAsTreeNodes(connId);
 				children.addAll(extras);
 			}
@@ -106,7 +140,7 @@ public class TreeService {
 		} catch (Exception e) {
 			// 日志记录，生产加 Sentry 等
 			System.err.println("Load children failed for path: " + path + ", error: " + e.getMessage());
-			return Collections.emptyList();
+			throw new RuntimeException("加载子节点失败: " + e.getMessage(), e);  // 抛出，交由全局异常处理器
 		}
 	}
 
@@ -118,14 +152,16 @@ public class TreeService {
 		DbConfig dbConfig = configLoader.getDbConfig(getDbType(connId));
 		JdbcTemplate jdbc = connectionService.getJdbcTemplate(connId);
 
-		if (dbConfig.getExtraLevels() != null) {
-			for (ExtraLevel extra : dbConfig.getExtraLevels()) {
-				if ("connection".equals(extra.getPosition())) {  // **未来可替换为枚举匹配**
+		if (dbConfig.getExtraLevels() != null && !dbConfig.getExtraLevels().isEmpty()) {
+			for (Map.Entry<String, ExtraLevel> entry : dbConfig.getExtraLevels().entrySet()) {
+				String extraKey = entry.getKey();  // e.g., "publications"
+				ExtraLevel extra = entry.getValue();
+				if (NodeType.CONNECTION.getValue().equals(extra.getPosition())) {
 					try {
 						String sql = replacePlaceholders(extra.getSqlQuery(), "", new String[0]);
 						List<Map<String, Object>> rows = jdbc.queryForList(sql);
 						for (Map<String, Object> row : rows) {
-							TreeNode node = createLeafNode(row, extra, "", connId);
+							TreeNode node = createLeafNode(row, extra, extraKey, connId);  // 路径用 extraKey
 							extras.add(node);
 						}
 					} catch (Exception e) {
@@ -148,7 +184,7 @@ public class TreeService {
 	}
 
 	/**
-	 * 创建虚拟聚合组节点（如 tables_group），并加载其子节点。
+	 * 创建虚拟聚合组节点（如 tables_group），并加载其子节点（真实 SQL）。
 	 */
 	private TreeNode createVirtualGroupNode(String groupKey, GroupByConfig group, String parentPath, JdbcTemplate jdbc, Long connId) {
 		TreeNode groupNode = new TreeNode();
@@ -202,13 +238,27 @@ public class TreeService {
 	}
 
 	/**
+	 * 将 Fodler 实体转为 TreeNode。
+	 */
+	private TreeNode toTreeNodeFromFolder(Folder folder) {
+		TreeNode node = new TreeNode();
+		node.setId(String.valueOf(folder.getId()));
+		node.setName(folder.getName());
+		node.setType(NodeType.FOLDER.getValue());
+		node.setParentId(folder.getParentId());
+		node.setExpanded(false);
+		node.setChildren(new ArrayList<>());
+		return node;
+	}
+
+	/**
 	 * 将 Connection 实体转为 TreeNode。
 	 */
 	private TreeNode toTreeNode(com.deego.model.Connection conn) {
 		TreeNode node = new TreeNode();
 		node.setId(String.valueOf(conn.getId()));
 		node.setName(conn.getName());
-		node.setType("connection");
+		node.setType(NodeType.CONNECTION.getValue());
 		node.setDbType(conn.getDbType());
 		node.setHost(conn.getHost());
 		node.setPort(conn.getPort());
@@ -231,20 +281,6 @@ public class TreeService {
 	}
 
 	/**
-	 * 创建文件夹节点（暂静态，实际可从 DB）。
-	 */
-	private TreeNode createFolder(String name, Long parentId) {
-		TreeNode folder = new TreeNode();
-		folder.setId("folder_" + UUID.randomUUID().toString().substring(0, 8));
-		folder.setName(name);
-		folder.setType("folder");
-		folder.setParentId(parentId);
-		folder.setExpanded(false);
-		folder.setChildren(new ArrayList<>());
-		return folder;
-	}
-
-	/**
 	 * 根据 segments 查找当前层级（简化：基于长度匹配 levels 索引）。
 	 * 实际可优化为精确路径匹配。
 	 */
@@ -257,15 +293,17 @@ public class TreeService {
 	 * 替换 SQL 中的占位符（如 {schemaName}）。
 	 */
 	private String replacePlaceholders(String sql, String path, String[] segments) {
-		// 示例替换：{schemaName} -> segments[1] (假设 segments[0]="database", [1]="mydb", [2]="schema")
 		Map<String, String> placeholders = new HashMap<>();
 		if (segments.length > 1) {
-			placeholders.put("schemaName", segments[segments.length - 1]);  // 最后一个为当前 schema
-			placeholders.put("dbName", segments.length > 0 ? segments[0] : "");  // 数据库名
-			// 扩展：{connId} -> path 等
+			placeholders.put(PlaceholderType.SCHEMA_NAME.getKey(), segments[segments.length - 1]);
+			placeholders.put(PlaceholderType.DB_NAME.getKey(), segments.length > 0 ? segments[0] : "");
 		}
-		for (Map.Entry<String, String> entry : placeholders.entrySet()) {
-			sql = sql.replace("{" + entry.getKey() + "}", entry.getValue());
+		// 遍历枚举替换（扩展点：所有 PlaceholderType）
+		for (PlaceholderType placeholder : PlaceholderType.values()) {
+			String key = placeholder.getKey();
+			if (placeholders.containsKey(key)) {
+				sql = sql.replace(placeholder.getValue(), placeholders.get(key));
+			}
 		}
 		return sql;
 	}
@@ -290,6 +328,8 @@ public class TreeService {
 	private String getDbType(Long connId) {
 		return connectionService.getConnection(connId)
 								.map(com.deego.model.Connection::getDbType)
-								.orElse("POSTGRESQL");  // 默认
+								.map(DatabaseType::fromValue)
+								.map(DatabaseType::getValue)
+								.orElse(DatabaseType.POSTGRESQL.getValue());  // 默认枚举
 	}
 }

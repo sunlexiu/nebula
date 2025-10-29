@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/config")
@@ -29,7 +28,7 @@ public class ConfigController {
 
 	@GetMapping("/tree")
 	public ResponseEntity<List<Map<String, Object>>> getTree() {
-		return ResponseEntity.ok(treeService.getTreeData().stream().map(beanUtils::beanToMap).collect(Collectors.toList()));
+		return ResponseEntity.ok(treeService.getTreeData().stream().map(beanUtils::beanToMap).toList());
 	}
 
 	@PostMapping("/folders")
@@ -81,13 +80,9 @@ public class ConfigController {
 		return ResponseEntity.noContent().build();
 	}
 
-	@GetMapping("/connections/{id}/test")
-	public ResponseEntity<String> testConnection(@PathVariable Long id) {
-		Optional<Connection> conn = connectionService.getConnection(id);
-		if (conn.isPresent()) {
-			return ResponseEntity.ok(connectionService.testConnection(conn.get()));
-		}
-		return ResponseEntity.notFound().build();
+	@PostMapping("/connections/test")
+	public ResponseEntity<String> testConnection(@RequestBody Connection conn) {
+		return ResponseEntity.ok(connectionService.testConnection(conn));
 	}
 
 	@GetMapping("/connections/{id}/config")
