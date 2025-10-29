@@ -1,17 +1,25 @@
 package com.deego.config;
 
+import com.deego.exception.BizException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
+import jakarta.annotation.PostConstruct;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
-import org.yaml.snakeyaml.Yaml;
-import jakarta.annotation.PostConstruct;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Map;
 
+import java.io.IOException;
+
+/**
+ * YAML 配置加载器，使用 Jackson YamlMapper 自动映射到 POJO。
+ */
 @Component
+@Slf4j
 public class TreeConfigLoader {
+
 	@Value("${deego.tree-config}")
 	private Resource configResource;
 
@@ -20,14 +28,16 @@ public class TreeConfigLoader {
 
 	@PostConstruct
 	public void loadConfig() {
-		Yaml yaml = new Yaml();
-		try (InputStream inputStream = configResource.getInputStream()) {
-			Map<String, Object> raw = yaml.load(inputStream);
-			treeConfig = new TreeConfig();
-			treeConfig.setTreeConfigs((Map<String, DbConfig>) raw.get("treeConfigs"));
-			System.out.println("Tree config loaded: " + treeConfig.getTreeConfigs().keySet());
+		YAMLMapper yamlMapper = new YAMLMapper(new YAMLFactory());
+		try {
+			// 直接反序列化为 TreeConfig POJO
+			treeConfig = yamlMapper.readValue(configResource.getInputStream(), TreeConfig.class);
+			log.info("Tree config loaded: {}", treeConfig.getTreeConfigs().keySet());
+		} catch (JsonMappingException e) {
+			throw new BizException(e);
 		} catch (IOException e) {
-			throw new RuntimeException("Failed to load tree-config.yml", e);
+			log.error("Failed to load tree-config.yml", e);
+			throw new BizException(e);
 		}
 	}
 
