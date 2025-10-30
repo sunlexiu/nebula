@@ -130,7 +130,7 @@ public class TreeService {
 							extras.add(node);
 						}
 					} catch (Exception e) {
-						System.err.println("Load extra level failed: " + extra.getType() + ", error: " + e.getMessage());
+						log.error("加载额外层级失败: ", e);
 					}
 				}
 			}

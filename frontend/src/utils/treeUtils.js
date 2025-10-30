@@ -11,6 +11,7 @@ import schemaIcon from '../public/icons/left_tree/schema_1.svg';
 import tableIcon  from '../public/icons/left_tree/table_1.svg';
 import viewIcon   from '../public/icons/left_tree/view_1.svg';
 import functionIcon from '../public/icons/left_tree/function_1.svg';
+import {useTreeStore} from "../stores/useTreeStore";
 
 /* -------------- 图标：优先节点 config.icon，后备旧逻辑 -------------- */
 export const getNodeIcon = node => {
@@ -45,13 +46,13 @@ export async function loadNodeChildren(node) {
     console.warn('[loadNodeChildren] 节点未连接', node);
     return { ...node, children: [] };
   }
-  const connId = findConnectionId(node.id, window.__treeData || []);
+  const connId = findConnectionId(node.id);
   if (!connId) {
     console.warn('[loadNodeChildren] 找不到所属连接', node);
     return { ...node, children: [] };
   }
-  const path = buildPath(node);                                    // 拼后端 path
-  const url  = `/api/meta/${connId}/children`;
+  const path = buildPath(node);
+  const url = `/api/meta/${connId}/${path}/children`;
 
   try {
     const res  = await fetch(url);
@@ -98,7 +99,8 @@ function buildPath(node) {
 }
 
 /* -------------- 找 connectionId -------------- */
-export function findConnectionId(nodeId, treeData) {
+export function findConnectionId(nodeId, treeData) {  // 保持签名，但实际调用时不用传 treeData
+  const actualTreeData = useTreeStore.getState().treeData;  // 从 store 取
   const find = (nodes, target) => {
     for (const n of nodes) {
       if (n.id === target) return n.id;
@@ -111,7 +113,7 @@ export function findConnectionId(nodeId, treeData) {
   };
   // 分割节点ID以获取连接ID
   const [connId, , ,] = nodeId.split('::');
-  return find(treeData, connId);
+  return find(actualTreeData, connId);  // 用 actualTreeData
 }
 
 /* -------------- 打补丁：连接节点强制主动作 -------------- */
