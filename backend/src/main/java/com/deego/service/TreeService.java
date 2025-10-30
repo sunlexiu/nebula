@@ -4,10 +4,11 @@ import com.deego.config.*;
 import com.deego.enums.DatabaseType;
 import com.deego.enums.NodeType;
 import com.deego.enums.PlaceholderType;
+import com.deego.exception.BizException;
 import com.deego.model.Folder;
 import com.deego.model.TreeNode;
 import com.deego.utils.BeanUtils;
-import com.deego.utils.IdWorker;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class TreeService {
 
 	@Autowired
@@ -71,12 +73,11 @@ public class TreeService {
 	}
 
 	public List<Map<String, Object>> loadChildren(String connIdStr, String path) {
-		String connId = connIdStr;
-		JdbcTemplate jdbc = connectionService.getJdbcTemplate(connId);
-		DbConfig dbConfig = configLoader.getDbConfig(getDbType(connId));
+		JdbcTemplate jdbc = connectionService.getJdbcTemplate(connIdStr);
+		DbConfig dbConfig = configLoader.getDbConfig(getDbType(connIdStr));
 
 		List<TreeNode> children = new ArrayList<>();
-		String[] segments = path.split("/");
+		String[] segments = Objects.isNull(path) ? new String[0] : path.split("/");
 		Level currentLevel = findCurrentLevel(dbConfig.getLevels(), segments);
 
 		try {
@@ -84,30 +85,30 @@ public class TreeService {
 				for (Map.Entry<String, GroupByConfig> entry : currentLevel.getGroupBy().entrySet()) {
 					String groupKey = entry.getKey();
 					GroupByConfig group = entry.getValue();
-					TreeNode groupNode = createVirtualGroupNode(groupKey, group, path, jdbc, connId);
+					TreeNode groupNode = createVirtualGroupNode(groupKey, group, path, jdbc, connIdStr);
 					children.add(groupNode);
 				}
 			} else {
-				String sql = replacePlaceholders(currentLevel.getSqlQuery(), path, segments);
+				String sql = replacePlaceholders(currentLevel.getSqlQuery(), segments);
 				List<Map<String, Object>> rows = jdbc.queryForList(sql);
 				for (Map<String, Object> row : rows) {
-					TreeNode node = createLeafNode(row, currentLevel, path, connId);
+					TreeNode node = createLeafNode(row, currentLevel, path, connIdStr);
 					children.add(node);
 				}
 			}
 
 			NodeType pathType = NodeType.fromPath(path);
 			if (pathType == NodeType.CONNECTION) {
-				children.addAll(loadExtraLevelsAsTreeNodes(connId));
+				children.addAll(loadExtraLevelsAsTreeNodes(connIdStr));
 			}
 
 			return children.stream()
 						   .map(beanUtils::beanToMap)
-						   .collect(Collectors.toList());
+					.toList();
 
 		} catch (Exception e) {
-			System.err.println("Load children failed for path: " + path + ", error: " + e.getMessage());
-			throw new RuntimeException("加载子节点失败: " + e.getMessage(), e);
+			log.error("加载子节点失败: ", e);
+			throw new BizException(e);
 		}
 	}
 
@@ -122,7 +123,7 @@ public class TreeService {
 				ExtraLevel extra = entry.getValue();
 				if (NodeType.CONNECTION.getValue().equals(extra.getPosition())) {
 					try {
-						String sql = replacePlaceholders(extra.getSqlQuery(), "", new String[0]);
+						String sql = replacePlaceholders(extra.getSqlQuery(), new String[0]);
 						List<Map<String, Object>> rows = jdbc.queryForList(sql);
 						for (Map<String, Object> row : rows) {
 							TreeNode node = createLeafNode(row, extra, extraKey, connId);
@@ -153,7 +154,7 @@ public class TreeService {
 		groupNode.setConfig(getActionsFromConfig(group.getActions()));
 
 		try {
-			String sql = replacePlaceholders(group.getSqlQuery(), parentPath, parentPath.split("/"));
+			String sql = replacePlaceholders(group.getSqlQuery(), parentPath.split("/"));
 			List<Map<String, Object>> rows = jdbc.queryForList(sql);
 			List<TreeNode> groupChildren = new ArrayList<>();
 			for (Map<String, Object> row : rows) {
@@ -170,6 +171,7 @@ public class TreeService {
 	}
 
 	private TreeNode createLeafNode(Map<String, Object> row, Object levelConfig, String parentPath, String connId) {
+		parentPath = Objects.isNull(parentPath) ? "" : parentPath;
 		TreeNode node = new TreeNode();
 		String name = (String) row.getOrDefault("name", row.get("id"));
 		String rawId = (String) row.getOrDefault("id", name);
@@ -226,11 +228,11 @@ public class TreeService {
 		return levels.get(levelIndex);
 	}
 
-	private String replacePlaceholders(String sql, String path, String[] segments) {
+	private String replacePlaceholders(String sql, String[] segments) {
 		Map<String, String> placeholders = new HashMap<>();
 		if (segments.length > 1) {
 			placeholders.put(PlaceholderType.SCHEMA_NAME.getKey(), segments[segments.length - 1]);
-			placeholders.put(PlaceholderType.DB_NAME.getKey(), segments.length > 0 ? segments[0] : "");
+			placeholders.put(PlaceholderType.DB_NAME.getKey(), segments[0]);
 		}
 		for (PlaceholderType placeholder : PlaceholderType.values()) {
 			String key = placeholder.getKey();

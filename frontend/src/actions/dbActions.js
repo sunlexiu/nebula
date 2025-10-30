@@ -1,13 +1,41 @@
 import toast from 'react-hot-toast';
 import { useTreeStore } from '../stores/useTreeStore';
-import { useTreeConfigStore } from '../stores/useTreeConfigStore';  // 新增
-import { findConnectionId, loadNodeChildren } from '../utils/treeUtils';  // 新增导入
+import { useTreeConfigStore } from '../stores/useTreeConfigStore';
+import { findConnectionId, loadNodeChildren, loadDatabasesForConnection } from '../utils/treeUtils';
 
 const treeConfigStore = window.treeConfigStore || { getState: () => ({ getConfig: () => ({}), getNextLevelConfig: () => ({}) }) };
 
 // 映射 handler 到函数（现有 + 新增模拟）——**修复：添加 export**
 export const actionHandlers = {
-  // 现有
+    /* -------  连接节点专属  ------- */
+    connectAndExpand: async (node, openModal, setExpandedKeys) => {
+      if (node.connected) {
+        setExpandedKeys(prev => new Map(prev).set(node.id, true));
+        return;
+      }
+      const ok = await connectDatabase(node);
+      if (ok) {
+        const dbKids = await loadDatabasesForConnection({ id: node.id, connected: true });
+        useTreeStore.getState().updateTreePath(node.id, (curr) => ({
+          ...curr,
+          expanded: true,
+          children: dbKids,
+          connected: true,
+          status: 'connected'
+        }));
+        setExpandedKeys(prev => new Map(prev).set(node.id, true));
+      }
+    },
+
+    /*  -------  兜底默认动作  -------  */
+    defaultAction: (node, setExpandedKeys) => {
+      if (node.type === 'connection') {   // 再次兜底，防止 yaml 配错
+        actionHandlers.connectAndExpand(node, setExpandedKeys);
+        return;
+      }
+      toast(`未知默认动作: ${node.name}`);
+    },
+
   refreshDatabase: (node, setExpandedKeys) => {
     if (!node.connected) return;
     loadNodeChildren(node).then((updated) => {

@@ -46,8 +46,7 @@ treeConfigs:
         sqlQuery: |
           SELECT schema_name AS name, schema_name AS id
           FROM information_schema.schemata
-          WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'pg_toast', 'pg_temp_1')
-          AND schema_name = ANY (SELECT nspname FROM pg_namespace WHERE nspacl IS NOT NULL)
+          WHERE catalog_name = '{dbName}'
           ORDER BY schema_name;
         actions:
           primary:

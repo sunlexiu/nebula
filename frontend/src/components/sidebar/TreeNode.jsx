@@ -1,10 +1,11 @@
-import React, { useState, memo, useMemo } from 'react';
+import React, { useState, memo } from 'react';
+import { useModal } from '../modals/ModalProvider';          // ← 1. 引入 useModal
 import { useTreeStore } from '../../stores/useTreeStore';
-import { actionHandlers, connectDatabase } from '../../actions/dbActions';  // **修复：添加导入**
+import { actionHandlers, connectDatabase } from '../../actions/dbActions';
 import {
   getExpandIcon,
   getNodeIcon,
-  loadNodeChildren
+  loadNodeChildren,
 } from '../../utils/treeUtils';
 import { getPrimaryAction } from '../../actions/dbActions';
 import {
@@ -20,7 +21,7 @@ import {
   childIndicatorStyles,
   actionContainerStyles,
   dragOverStyles,
-  dragSourceStyles
+  dragSourceStyles,
 } from './styles';
 
 const TreeNode = memo(({
@@ -41,9 +42,10 @@ const TreeNode = memo(({
   openNewGroup,
   openNewConnection,
   openRenameFolder,
-  openEditConnection
+  openEditConnection,
 }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const { openModal } = useModal();
   const isHovered = hoveredNode === node.id;
   const isActive = activeMoreMenuNode === node.id;
   const isDragging = dragSourceId === node.id;
@@ -51,16 +53,16 @@ const TreeNode = memo(({
   const hasChildren = node.children && node.children.length > 0;
   const isExpandable = hasChildren || node.config?.nextLevel || node.virtual || node.type === 'connection' || node.type === 'database' || node.type === 'schema' || node.type.includes('_group');
   const isDraggable = node.type === 'folder' || node.type === 'connection';
-  const isDropTarget = node.type === 'folder' || node.config?.allowDrop;  // config 支持
-  const primaryAction = getPrimaryAction(node);  // 使用 config
-  const theme = getThemeColors(node.type || node.config?.type);  // config.type fallback
+  const isDropTarget = node.type === 'folder' || node.config?.allowDrop;
+  const primaryAction = getPrimaryAction(node);
+  const theme = getThemeColors(node.type || node.config?.type);
   const { updateTreePath } = useTreeStore();
   const isExpanded = node.expanded;
   const isConnected = node.connected;
   if (isConnected) theme.accentColor = '#10b981';
 
-  // useMemo 优化：仅在必要时重新计算样式
-  const combinedStyles = useMemo(() => ({
+  /* -------------- 样式 -------------- */
+  const combinedStyles = {
     ...nodeBaseStyles,
     ...(isDragging && dragSourceStyles),
     ...(isDragOver && dragOverStyles(theme)),
@@ -72,9 +74,9 @@ const TreeNode = memo(({
     boxShadow: (isDragging ? '0 4px 12px rgba(0,0,0,0.2)' : ((isHovered || isActive) ? `0 1px 4px ${theme.accentColor}10` : 'none')),
     opacity: isDragging ? 0.5 : 1,
     paddingRight: (isHovered || isActive) ? '4px' : '8px'
-  }), [isDragging, isDragOver, isHovered, isActive, level, theme, isConnected]);
+  };
 
-  // 拖拽事件：不变
+  /* -------------- 拖拽事件 -------------- */
   const handleDragStart = (e) => {
     if (isDraggable) {
       setDragSourceId(node.id);
@@ -108,17 +110,19 @@ const TreeNode = memo(({
     setDragOverNodeId(null);
   };
 
+  /* -------------- 单击展开 / 加载 -------------- */
   const handleClick = async (e) => {
     e.stopPropagation();
+    if (node.type === 'connection') return;
     if (isExpandable) {
-      if (!hasChildren && !node.virtual) {  // 虚拟节点已加载
+      if (!hasChildren && !node.virtual) {
         setIsLoading(true);
         try {
-          const updatedNode = await loadNodeChildren(node);
-          if (updatedNode && updatedNode.children) {
+          const updated = await loadNodeChildren(node);
+          if (updated && updated.children) {
             updateTreePath(node.id, (current) => ({
               ...current,
-              children: updatedNode.children,
+              children: updated.children,
               expanded: true
             }));
           }
@@ -134,20 +138,18 @@ const TreeNode = memo(({
     }
   };
 
-  const handlePrimaryAction = (e) => {
-    e.stopPropagation();
-    if (primaryAction && !activeMoreMenuNode) {
-      // **修复：传递空 options（openModal 未提供，使用 fallback）**
-      actionHandlers.dynamicHandler(primaryAction.handler || 'defaultAction', node, {});
-      // 对于 connection，连接后加载 children
-      if (node.type === 'connection') {
-        connectDatabase(node).then((ok) => {
-          if (ok) loadNodeChildren(node).then((updated) => updateTreePath(node.id, () => updated));
-        });
-      }
-    }
-  };
+  /* -------------- 主动作（连接/刷新/预览...） -------------- */
+const handlePrimaryAction = async (e) => {
+  e.stopPropagation();
+  if (primaryAction && !activeMoreMenuNode) {
+    await actionHandlers.dynamicHandler(primaryAction.handler, node, {
+      setExpandedKeys,
+      openModal,
+    });
+  }
+};
 
+  /* -------------- 更多菜单 -------------- */
   const handleMoreMenu = (e) => {
     e.stopPropagation();
     if (!activeMoreMenuNode) {
@@ -184,9 +186,7 @@ const TreeNode = memo(({
         {isLoading ? (
           <span style={{ fontSize: 9 }}>⟳</span>
         ) : getExpandIcon(node) ? (
-          <span style={{ fontSize: 9, fontWeight: 'bold' }}>
-            {getExpandIcon(node)}
-          </span>
+          <span style={{ fontSize: 9, fontWeight: 'bold' }}>{getExpandIcon(node)}</span>
         ) : (
           <div style={{ width: 10, height: 10 }} />
         )}

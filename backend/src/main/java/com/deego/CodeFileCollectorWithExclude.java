@@ -9,7 +9,7 @@ public class CodeFileCollectorWithExclude {
 
 	// 支持的代码文件扩展名
 	private static final String[] CODE_EXTENSIONS = {
-			".java", ".xml", ".yml", ".xml"
+			".java", ".xml", ".yml", ".xml", ".js", ".jsx", ".css", ".html"
 	};
 
 	// 要排除的文件夹名称
@@ -21,7 +21,7 @@ public class CodeFileCollectorWithExclude {
 	));
 
 	public static void main(String[] args) {
-		String sourceFolder = "E:\\workspace\\deego\\nebula\\backend";  // 要扫描的源代码文件夹
+		String sourceFolder = "D:\\workspace\\nebula_db\\backend";  // 要扫描的源代码文件夹
 		String outputFile = "all_codes.txt";  // 输出文件
 
 
