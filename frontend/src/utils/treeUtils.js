@@ -47,11 +47,11 @@ export async function loadNodeChildren(node) {
   }
   const connId = findConnectionId(node.id, window.__treeData || []);
   if (!connId) {
-     console.warn('[loadNodeChildren] 找不到所属连接', node);
-     return { ...node, children: [] };
+    console.warn('[loadNodeChildren] 找不到所属连接', node);
+    return { ...node, children: [] };
   }
   const path = buildPath(node);                                    // 拼后端 path
-  const url  = `/api/meta/${connId}/${path}/children`;
+  const url  = `/api/meta/${connId}/children`;
 
   try {
     const res  = await fetch(url);
@@ -71,6 +71,7 @@ export async function loadNodeChildren(node) {
     return { ...node, expanded: false, children: [] };
   }
 }
+
 
 export async function loadDatabasesForConnection(connectionNode) {
   const connId = connectionNode.id;
@@ -100,7 +101,7 @@ function buildPath(node) {
 export function findConnectionId(nodeId, treeData) {
   const find = (nodes, target) => {
     for (const n of nodes) {
-      if (n.id === target && n.type === 'connection') return n.id;
+      if (n.id === target) return n.id;
       if (n.children) {
         const c = find(n.children, target);
         if (c) return c;
@@ -108,7 +109,9 @@ export function findConnectionId(nodeId, treeData) {
     }
     return null;
   };
-  return find(treeData, nodeId);
+  // 分割节点ID以获取连接ID
+  const [connId, , ,] = nodeId.split('::');
+  return find(treeData, connId);
 }
 
 /* -------------- 打补丁：连接节点强制主动作 -------------- */

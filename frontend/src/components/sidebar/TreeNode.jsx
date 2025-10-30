@@ -113,7 +113,6 @@ const TreeNode = memo(({
   /* -------------- 单击展开 / 加载 -------------- */
   const handleClick = async (e) => {
     e.stopPropagation();
-    if (node.type === 'connection') return;
     if (isExpandable) {
       if (!hasChildren && !node.virtual) {
         setIsLoading(true);
@@ -137,6 +136,7 @@ const TreeNode = memo(({
       }
     }
   };
+
 
   /* -------------- 主动作（连接/刷新/预览...） -------------- */
 const handlePrimaryAction = async (e) => {
