@@ -73,6 +73,7 @@ public class TreeService {
 	}
 
 	public List<Map<String, Object>> loadChildren(String connIdStr, String path) {
+		log.debug("Loading children for connId={}, path={}", connIdStr, path);  // 优化：加日志
 		JdbcTemplate jdbc = connectionService.getJdbcTemplate(connIdStr);
 		DbConfig dbConfig = configLoader.getDbConfig(getDbType(connIdStr));
 
@@ -104,10 +105,10 @@ public class TreeService {
 
 			return children.stream()
 						   .map(beanUtils::beanToMap)
-					.toList();
+						   .collect(Collectors.toList());
 
 		} catch (Exception e) {
-			log.error("加载子节点失败: ", e);
+			log.error("加载子节点失败 for connId={}, path={}: ", connIdStr, path, e);  // 优化：加上下文日志
 			throw new BizException(e);
 		}
 	}
@@ -126,11 +127,11 @@ public class TreeService {
 						String sql = replacePlaceholders(extra.getSqlQuery(), new String[0]);
 						List<Map<String, Object>> rows = jdbc.queryForList(sql);
 						for (Map<String, Object> row : rows) {
-							TreeNode node = createLeafNode(row, extra, extraKey, connId);
+							TreeNode node = createLeafNode(row, extra, "", connId);  // 修复：parentPath = ""
 							extras.add(node);
 						}
 					} catch (Exception e) {
-						log.error("加载额外层级失败: ", e);
+						log.error("加载额外层级失败 for extraKey={}, connId={}: ", extraKey, connId, e);  // 优化：加日志
 					}
 				}
 			}
@@ -173,16 +174,29 @@ public class TreeService {
 	private TreeNode createLeafNode(Map<String, Object> row, Object levelConfig, String parentPath, String connId) {
 		parentPath = Objects.isNull(parentPath) ? "" : parentPath;
 		TreeNode node = new TreeNode();
-		String name = (String) row.getOrDefault("name", row.get("id"));
-		String rawId = (String) row.getOrDefault("id", name);
+		// 优化：统一取 id 或 name，避免 null
+		String rawId = Optional.ofNullable((String) row.get("id")).orElseGet(() -> (String) row.get("name"));
+		String name = Optional.ofNullable((String) row.get("name")).orElse(rawId);
 		String uniqueKey = parentPath.isEmpty() ? rawId : parentPath + "/" + rawId;
 		node.setId(connId + "::" + uniqueKey);
 		node.setName(name);
-		node.setType(levelConfig instanceof Level ? ((Level) levelConfig).getType() : ((ChildConfig) levelConfig).getType());
+		// 修复：添加 ExtraLevel 支持
+		if (levelConfig instanceof Level) {
+			node.setType(((Level) levelConfig).getType());
+			node.setIcon(((Level) levelConfig).getIcon());
+		} else if (levelConfig instanceof ChildConfig) {
+			node.setType(((ChildConfig) levelConfig).getType());
+			node.setIcon(((ChildConfig) levelConfig).getIcon());
+		} else if (levelConfig instanceof ExtraLevel) {  // 新增：支持 ExtraLevel
+			node.setType(((ExtraLevel) levelConfig).getType());
+			node.setIcon(((ExtraLevel) levelConfig).getIcon());
+		} else {
+			node.setType("unknown");  // 兜底
+			node.setIcon("default_icon.svg");
+		}
 		if (row.containsKey("subType")) {
 			node.setSubType((String) row.get("subType"));
 		}
-		node.setIcon(levelConfig instanceof Level ? ((Level) levelConfig).getIcon() : ((ChildConfig) levelConfig).getIcon());
 		node.setConnected(true);
 		node.setExpanded(false);
 		node.setConfig(getActionsFromConfig(levelConfig));
@@ -230,15 +244,14 @@ public class TreeService {
 
 	private String replacePlaceholders(String sql, String[] segments) {
 		Map<String, String> placeholders = new HashMap<>();
-		// 数据库层：segments.length == 1，segments[0] = dbName
-		if (segments.length == 1) {
+		if (segments.length >= 1) {
 			placeholders.put(PlaceholderType.DB_NAME.getKey(), segments[0]);
 		}
-		// 更深层：segments.length > 1，例如 [dbName, schemaName]
-		else if (segments.length > 1) {
-			placeholders.put(PlaceholderType.DB_NAME.getKey(), segments[0]);
+		if (segments.length > 1) {
 			placeholders.put(PlaceholderType.SCHEMA_NAME.getKey(), segments[segments.length - 1]);
 		}
+		// 新增：支持 connId（从外部传入，或默认）
+		placeholders.put(PlaceholderType.CONN_ID.getKey(), "当前连接ID");
 		for (PlaceholderType placeholder : PlaceholderType.values()) {
 			String key = placeholder.getKey();
 			if (placeholders.containsKey(key)) {

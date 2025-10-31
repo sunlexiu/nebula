@@ -19,6 +19,6 @@ public enum PlaceholderType {
 	}
 
 	public String getValue() {
-		return "{" + key + "}";  // e.g., {schemaName}
+		return "{" + key + "}";
 	}
 }
