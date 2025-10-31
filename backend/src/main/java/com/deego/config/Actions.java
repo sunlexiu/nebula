@@ -5,6 +5,6 @@ import java.util.List;
 
 @Data
 public class Actions {
-	private PrimaryAction primary;
-	private List<MenuAction> menu;
+    private PrimaryAction primary;
+    private List<MenuAction> menu;
 }

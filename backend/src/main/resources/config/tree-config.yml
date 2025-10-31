@@ -1,299 +1,172 @@
-# config/tree-config.yml
-# PostgreSQL 树结构配置（当前仅针对 PostgreSQL，后续扩展其他 dbType）
 treeConfigs:
   POSTGRESQL:
-    # 连接级别图标
-    icon: "pgsql_icon.svg"
-    # 基础层级定义（从 connection 开始，逐层展开）
-    levels:
-      # 第一层：Databases
-      - type: "database"
-        label: "数据库"
+    defaultIcon: "pgsql_icon.svg"
+    defaultActions:
+      primary: { label: "刷新", icon: "🔄", handler: "refreshNode" }
+      menu:
+        - { label: "属性", icon: "ℹ️", handler: "showProperties" }
+
+    nodes:
+      roles_aggregate:
+        parent: null
+        virtual: true
+        type: "roles"
+        label: "Login/Group Roles"
+        position: 1
+        children: { users: "users_real" }
+        actions:
+          menu:
+            - { label: "新建角色", icon: "➕", handler: "createRole" }
+
+      databases_aggregate:
+        parent: null
+        virtual: true
+        type: "databases"
+        label: "Databases"
+        position: 2
+        nextLevel: "dbs_real"
+        actions:
+          menu:
+            - { label: "新建数据库", icon: "➕", handler: "createNewDatabase" }
+
+      dbs_real:
+        parent: "databases_aggregate"
+        virtual: false
+        type: "database"
         icon: "db_icon.svg"
-        # SQL 查询模板：占位符如 {connId} 将由后端替换为实际连接参数
         sqlQuery: |
           SELECT datname AS name, datname AS id
           FROM pg_database
           WHERE datistemplate = false AND datallowconn = true
           ORDER BY datname;
-        # 动作配置（primary 为默认主动作，menu 为右键菜单项）
-        actions:
-          primary:
-            label: "刷新"
-            icon: "🔄"
-            handler: "refreshDatabase"  # 前端函数名或后端端点
-          menu:
-            - label: "新建 Schema"
-              icon: "📁"
-              handler: "createNewSchema"
-            - label: "导出结构"
-              icon: "📤"
-              handler: "exportDatabase"
-            - type: "separator"
-            - label: "删除数据库"
-              icon: "🗑️"
-              handler: "deleteDatabase"
-              variant: "danger"
-            - label: "属性"
-              icon: "ℹ️"
-              handler: "showProperties"
-        # 下一层引用
-        nextLevel: "schema"
-      # 第二层：Schemas
-      - type: "schema"
-        label: "Schema"
+        nextLevel: "db_subs_virtual"
+
+      db_subs_virtual:
+        parent: "dbs_real"
+        virtual: true
+        type: "db_subs"
+        label: null
+        icon: null
+        children:
+          casts: "casts_virtual"
+          extensions: "extensions_virtual"
+          schemas: "schemas_aggregate"
+
+      casts_virtual:
+        parent: "db_subs_virtual"
+        virtual: true
+        type: "casts"
+        label: "Casts"
+        icon: "casts_icon.svg"
+        children: {}
+
+      extensions_virtual:
+        parent: "db_subs_virtual"
+        virtual: true
+        type: "extensions"
+        label: "Extensions"
+        icon: "extension_icon.svg"
+        children: {}
+
+      schemas_aggregate:
+        parent: "db_subs_virtual"
+        virtual: true
+        type: "schemas"
+        label: "Schemas"
+        icon: "schema_icon.svg"
+        nextLevel: "schemas_real"
+
+      schemas_real:
+        parent: "schemas_aggregate"
+        virtual: false
+        type: "schema"
         icon: "schema_icon.svg"
         sqlQuery: |
-          SELECT schema_name AS name, schema_name AS id
-          FROM information_schema.schemata
-          WHERE catalog_name = '{dbName}'
-          ORDER BY schema_name;
-        actions:
-          primary:
-            label: "刷新"
-            icon: "🔄"
-            handler: "refreshSchema"
-          menu:
-            - label: "新建表"
-              icon: "📊"
-              handler: "createNewTable"
-            - label: "新建视图"
-              icon: "👁️"
-              handler: "createNewView"
-            - label: "新建函数"
-              icon: "⚙️"
-              handler: "createNewFunction"
-            - type: "separator"
-            - label: "导出结构"
-              icon: "📤"
-              handler: "exportSchema"
-            - label: "删除 Schema"
-              icon: "🗑️"
-              handler: "deleteSchema"
-              variant: "danger"
-            - label: "属性"
-              icon: "ℹ️"
-              handler: "showProperties"
-        nextLevel: "objects"  # 指向聚合层
-      # 第三层：Objects（聚合层：支持多种子类型，自动创建虚拟聚合节点）
-      - type: "objects"
-        label: "对象"
-        icon: "objects_icon.svg"  # 默认聚合图标
-        # 无直接 SQL，此层为虚拟聚合，根据 groupBy 执行子查询
-        groupBy:  # 定义子类型分组，每个分组为一个虚拟节点
-          # Tables 分组
-          tables:
-            type: "table_group"  # 虚拟聚合节点类型
-            label: "Tables"  # 聚合节点显示标签
-            icon: "tables_group.svg"
-            sqlQuery: |
-              SELECT table_name AS name, table_name AS id, 'table' AS subType
-              FROM information_schema.tables
-              WHERE table_schema = '{schemaName}'  # 占位符：当前 schema
-              AND table_type = 'BASE TABLE'
-              ORDER BY table_name;
-            actions:
-              primary:
-                label: "预览"
-                icon: "📊"
-                handler: "previewTable"
-              menu: []  # 聚合节点无额外菜单，或继承子节点
-            # 子节点配置（注入到每个 table 节点）
-            childConfig:
-              type: "table"
-              icon: "table_icon.svg"
-              actions:
-                primary:
-                  label: "预览数据"
-                  icon: "📊"
-                  handler: "previewTable"
-                menu:
-                  - label: "编辑结构"
-                    icon: "✏️"
-                    handler: "editTableStructure"
-                  - label: "生成 SQL"
-                    icon: "💾"
-                    handler: "generateTableSQL"
-                  - label: "导出数据"
-                    icon: "📤"
-                    handler: "exportTableData"
-                  - type: "separator"
-                  - label: "删除表"
-                    icon: "🗑️"
-                    handler: "deleteTable"
-                    variant: "danger"
-          # Views 分组
-          views:
-            type: "view_group"
-            label: "Views"
-            icon: "views_group.svg"
-            sqlQuery: |
-              SELECT table_name AS name, table_name AS id, 'view' AS subType
-              FROM information_schema.views
-              WHERE table_schema = '{schemaName}'
-              ORDER BY table_name;
-            actions:
-              primary:
-                label: "查看定义"
-                icon: "👁️"
-                handler: "viewDefinition"
-              menu: []
-            childConfig:
-              type: "view"
-              icon: "view_icon.svg"
-              actions:
-                primary:
-                  label: "查看定义"
-                  icon: "👁️"
-                  handler: "viewDefinition"
-                menu:
-                  - label: "编辑视图"
-                    icon: "✏️"
-                    handler: "editView"
-                  - label: "生成 SQL"
-                    icon: "💾"
-                    handler: "generateViewSQL"
-                  - type: "separator"
-                  - label: "删除视图"
-                    icon: "🗑️"
-                    handler: "deleteView"
-                    variant: "danger"
-          # Materialized Views 分组
-          materialized_views:
-            type: "mview_group"
-            label: "Materialized Views"
-            icon: "mviews_group.svg"
-            sqlQuery: |
-              SELECT matviewname AS name, matviewname AS id, 'materialized_view' AS subType
-              FROM pg_matviews
-              WHERE schemaname = '{schemaName}'
-              ORDER BY matviewname;
-            actions:
-              primary:
-                label: "预览"
-                icon: "📊"
-                handler: "previewTable"  # 复用 table 预览
-              menu: []
-            childConfig:
-              type: "materialized_view"
-              icon: "mview_icon.svg"
-              actions:
-                primary:
-                  label: "预览数据"
-                  icon: "📊"
-                  handler: "previewTable"
-                menu:
-                  - label: "刷新物化视图"
-                    icon: "🔄"
-                    handler: "refreshMaterializedView"
-                  - label: "编辑结构"
-                    icon: "✏️"
-                    handler: "editTableStructure"
-                  - type: "separator"
-                  - label: "删除物化视图"
-                    icon: "🗑️"
-                    handler: "deleteView"  # 复用 view 删除
-                    variant: "danger"
-          # Functions 分组
-          functions:
-            type: "function_group"
-            label: "Functions"
-            icon: "functions_group.svg"
-            sqlQuery: |
-              SELECT p.proname AS name,
-                     p.proname || '(' || pg_get_function_arguments(p.oid) || ')' AS id,
-                     'function' AS subType,
-                     pg_get_function_arguments(p.oid) AS args
-              FROM pg_proc p
-              JOIN pg_namespace n ON p.pronamespace = n.oid
-              WHERE n.nspname = '{schemaName}'
-              AND p.prokind = 'f'  # 函数
-              ORDER BY p.proname;
-            actions:
-              primary:
-                label: "编辑"
-                icon: "⚙️"
-                handler: "editFunction"
-              menu: []
-            childConfig:
-              type: "function"
-              icon: "function_icon.svg"
-              actions:
-                primary:
-                  label: "编辑函数"
-                  icon: "✏️"
-                  handler: "editFunction"
-                menu:
-                  - label: "查看源码"
-                    icon: "👁️"
-                    handler: "viewFunctionSource"
-                  - label: "执行测试"
-                    icon: "🔬"
-                    handler: "testFunction"
-                  - type: "separator"
-                  - label: "删除函数"
-                    icon: "🗑️"
-                    handler: "deleteFunction"
-                    variant: "danger"
-        # 聚合层通用动作（继承到虚拟节点）
-        actions:
-          primary:
-            label: "展开"
-            icon: "▶"
-            handler: "toggleExpand"
-          menu:
-            - label: "刷新"
-              icon: "🔄"
-              handler: "refreshObjects"
-    # 额外可选层级（全局或特定位置插入，如在 databases 旁）
-    extraLevels:
-      # Publications（全局或在 connection 下一级）
-      publications:
-        type: "publications"
-        label: "Publications"
-        icon: "publications_icon.svg"
+          SELECT nspname AS name, nspname AS id
+          FROM pg_namespace
+          WHERE nspname NOT IN ('pg_catalog', 'information_schema')
+          ORDER BY nspname;
+        nextLevel: "schema_subs_virtual"
+
+      schema_subs_virtual:
+        parent: "schemas_real"
+        virtual: true
+        type: "schema_subs"
+        label: null
+        icon: null
+        children:
+          tables: "tables_group"
+          views: "views_group"
+          functions: "functions_group"
+
+      tables_group:
+        parent: "schema_subs_virtual"
+        virtual: true
+        type: "tables"
+        label: "Tables"
+        icon: "table_icon.svg"
+        nextLevel: "tables_real"
+
+      tables_real:
+        parent: "tables_group"
+        virtual: false
+        type: "table"
+        icon: "table_icon.svg"
         sqlQuery: |
-          SELECT pubname AS name, pubname AS id
-          FROM pg_publication
-          ORDER BY pubname;
-        actions:
-          primary:
-            label: "查看"
-            icon: "👁️"
-            handler: "viewPublication"
-          menu:
-            - label: "新建 Publication"
-              icon: "➕"
-              handler: "createPublication"
-            - type: "separator"
-            - label: "删除"
-              icon: "🗑️"
-              handler: "deletePublication"
-              variant: "danger"
-        # 可作为 connection 的并行子层（非树状嵌套）
-        position: "connection"  # 插入位置：connection, database 等
-      # Roles/Users（全局）
-      roles:
-        type: "roles"
-        label: "Roles/Users"
-        icon: "roles_icon.svg"
+          SELECT c.relname AS name, c.relname AS id
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE c.relkind = 'r'
+            AND n.nspname NOT IN ('pg_catalog','information_schema')
+          ORDER BY c.relname;
+
+      views_group:
+        parent: "schema_subs_virtual"
+        virtual: true
+        type: "views"
+        label: "Views"
+        icon: "view_icon.svg"
+        nextLevel: "views_real"
+
+      views_real:
+        parent: "views_group"
+        virtual: false
+        type: "view"
+        icon: "view_icon.svg"
+        sqlQuery: |
+          SELECT c.relname AS name, c.relname AS id
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE c.relkind = 'v'
+            AND n.nspname NOT IN ('pg_catalog','information_schema')
+          ORDER BY c.relname;
+
+      functions_group:
+        parent: "schema_subs_virtual"
+        virtual: true
+        type: "functions"
+        label: "Functions"
+        icon: "function_icon.svg"
+        nextLevel: "functions_real"
+
+      functions_real:
+        parent: "functions_group"
+        virtual: false
+        type: "function"
+        icon: "function_icon.svg"
+        sqlQuery: |
+          SELECT p.proname AS name, p.oid::text AS id
+          FROM pg_proc p
+          JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname NOT IN ('pg_catalog','information_schema')
+          ORDER BY p.proname;
+
+      users_real:
+        parent: "roles_aggregate"
+        virtual: false
+        type: "role"
+        icon: "user_icon.svg"
         sqlQuery: |
           SELECT rolname AS name, rolname AS id
           FROM pg_roles
-          WHERE rolcanlogin = true
           ORDER BY rolname;
-        actions:
-          primary:
-            label: "属性"
-            icon: "ℹ️"
-            handler: "showRoleProperties"
-          menu:
-            - label: "新建角色"
-              icon: "➕"
-              handler: "createRole"
-            - type: "separator"
-            - label: "删除角色"
-              icon: "🗑️"
-              handler: "deleteRole"
-              variant: "danger"
-        position: "connection"  # 插入到 connection 下一级

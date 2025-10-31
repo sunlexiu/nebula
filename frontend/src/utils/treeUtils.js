@@ -7,6 +7,8 @@ import fileGroupIcon from '../public/icons/left_tree/file_group_1.svg';
 import folderIcon    from '../public/icons/left_tree/folder_1.svg';
 import folderOpenIcon from '../public/icons/left_tree/folder_open_1.svg';
 import dbIcon   from '../public/icons/left_tree/db_1.svg';
+import dbsIcon   from '../public/icons/left_tree/dbs.svg';
+import rolesIcon   from '../public/icons/left_tree/roles_1.svg';
 import schemaIcon from '../public/icons/left_tree/schema_1.svg';
 import tableIcon  from '../public/icons/left_tree/table_1.svg';
 import viewIcon   from '../public/icons/left_tree/view_1.svg';
@@ -25,12 +27,20 @@ export const getNodeIcon = node => {
       default:           return dbIcon;
     }
   }
-  const map = { folder: node.expanded ? folderOpenIcon : folderIcon,
-                database: dbIcon,
-                schema: schemaIcon,
-                table: tableIcon,
-                view: viewIcon,
-                function: functionIcon };
+    // 默认图标映射：当 YAML 未提供 config.icon 时使用
+    // 注：聚合节点保持原 type（databases / roles），这里给出兜底
+    const map = {
+        folder:   node.expanded ? folderOpenIcon : folderIcon,
+        // 顶层虚拟聚合
+        databases: dbsIcon,        // Databases 聚合
+        roles:     rolesIcon,      // Roles 聚合（无专用图标时用分组图标兜底）
+        // 实体节点
+        database: dbIcon,
+        schema:   schemaIcon,
+        table:    tableIcon,
+        view:     viewIcon,
+        function: functionIcon,
+    };
   return map[node.type] || fileGroupIcon;
 };
 
@@ -83,10 +93,10 @@ export async function loadDatabasesForConnection(connectionNode) {
   const items = Array.isArray(json.data) ? json.data : [];
   // 注入下一层 config（database 层）
     return items.map(it => ({
-     ...it,
-     parentId: connId,
-     connected: true,
-     config: it.config || { type: 'database', icon: it.icon }
+      ...it,
+      parentId: connId,
+      connected: true,
+      config: it.config || { type: it.type, icon: it.icon }
     }));
 }
 

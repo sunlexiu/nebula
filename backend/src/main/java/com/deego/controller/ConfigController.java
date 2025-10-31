@@ -1,5 +1,6 @@
 package com.deego.controller;
 
+import com.deego.config.TreeConfigLoader;
 import com.deego.model.Connection;
 import com.deego.model.Folder;
 import com.deego.service.ConnectionService;
@@ -25,6 +26,8 @@ public class ConfigController {
 	private FolderService folderService;
 	@Autowired
 	private BeanUtils beanUtils;
+	@Autowired
+	private TreeConfigLoader configLoader;
 
 	@GetMapping("/tree")
 	public ResponseEntity<List<Map<String, Object>>> getTree() {
@@ -92,9 +95,17 @@ public class ConfigController {
 	}
 
 	@GetMapping("/connections/{id}/config")
-	public ResponseEntity<Map<String, Object>> getConfig(@PathVariable String id) {
-		// 返回 YAML config for conn (简化，返回全 POSTGRESQL config)
-		Map<String, Object> config = Map.of("dbType", "POSTGRESQL", "actions", Map.of()); // 从 loader
-		return ResponseEntity.ok(config);
-	}
+    public ResponseEntity<Map<String, Object>> getConfig(@PathVariable String id) {
+        return connectionService.getConnection(id)
+            .map(conn -> {
+                var db = configLoader.getDbConfig(conn.getDbType());
+                Map<String,Object> resp = new java.util.LinkedHashMap<>();
+                resp.put("dbType", conn.getDbType());
+                resp.put("defaultIcon", db != null ? db.getDefaultIcon() : null);
+                resp.put("defaultActions", db != null ? db.getDefaultActions() : null);
+                resp.put("nodes", db != null ? db.getNodes() : java.util.Map.of());
+                return ResponseEntity.ok(resp);
+            })
+            .orElseGet(() -> ResponseEntity.notFound().build());
+    }
 }

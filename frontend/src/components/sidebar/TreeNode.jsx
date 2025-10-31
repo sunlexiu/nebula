@@ -114,7 +114,7 @@ const TreeNode = memo(({
   const handleClick = async (e) => {
     e.stopPropagation();
     if (isExpandable) {
-      if (!hasChildren && !node.virtual) {
+      if (!hasChildren) {
         setIsLoading(true);
         try {
           const updated = await loadNodeChildren(node);

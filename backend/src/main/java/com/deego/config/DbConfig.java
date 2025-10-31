@@ -3,19 +3,12 @@ package com.deego.config;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
-
-import java.util.List;
-import java.util.Map;  // 改为 Map
+import java.util.LinkedHashMap;
 
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class DbConfig {
-	@JsonProperty("icon")
-	private String icon;
-
-	@JsonProperty("levels")
-	private List<Level> levels;
-
-	@JsonProperty("extraLevels")
-	private Map<String, ExtraLevel> extraLevels;
+    @JsonProperty("defaultIcon")    private String defaultIcon;
+    @JsonProperty("defaultActions") private Actions defaultActions;
+    @JsonProperty("nodes")          private LinkedHashMap<String, NodeDef> nodes;
 }
