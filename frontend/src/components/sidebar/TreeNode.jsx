@@ -6,6 +6,7 @@ import {
   getExpandIcon,
   getNodeIcon,
   loadNodeChildren,
+  isExpandable
 } from '../../utils/treeUtils';
 import { getPrimaryAction } from '../../actions/dbActions';
 import {

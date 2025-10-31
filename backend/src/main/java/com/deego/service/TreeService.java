@@ -116,11 +116,29 @@ public class TreeService {
     private List<Map<String, Object>> expandNode(Connection conn, LinkedHashMap<String, NodeDef> reg, String nodeKey, NodeDef def, String parentId) {
         if (def.isVirtual() && def.getChildren() != null && !def.getChildren().isEmpty()) {
             return def.getChildren().entrySet().stream()
-                    .map(e -> {
-                        String childKey = e.getValue();
-                        NodeDef childDef = reg.get(childKey);
-                        return toNodeMap(conn, childKey, childDef, parentId);
-                    }).collect(Collectors.toList());
+                      .map(e -> {
+                          String alias = e.getKey();       // YAML 中的别名，如 "users"
+                          String childKey = e.getValue();  // 真正的节点 key，如 "users_real"
+                          NodeDef childDef = reg.get(childKey);
+
+                          Map<String, Object> m = toNodeMap(conn, childKey, childDef, parentId);
+
+                          // 用别名作为展示名（首字母大写，_ 转空格）
+                          if (alias != null && !alias.isBlank() && !alias.equals(childKey)) {
+                              String pretty = alias.replace('_', ' ');
+                              pretty = pretty.substring(0, 1).toUpperCase() + pretty.substring(1);
+                              m.put("name", pretty);  // “Users”
+                          }
+
+                          // 若虚拟子分组有 nextLevel，则透传到 config，让前端识别为可展开
+                          if (childDef != null && childDef.getNextLevel() != null) {
+                              @SuppressWarnings("unchecked")
+                              Map<String, Object> cfg = (Map<String, Object>) m.get("config");
+                              if (cfg != null) cfg.put("nextLevel", childDef.getNextLevel());
+                          }
+                          return m;
+                      })
+                      .collect(Collectors.toList());
         }
         if (def.isVirtual() && def.getNextLevel() != null) {
             String nextKey = def.getNextLevel();
@@ -227,7 +245,10 @@ public class TreeService {
         }
         m.put("config", cfg);
         m.put("virtual", def.isVirtual());
-        m.put("connected", conn.getConnected() != null ? conn.getConnected() : Boolean.TRUE);
+        boolean isConnectionType = "connection".equalsIgnoreCase(def.getType());
+        m.put("connected", isConnectionType
+                ? (conn.getConnected() != null ? conn.getConnected() : Boolean.TRUE)
+                : Boolean.TRUE);
         m.put("children", new ArrayList<>());
         return m;
     }

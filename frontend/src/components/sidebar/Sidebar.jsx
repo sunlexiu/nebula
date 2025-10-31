@@ -1,3 +1,4 @@
+// src/components/sidebar/Sidebar.jsx
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import TreeContainer from './TreeContainer';
@@ -5,9 +6,42 @@ import MoreActionsMenu from './MoreActionsMenu';
 import deegoLogo from '../../public/icons/deego_1.svg';
 import { useTreeStore } from '../../stores/useTreeStore';
 import { useModal } from '../modals/ModalProvider';
-import { openNewGroup, openNewConnection, openConfirm, openRenameFolder, openEditConnection } from '../modals/modalActions';
+import {
+  openNewGroup,
+  openNewConnection,
+  openConfirm,
+  openRenameFolder,
+  openEditConnection
+} from '../modals/modalActions';
 import { refreshFolder, deleteFolder } from '../../actions/treeActions';
-import { connectDatabase, disconnectDatabase, refreshConnection, deleteConnection, refreshDatabase, refreshSchema, createNewSchema, exportDatabase, createNewTable, exportSchema, previewTable, editTableStructure, generateTableSQL, exportTableData, viewDefinition, editView, generateViewSQL, editFunction, viewFunctionSource, testFunction, showProperties, deleteDatabase, deleteSchema, deleteTable, deleteView, deleteFunction } from '../../actions/dbActions';
+import {
+  connectDatabase,
+  disconnectDatabase,
+  refreshConnection,
+  deleteConnection,
+  refreshDatabase,
+  refreshSchema,
+  createNewSchema,
+  exportDatabase,
+  createNewTable,
+  exportSchema,
+  previewTable,
+  editTableStructure,
+  generateTableSQL,
+  exportTableData,
+  viewDefinition,
+  editView,
+  generateViewSQL,
+  editFunction,
+  viewFunctionSource,
+  testFunction,
+  showProperties,
+  deleteDatabase,
+  deleteSchema,
+  deleteTable,
+  deleteView,
+  deleteFunction
+} from '../../actions/dbActions';
 import { useDragDrop } from './hooks/useDragDrop';
 import { findNode } from '../../utils/treeUtils';
 
@@ -17,11 +51,12 @@ const Sidebar = ({ treeData }) => {
   const [moreMenuPosition, setMoreMenuPosition] = useState({ x: 0, y: 0, flip: false });
   const [activeMoreMenuNode, setActiveMoreMenuNode] = useState(null);
   const [hoveredNode, setHoveredNode] = useState(null);
+
   const { openModal } = useModal();
-  const { dragSourceId, setDragSourceId, dragOverNodeId, setDragOverNodeId, isDragOverRoot, setIsDragOverRoot } = useDragDrop();
+  const { dragSourceId, setDragSourceId, dragOverNodeId, setDragOverNodeId, isDragOverRoot, setIsDragOverRoot } =
+    useDragDrop();
   const updateTreePath = useTreeStore((state) => state.updateTreePath);
 
-  // 外部点击关闭菜单：不变
   useEffect(() => {
     if (!showMoreMenu) return;
     const handleClickOutside = (event) => {
@@ -37,14 +72,24 @@ const Sidebar = ({ treeData }) => {
 
   useEffect(() => {
     if (!showMoreMenu) return;
-    const onKey = (e) => { if (e.key === 'Escape') { setShowMoreMenu(null); setActiveMoreMenuNode(null); setMoreMenuPosition({ x: 0, y: 0, flip: false });} };
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setShowMoreMenu(null);
+        setActiveMoreMenuNode(null);
+        setMoreMenuPosition({ x: 0, y: 0, flip: false });
+      }
+    };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [showMoreMenu]);
 
   useEffect(() => {
     if (!showMoreMenu) return;
-    const close = () => { setShowMoreMenu(null); setActiveMoreMenuNode(null); setMoreMenuPosition({ x: 0, y: 0, flip: false });};
+    const close = () => {
+      setShowMoreMenu(null);
+      setActiveMoreMenuNode(null);
+      setMoreMenuPosition({ x: 0, y: 0, flip: false });
+    };
     window.addEventListener('scroll', close, true);
     window.addEventListener('resize', close);
     return () => {
@@ -97,7 +142,10 @@ const Sidebar = ({ treeData }) => {
       <MoreActionsMenu
         node={node}
         position={moreMenuPosition}
-        onClose={() => { setShowMoreMenu(null); setActiveMoreMenuNode(null); }}
+        onClose={() => {
+          setShowMoreMenu(null);
+          setActiveMoreMenuNode(null);
+        }}
         setExpandedKeys={setExpandedKeys}
         openNewGroup={(parentId) => openNewGroup(parentId, openModal)}
         openNewConnection={(parentId) => openNewConnection(parentId, openModal)}
@@ -107,7 +155,7 @@ const Sidebar = ({ treeData }) => {
         refreshFolder={(node) => refreshFolder(node)}
         deleteFolder={(node) => deleteFolder(node, openModal)}
         refreshConnection={(node, setExpandedKeys) => refreshConnection(node, setExpandedKeys)}
-        connectDatabase={(node) => connectDatabase(node)}  // 已集成配置加载
+        connectDatabase={(node) => connectDatabase(node)} // 已集成配置加载
         disconnectDatabase={(node) => disconnectDatabase(node)}
         refreshDatabase={(node, setExpandedKeys) => refreshDatabase(node, setExpandedKeys)}
         refreshSchema={(node, setExpandedKeys) => refreshSchema(node, setExpandedKeys)}
@@ -139,14 +187,26 @@ const Sidebar = ({ treeData }) => {
 
   return (
     <>
-      <div className="sidebar-tree">
+      {/* 让左侧树具备独立滚动：父容器列布局占满高度，树列表区域 overflow-y:auto */}
+      <div
+        className="sidebar-tree"
+        style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}
+      >
+        {/* 顶部卡片不参与滚动，保持固定 */}
         <div style={{ padding: '0 16px', marginBottom: '20px' }}>
           <div
             style={{
-              display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '10px',
-              boxShadow: '0 4px 14px rgba(102, 126, 234, 0.2)', marginBottom: '16px', color: 'white',
-              transition: 'all 0.3s ease', cursor: 'pointer'
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 16px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderRadius: '10px',
+              boxShadow: '0 4px 14px rgba(102, 126, 234, 0.2)',
+              marginBottom: '16px',
+              color: 'white',
+              transition: 'all 0.3s ease',
+              cursor: 'pointer'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-2px)';
@@ -165,28 +225,33 @@ const Sidebar = ({ treeData }) => {
             </div>
           </div>
         </div>
-        <TreeContainer
-          treeData={treeData}
-          expandedKeys={expandedKeys}
-          setExpandedKeys={setExpandedKeys}
-          hoveredNode={hoveredNode}
-          setHoveredNode={setHoveredNode}
-          onMoreMenu={handleMoreMenu}
-          activeMoreMenuNode={activeMoreMenuNode}
-          setActiveMoreMenuNode={setActiveMoreMenuNode}
-          dragSourceId={dragSourceId}
-          setDragSourceId={setDragSourceId}
-          dragOverNodeId={dragOverNodeId}
-          setDragOverNodeId={setDragOverNodeId}
-          isDragOverRoot={isDragOverRoot}
-          setIsDragOverRoot={setIsDragOverRoot}
-          openNewGroup={(parentId) => openNewGroup(parentId, openModal)}
-          openNewConnection={(parentId) => openNewConnection(parentId, openModal)}
-          openRenameFolder={(node) => openRenameFolder(node, openModal)}
-          openEditConnection={(connection) => openEditConnection(connection, openModal)}
-          openModal={openModal}
-        />
+
+        {/* 树列表滚动容器 */}
+        <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+          <TreeContainer
+            treeData={treeData}
+            expandedKeys={expandedKeys}
+            setExpandedKeys={setExpandedKeys}
+            hoveredNode={hoveredNode}
+            setHoveredNode={setHoveredNode}
+            onMoreMenu={handleMoreMenu}
+            activeMoreMenuNode={activeMoreMenuNode}
+            setActiveMoreMenuNode={setActiveMoreMenuNode}
+            dragSourceId={dragSourceId}
+            setDragSourceId={setDragSourceId}
+            dragOverNodeId={dragOverNodeId}
+            setDragOverNodeId={setDragOverNodeId}
+            isDragOverRoot={isDragOverRoot}
+            setIsDragOverRoot={setIsDragOverRoot}
+            openNewGroup={(parentId) => openNewGroup(parentId, openModal)}
+            openNewConnection={(parentId) => openNewConnection(parentId, openModal)}
+            openRenameFolder={(node) => openRenameFolder(node, openModal)}
+            openEditConnection={(connection) => openEditConnection(connection, openModal)}
+            openModal={openModal}
+          />
+        </div>
       </div>
+
       {renderMoreMenuPortal()}
     </>
   );

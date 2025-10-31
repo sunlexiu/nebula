@@ -33,7 +33,6 @@ treeConfigs:
         parent: "databases_aggregate"
         virtual: false
         type: "database"
-        icon: "db_icon.svg"
         sqlQuery: |
           SELECT datname AS name, datname AS id
           FROM pg_database
@@ -57,7 +56,6 @@ treeConfigs:
         virtual: true
         type: "casts"
         label: "Casts"
-        icon: "casts_icon.svg"
         children: {}
 
       extensions_virtual:
@@ -65,7 +63,6 @@ treeConfigs:
         virtual: true
         type: "extensions"
         label: "Extensions"
-        icon: "extension_icon.svg"
         children: {}
 
       schemas_aggregate:
@@ -73,14 +70,12 @@ treeConfigs:
         virtual: true
         type: "schemas"
         label: "Schemas"
-        icon: "schema_icon.svg"
         nextLevel: "schemas_real"
 
       schemas_real:
         parent: "schemas_aggregate"
         virtual: false
         type: "schema"
-        icon: "schema_icon.svg"
         sqlQuery: |
           SELECT nspname AS name, nspname AS id
           FROM pg_namespace
@@ -104,14 +99,12 @@ treeConfigs:
         virtual: true
         type: "tables"
         label: "Tables"
-        icon: "table_icon.svg"
         nextLevel: "tables_real"
 
       tables_real:
         parent: "tables_group"
         virtual: false
         type: "table"
-        icon: "table_icon.svg"
         sqlQuery: |
           SELECT c.relname AS name, c.relname AS id
           FROM pg_class c
@@ -125,14 +118,12 @@ treeConfigs:
         virtual: true
         type: "views"
         label: "Views"
-        icon: "view_icon.svg"
         nextLevel: "views_real"
 
       views_real:
         parent: "views_group"
         virtual: false
         type: "view"
-        icon: "view_icon.svg"
         sqlQuery: |
           SELECT c.relname AS name, c.relname AS id
           FROM pg_class c
@@ -146,14 +137,12 @@ treeConfigs:
         virtual: true
         type: "functions"
         label: "Functions"
-        icon: "function_icon.svg"
         nextLevel: "functions_real"
 
       functions_real:
         parent: "functions_group"
         virtual: false
         type: "function"
-        icon: "function_icon.svg"
         sqlQuery: |
           SELECT p.proname AS name, p.oid::text AS id
           FROM pg_proc p
@@ -165,7 +154,6 @@ treeConfigs:
         parent: "roles_aggregate"
         virtual: false
         type: "role"
-        icon: "user_icon.svg"
         sqlQuery: |
           SELECT rolname AS name, rolname AS id
           FROM pg_roles
