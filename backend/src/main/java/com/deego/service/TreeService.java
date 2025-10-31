@@ -230,9 +230,14 @@ public class TreeService {
 
 	private String replacePlaceholders(String sql, String[] segments) {
 		Map<String, String> placeholders = new HashMap<>();
-		if (segments.length > 1) {
-			placeholders.put(PlaceholderType.SCHEMA_NAME.getKey(), segments[segments.length - 1]);
+		// 数据库层：segments.length == 1，segments[0] = dbName
+		if (segments.length == 1) {
 			placeholders.put(PlaceholderType.DB_NAME.getKey(), segments[0]);
+		}
+		// 更深层：segments.length > 1，例如 [dbName, schemaName]
+		else if (segments.length > 1) {
+			placeholders.put(PlaceholderType.DB_NAME.getKey(), segments[0]);
+			placeholders.put(PlaceholderType.SCHEMA_NAME.getKey(), segments[segments.length - 1]);
 		}
 		for (PlaceholderType placeholder : PlaceholderType.values()) {
 			String key = placeholder.getKey();

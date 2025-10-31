@@ -280,7 +280,7 @@ treeConfigs:
         sqlQuery: |
           SELECT rolname AS name, rolname AS id
           FROM pg_roles
-          WHERE rolcanlogin = true  # 可登录用户
+          WHERE rolcanlogin = true
           ORDER BY rolname;
         actions:
           primary:
