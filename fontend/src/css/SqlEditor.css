@@ -1,0 +1,63 @@
+/** SqlEditor.css **/
+.sql-editor {
+  flex: 1;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 6;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.codemirror-custom {
+  width: 100%;
+  height: 100%;
+  min-height: 80px;
+  border: 1px solid #e1e5e9;
+  border-radius: 6px;
+  font-family: 'Fira Code', 'SF Mono', Monaco, Consolas, monospace; /* 优化字体栈 */
+  font-size: 14px; /* 增加字体大小，提升可读性 */
+  line-height: 1.6; /* 调整行高，增加间距 */
+  color: #1a1a1a;
+  background: #fdfdfd;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: none;
+}
+
+.codemirror-custom .cm-scroller {
+  overflow-y: auto;
+  overflow-x: auto;
+  box-sizing: border-box;
+}
+
+.codemirror-custom .cm-content {
+  padding: 12px;
+}
+
+/* 聚焦时的样式 */
+.codemirror-custom.cm-focused {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(11, 105, 255, 0.1);
+}
+
+/* 占位符样式 */
+.codemirror-custom .cm-placeholder {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* 拖拽时禁用指针事件 */
+.editor-area.dragging .codemirror-custom {
+  pointer-events: none;
+}
+
+/* 拖拽时禁用过渡 */
+.editor-area.dragging,
+.editor-area.dragging * {
+  transition: none !important;
+}
+
+// =========================================
