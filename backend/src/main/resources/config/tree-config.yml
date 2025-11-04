@@ -68,7 +68,7 @@ treeConfigs:
         label: "Extensions"
         children: {}
 
-      # ===== Schemas (kept, with id accumulating db + '.' + schema) =====
+      # ===== Schemas (kept) =====
       schemas_aggregate:
         parent: "db_subs_virtual"
         virtual: true
@@ -83,14 +83,14 @@ treeConfigs:
         sqlQuery: |
           SELECT
             nspname AS name,
-            -- id 累加： db.schema
+            -- id: db.schema
             ('{parentId}' || '.' || nspname) AS id
           FROM pg_namespace
           WHERE nspname NOT IN ('pg_catalog','information_schema')
           ORDER BY nspname;
         nextLevel: "schema_subs_virtual"
 
-      # ===== Schema subs: add tables / views / matviews / sequences / functions / procedures =====
+      # ===== Schema subs =====
       schema_subs_virtual:
         parent: "schemas_real"
         virtual: true
@@ -120,12 +120,12 @@ treeConfigs:
         sqlQuery: |
           SELECT
             c.relname AS name,
-            -- id 累加： db.schema.table
-            ('.' || c.relname) AS id
+            -- id: db.schema.table  (child must be fully-qualified for next URLs)
+            ('{parentId}' || '.' || c.relname) AS id
           FROM pg_class c
           JOIN pg_namespace n ON n.oid = c.relnamespace
-          WHERE c.relkind = 'r'
-            AND n.nspname = '{schemaName}'
+          WHERE c.relkind IN ('r')
+            AND n.nspname = split_part('{parentId}','.',2)
           ORDER BY c.relname;
         nextLevel: "table_subs_virtual"
 
@@ -156,13 +156,13 @@ treeConfigs:
         sqlQuery: |
           SELECT
             a.attname AS name,
-            -- id 累加： db.schema.table.column
-            ('.' || a.attname) AS id
+            -- id: db.schema.table.column
+            ('{parentId}' || '.' || a.attname) AS id
           FROM pg_attribute a
           JOIN pg_class c ON c.oid = a.attrelid
           JOIN pg_namespace n ON n.oid = c.relnamespace
-          WHERE n.nspname = split_part('{parentId}','.',1)
-            AND c.relname = split_part('{parentId}','.',2)
+          WHERE n.nspname = split_part('{parentId}','.',2)
+            AND c.relname = split_part('{parentId}','.',3)
             AND a.attnum > 0
             AND NOT a.attisdropped
           ORDER BY a.attnum;
@@ -181,12 +181,13 @@ treeConfigs:
         sqlQuery: |
           SELECT
             con.conname AS name,
-            ('.' || con.conname) AS id
+            -- id: db.schema.table.constraint
+            ('{parentId}' || '.' || con.conname) AS id
           FROM pg_constraint con
           JOIN pg_class c ON c.oid = con.conrelid
           JOIN pg_namespace n ON n.oid = c.relnamespace
-          WHERE n.nspname = split_part('{parentId}','.',1)
-            AND c.relname = split_part('{parentId}','.',2)
+          WHERE n.nspname = split_part('{parentId}','.',2)
+            AND c.relname = split_part('{parentId}','.',3)
           ORDER BY con.conname;
 
       table_indexes_aggregate:
@@ -203,10 +204,11 @@ treeConfigs:
         sqlQuery: |
           SELECT
             i.indexname AS name,
-            ('.' || i.indexname) AS id
+            -- id: db.schema.table.index (pg_indexes has schemaname & tablename)
+            ('{parentId}' || '.' || i.indexname) AS id
           FROM pg_indexes i
-          WHERE i.schemaname = split_part('{parentId}','.',1)
-            AND i.tablename = split_part('{parentId}','.',2)
+          WHERE i.schemaname = split_part('{parentId}','.',2)
+            AND i.tablename = split_part('{parentId}','.',3)
           ORDER BY i.indexname;
 
       table_triggers_aggregate:
@@ -223,12 +225,13 @@ treeConfigs:
         sqlQuery: |
           SELECT
             t.tgname AS name,
-            ('.' || t.tgname) AS id
+            -- id: db.schema.table.trigger
+            ('{parentId}' || '.' || t.tgname) AS id
           FROM pg_trigger t
           JOIN pg_class c ON c.oid = t.tgrelid
           JOIN pg_namespace n ON n.oid = c.relnamespace
-          WHERE n.nspname = split_part('{parentId}','.',1)
-            AND c.relname = split_part('{parentId}','.',2)
+          WHERE n.nspname = split_part('{parentId}','.',2)
+            AND c.relname = split_part('{parentId}','.',3)
             AND NOT t.tgisinternal
           ORDER BY t.tgname;
 
@@ -247,12 +250,12 @@ treeConfigs:
         sqlQuery: |
           SELECT
             c.relname AS name,
-            -- id 累加： db.schema.view
-            ('.' || c.relname) AS id
+            -- id: db.schema.view
+            ('{parentId}' || '.' || c.relname) AS id
           FROM pg_class c
           JOIN pg_namespace n ON n.oid = c.relnamespace
           WHERE c.relkind = 'v'
-            AND n.nspname = '{schemaName}'
+            AND n.nspname = split_part('{parentId}','.',2)
           ORDER BY c.relname;
         nextLevel: "view_subs_virtual"
 
@@ -279,10 +282,11 @@ treeConfigs:
         sqlQuery: |
           SELECT
             column_name AS name,
-            ('.' || column_name) AS id
+            -- id: db.schema.view.column
+            ('{parentId}' || '.' || column_name) AS id
           FROM information_schema.columns
-          WHERE table_schema = split_part('{parentId}','.',1)
-            AND table_name   = split_part('{parentId}','.',2)
+          WHERE table_schema = split_part('{parentId}','.',2)
+            AND table_name   = split_part('{parentId}','.',3)
           ORDER BY ordinal_position;
 
       # ===== Materialized Views =====
@@ -300,12 +304,12 @@ treeConfigs:
         sqlQuery: |
           SELECT
             c.relname AS name,
-            -- id 累加： db.schema.matview
-            ('.' || c.relname) AS id
+            -- id: db.schema.matview
+            ('{parentId}' || '.' || c.relname) AS id
           FROM pg_class c
           JOIN pg_namespace n ON n.oid = c.relnamespace
           WHERE c.relkind = 'm'
-            AND n.nspname = '{schemaName}'
+            AND n.nspname = split_part('{parentId}','.',2)
           ORDER BY c.relname;
         nextLevel: "matview_subs_virtual"
 
@@ -333,13 +337,14 @@ treeConfigs:
         sqlQuery: |
           SELECT
             a.attname AS name,
-            ('.' || a.attname) AS id
+            -- id: db.schema.matview.column
+            ('{parentId}' || '.' || a.attname) AS id
           FROM pg_class c
           JOIN pg_namespace n ON n.oid = c.relnamespace
           JOIN pg_attribute a ON a.attrelid = c.oid
           WHERE c.relkind = 'm'
-            AND n.nspname = split_part('{parentId}','.',1)
-            AND c.relname = split_part('{parentId}','.',2)
+            AND n.nspname = split_part('{parentId}','.',2)
+            AND c.relname = split_part('{parentId}','.',3)
             AND a.attnum > 0
             AND NOT a.attisdropped
           ORDER BY a.attnum;
@@ -358,10 +363,11 @@ treeConfigs:
         sqlQuery: |
           SELECT
             i.indexname AS name,
-            ('.' || i.indexname) AS id
+            -- id: db.schema.matview.index
+            ('{parentId}' || '.' || i.indexname) AS id
           FROM pg_indexes i
-          WHERE i.schemaname = split_part('{parentId}','.',1)
-            AND i.tablename = split_part('{parentId}','.',2)
+          WHERE i.schemaname = split_part('{parentId}','.',2)
+            AND i.tablename = split_part('{parentId}','.',3)
           ORDER BY i.indexname;
 
       # ===== Sequences =====
@@ -379,12 +385,12 @@ treeConfigs:
         sqlQuery: |
           SELECT
             c.relname AS name,
-            -- id 累加： db.schema.sequence
-            ('.' || c.relname) AS id
+            -- id: db.schema.sequence
+            ('{parentId}' || '.' || c.relname) AS id
           FROM pg_class c
           JOIN pg_namespace n ON n.oid = c.relnamespace
           WHERE c.relkind = 'S'
-            AND n.nspname = '{schemaName}'
+            AND n.nspname = split_part('{parentId}','.',2)
           ORDER BY c.relname;
         nextLevel: "sequence_subs_virtual"
 
@@ -411,45 +417,45 @@ treeConfigs:
         sqlQuery: |
           SELECT
             ('data_type = ' || s.data_type) AS name,
-            ('.data_type') AS id
+            ('{parentId}' || '.data_type') AS id
           FROM information_schema.sequences s
-          WHERE s.sequence_schema = split_part('{parentId}','.',1)
-            AND s.sequence_name   = split_part('{parentId}','.',2)
+          WHERE s.sequence_schema = split_part('{parentId}','.',2)
+            AND s.sequence_name   = split_part('{parentId}','.',3)
           UNION ALL
           SELECT
             ('start_value = ' || s.start_value) AS name,
-            ('.start_value') AS id
+            ('{parentId}' || '.start_value') AS id
           FROM information_schema.sequences s
-          WHERE s.sequence_schema = split_part('{parentId}','.',1)
-            AND s.sequence_name   = split_part('{parentId}','.',2)
+          WHERE s.sequence_schema = split_part('{parentId}','.',2)
+            AND s.sequence_name   = split_part('{parentId}','.',3)
           UNION ALL
           SELECT
             ('minimum_value = ' || s.minimum_value) AS name,
-            ('.minimum_value') AS id
+            ('{parentId}' || '.minimum_value') AS id
           FROM information_schema.sequences s
-          WHERE s.sequence_schema = split_part('{parentId}','.',1)
-            AND s.sequence_name   = split_part('{parentId}','.',2)
+          WHERE s.sequence_schema = split_part('{parentId}','.',2)
+            AND s.sequence_name   = split_part('{parentId}','.',3)
           UNION ALL
           SELECT
             ('maximum_value = ' || s.maximum_value) AS name,
-            ('.maximum_value') AS id
+            ('{parentId}' || '.maximum_value') AS id
           FROM information_schema.sequences s
-          WHERE s.sequence_schema = split_part('{parentId}','.',1)
-            AND s.sequence_name   = split_part('{parentId}','.',2)
+          WHERE s.sequence_schema = split_part('{parentId}','.',2)
+            AND s.sequence_name   = split_part('{parentId}','.',3)
           UNION ALL
           SELECT
             ('increment = ' || s.increment) AS name,
-            ('.increment') AS id
+            ('{parentId}' || '.increment') AS id
           FROM information_schema.sequences s
-          WHERE s.sequence_schema = split_part('{parentId}','.',1)
-            AND s.sequence_name   = split_part('{parentId}','.',2)
+          WHERE s.sequence_schema = split_part('{parentId}','.',2)
+            AND s.sequence_name   = split_part('{parentId}','.',3)
           UNION ALL
           SELECT
             ('cycle = ' || s.cycle_option) AS name,
-            ('.cycle') AS id
+            ('{parentId}' || '.cycle') AS id
           FROM information_schema.sequences s
-          WHERE s.sequence_schema = split_part('{parentId}','.',1)
-            AND s.sequence_name   = split_part('{parentId}','.',2)
+          WHERE s.sequence_schema = split_part('{parentId}','.',2)
+            AND s.sequence_name   = split_part('{parentId}','.',3)
           ORDER BY name;
 
       # ===== Functions =====
@@ -467,11 +473,11 @@ treeConfigs:
         sqlQuery: |
           SELECT
             p.proname AS name,
-            -- id 累加： db.schema.func
-            ('.' || p.proname) AS id
+            -- keep id = OID (unique across overloads); frontend shows 'name'
+            p.oid::text AS id
           FROM pg_proc p
           JOIN pg_namespace n ON n.oid = p.pronamespace
-          WHERE n.nspname = '{schemaName}'
+          WHERE n.nspname = split_part('{parentId}','.',2)
             AND p.prokind = 'f'
           ORDER BY p.proname;
         nextLevel: "function_subs_virtual"
@@ -500,13 +506,13 @@ treeConfigs:
         sqlQuery: |
           SELECT
             ('arguments: ' || pg_get_function_arguments(p.oid)) AS name,
-            ('.arguments') AS id
+            (p.oid::text || '.arguments') AS id
           FROM pg_proc p
           WHERE p.oid::text = '{parentId}'
           UNION ALL
           SELECT
             ('returns: ' || pg_get_function_result(p.oid)) AS name,
-            ('.result') AS id
+            (p.oid::text || '.result') AS id
           FROM pg_proc p
           WHERE p.oid::text = '{parentId}';
 
@@ -524,7 +530,7 @@ treeConfigs:
         sqlQuery: |
           SELECT
             ('definition: ' || left(pg_get_functiondef(p.oid), 120) || '…') AS name,
-            ('.definition') AS id
+            (p.oid::text || '.definition') AS id
           FROM pg_proc p
           WHERE p.oid::text = '{parentId}';
 
@@ -543,11 +549,10 @@ treeConfigs:
         sqlQuery: |
           SELECT
             p.proname AS name,
-            -- id 累加： db.schema.proc
-            ('.' || p.proname) AS id
+            p.oid::text AS id
           FROM pg_proc p
           JOIN pg_namespace n ON n.oid = p.pronamespace
-          WHERE n.nspname = '{schemaName}'
+          WHERE n.nspname = split_part('{parentId}','.',2)
             AND p.prokind = 'p'
           ORDER BY p.proname;
         nextLevel: "procedure_subs_virtual"
@@ -576,13 +581,13 @@ treeConfigs:
         sqlQuery: |
           SELECT
             ('arguments: ' || pg_get_function_arguments(p.oid)) AS name,
-            ('.arguments') AS id
+            (p.oid::text || '.arguments') AS id
           FROM pg_proc p
           WHERE p.oid::text = '{parentId}'
           UNION ALL
           SELECT
             ('language: ' || l.lanname) AS name,
-            ('.language') AS id
+            (p.oid::text || '.language') AS id
           FROM pg_proc p
           JOIN pg_language l ON l.oid = p.prolang
           WHERE p.oid::text = '{parentId}';
@@ -601,7 +606,7 @@ treeConfigs:
         sqlQuery: |
           SELECT
             ('definition: ' || left(pg_get_functiondef(p.oid), 120) || '…') AS name,
-            ('.definition') AS id
+            (p.oid::text || '.definition') AS id
           FROM pg_proc p
           WHERE p.oid::text = '{parentId}';
 

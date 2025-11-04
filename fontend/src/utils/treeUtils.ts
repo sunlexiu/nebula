@@ -14,6 +14,7 @@ import rolesIcon from '../public/icons/left_tree/roles_1.svg';
 import schemaIcon   from '../public/icons/left_tree/schema.svg';
 import schemasIcon   from '../public/icons/left_tree/schemas.svg';
 import tableIcon    from '../public/icons/left_tree/table_1.svg';
+import tableIcon    from '../public/icons/left_tree/table_1.svg';
 import viewIcon     from '../public/icons/left_tree/view_1.svg';
 import functionIcon from '../public/icons/left_tree/function_1.svg';
 
