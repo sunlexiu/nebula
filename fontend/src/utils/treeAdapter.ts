@@ -14,9 +14,8 @@ export function adaptNode(n, connectionId) {
         key: id,
         type: n.type,
         name: n.label,
-        hasChildren: !!n.hasChildren,
+        hasChildren: n.hasChildren,
 
-        // ★ 样式关键：给组件一个“最终可用的类名”
         icon: toIconClass(n.icon, n.type),
 
         _ctx: {
@@ -27,7 +26,9 @@ export function adaptNode(n, connectionId) {
         },
 
         actions: Array.isArray(n.actions) ? n.actions.map(adaptAction) : [],
-        badges: Array.isArray(n.badges) ? n.badges : []
+        badges: Array.isArray(n.badges) ? n.badges : [],
+        database: undefined as string | undefined,
+        schema: undefined as string | undefined
     };
 
     if (n.type === 'database') out.database = n.label;
@@ -51,4 +52,3 @@ function adaptAction(a) {
     };
 }
 
-// =========================================

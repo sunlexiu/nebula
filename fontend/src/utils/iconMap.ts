@@ -27,4 +27,3 @@ export function toIconClass(iconKey, type) {
     return MAP.default;
 }
 
-// =========================================

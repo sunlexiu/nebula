@@ -347,4 +347,3 @@ const NewConnectionModal = ({
 
 export default NewConnectionModal;
 
-// =========================================

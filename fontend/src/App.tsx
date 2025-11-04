@@ -19,5 +19,3 @@ export default function App() {
     </ModalProvider>
   );
 }
-
-// =========================================

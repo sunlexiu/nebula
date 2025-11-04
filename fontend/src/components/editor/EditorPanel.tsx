@@ -52,5 +52,3 @@ const EditorPanel = ({ query, results, updateQuery, executeQuery, editorHeight, 
 };
 
 export default EditorPanel;
-
-// =========================================

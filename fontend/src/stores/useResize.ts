@@ -80,4 +80,3 @@ export const useResize = (initialSidebarWidth = 260, initialEditorHeight = 300) 
   };
 };
 
-// =========================================

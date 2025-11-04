@@ -1,24 +1,66 @@
-/* src/utils/treeUtils.js  –– 所有节点展开统一走 /meta/{connId}/{path}/children */
-import pgsqlIcon     from '../public/icons/db/postgresql_icon_3.svg';
-import mysqlIcon     from '../public/icons/db/mysql_icon_2.svg';
-import oracleIcon    from '../public/icons/db/oracle_icon_3.svg';
+import pgsqlIcon from '../public/icons/db/postgresql_icon_3.svg';
+import mysqlIcon from '../public/icons/db/mysql_icon_2.svg';
+import oracleIcon from '../public/icons/db/oracle_icon_3.svg';
 import sqlserverIcon from '../public/icons/db/sqlserver_icon_1.svg';
 
-import fileGroupIcon  from '../public/icons/left_tree/file_group_1.svg';
-import folderIcon     from '../public/icons/left_tree/folder_1.svg';
+import fileGroupIcon from '../public/icons/left_tree/file_group_1.svg';
+import folderIcon from '../public/icons/left_tree/folder_1.svg';
 import folderOpenIcon from '../public/icons/left_tree/folder_open_1.svg';
 
-import dbIcon    from '../public/icons/left_tree/db_1.svg';
-import dbsIcon   from '../public/icons/left_tree/dbs.svg';
-import rolesIcon from '../public/icons/left_tree/roles_1.svg';
-import schemaIcon   from '../public/icons/left_tree/schema.svg';
-import schemasIcon   from '../public/icons/left_tree/schemas.svg';
-import tableIcon    from '../public/icons/left_tree/table_1.svg';
-import tableIcon    from '../public/icons/left_tree/table_1.svg';
-import viewIcon     from '../public/icons/left_tree/view_1.svg';
-import functionIcon from '../public/icons/left_tree/function_1.svg';
+/* 新版左侧树图标（全部为 24×24、描边图标、stroke="currentColor"） */
+import rolesAggIcon from '../public/icons/left_tree/roles.svg';
+import dbsAggIcon from '../public/icons/left_tree/databases.svg';
+import dbIcon from '../public/icons/left_tree/database.svg';
+import dbSubsIcon from '../public/icons/left_tree/db_subs.svg';
 
-import { useTreeStore } from '../stores/useTreeStore';
+import castsIcon from '../public/icons/left_tree/casts.svg';
+import extensionsIcon from '../public/icons/left_tree/extensions.svg';
+
+import schemasAggIcon from '../public/icons/left_tree/schemas.svg';
+import schemaIcon from '../public/icons/left_tree/schema.svg';
+import schemaSubsIcon from '../public/icons/left_tree/schema_subs.svg';
+
+import tablesAggIcon from '../public/icons/left_tree/tables.svg';
+import tableIcon from '../public/icons/left_tree/table.svg';
+import tableSubsIcon from '../public/icons/left_tree/table_subs.svg';
+import columnsAggIcon from '../public/icons/left_tree/columns.svg';
+import columnIcon from '../public/icons/left_tree/column.svg';
+import constraintsAggIcon from '../public/icons/left_tree/constraints.svg';
+import constraintIcon from '../public/icons/left_tree/constraint.svg';
+import indexesAggIcon from '../public/icons/left_tree/indexes.svg';
+import indexIcon from '../public/icons/left_tree/index.svg';
+import triggersAggIcon from '../public/icons/left_tree/triggers.svg';
+import triggerIcon from '../public/icons/left_tree/trigger.svg';
+
+import viewsAggIcon from '../public/icons/left_tree/views.svg';
+import viewIcon from '../public/icons/left_tree/view.svg';
+import viewSubsIcon from '../public/icons/left_tree/view_subs.svg';
+import viewColumnsAggIcon from '../public/icons/left_tree/view_columns.svg';
+import viewColumnIcon from '../public/icons/left_tree/view_column.svg';
+
+import matviewsAggIcon from '../public/icons/left_tree/matviews.svg';
+import matviewIcon from '../public/icons/left_tree/matview.svg';
+import matviewSubsIcon from '../public/icons/left_tree/matview_subs.svg';
+import matviewColumnsAggIcon from '../public/icons/left_tree/matview_columns.svg';
+import matviewIndexesAggIcon from '../public/icons/left_tree/matview_indexes.svg';
+
+import sequencesAggIcon from '../public/icons/left_tree/sequences.svg';
+import sequenceIcon from '../public/icons/left_tree/sequence.svg';
+import sequenceSubsIcon from '../public/icons/left_tree/sequence_subs.svg';
+import sequencePropsAggIcon from '../public/icons/left_tree/sequence_props.svg';
+import propertyIcon from '../public/icons/left_tree/property.svg';
+
+import functionsAggIcon from '../public/icons/left_tree/functions.svg';
+import functionIcon from '../public/icons/left_tree/function.svg';
+import functionSubsIcon from '../public/icons/left_tree/function_subs.svg';
+import functionInfoAggIcon from '../public/icons/left_tree/function_info.svg';
+import functionDefAggIcon from '../public/icons/left_tree/function_definition.svg';
+
+import proceduresAggIcon from '../public/icons/left_tree/procedures.svg';
+import procedureIcon from '../public/icons/left_tree/procedure.svg';
+import procedureSubsIcon from '../public/icons/left_tree/procedure_subs.svg';
+import procedureInfoAggIcon from '../public/icons/left_tree/procedure_info.svg';
+import procedureDefAggIcon from '../public/icons/left_tree/procedure_definition.svg';
 
 /* -------------- 图标：优先节点 config.icon，后备旧逻辑 -------------- */
 export const getNodeIcon = (node) => {
@@ -35,21 +77,74 @@ export const getNodeIcon = (node) => {
   }
 
   // 默认图标映射：当 YAML 未提供 config.icon 时使用
-  // 注：聚合节点保持原 type（databases / roles），这里给出兜底
+  // 注：聚合节点保持原 type（databases / roles 等）兜底
   const map = {
-    folder:   node?.expanded ? folderOpenIcon : folderIcon,
+    folder: node?.expanded ? folderOpenIcon : folderIcon,
 
-    // 顶层虚拟聚合
-    databases: dbsIcon,        // Databases 聚合
-    roles:     rolesIcon,      // Roles 聚合
+    // 顶层聚合
+    databases: dbsAggIcon,
+    roles:     rolesAggIcon,
 
-    // 实体节点
-    database: dbIcon,
-    schema:   schemaIcon,
-    schemas:   schemasIcon,
-    table:    tableIcon,
-    view:     viewIcon,
-    function: functionIcon,
+    // 数据库层
+    database:  dbIcon,
+    db_subs:   dbSubsIcon,
+
+    // 数据库内分组
+    casts:       castsIcon,
+    extensions:  extensionsIcon,
+
+    // 模式（schema）
+    schemas:      schemasAggIcon,
+    schema:       schemaIcon,
+    schema_subs:  schemaSubsIcon,
+
+    // 表
+    tables:         tablesAggIcon,
+    table:          tableIcon,
+    table_subs:     tableSubsIcon,
+    columns:        columnsAggIcon,
+    column:         columnIcon,
+    constraints:    constraintsAggIcon,
+    constraint:     constraintIcon,
+    indexes:        indexesAggIcon,
+    index:          indexIcon,
+    triggers:       triggersAggIcon,
+    trigger:        triggerIcon,
+
+    // 视图
+    views:          viewsAggIcon,
+    view:           viewIcon,
+    view_subs:      viewSubsIcon,
+    view_columns:   viewColumnsAggIcon,
+    view_column:    viewColumnIcon,
+
+    // 物化视图
+    matviews:         matviewsAggIcon,
+    materialized_view: matviewIcon,
+    matview_subs:     matviewSubsIcon,
+    matview_columns:  matviewColumnsAggIcon,
+    matview_indexes:  matviewIndexesAggIcon,
+
+    // 序列
+    sequences:       sequencesAggIcon,
+    sequence:        sequenceIcon,
+    sequence_subs:   sequenceSubsIcon,
+    properties:      sequencePropsAggIcon,  // 序列属性聚合
+    property:        propertyIcon,
+
+    // 函数
+    functions:          functionsAggIcon,
+    function:           functionIcon,
+    function_subs:      functionSubsIcon,
+    info:               functionInfoAggIcon,       // 函数信息聚合
+    definition:         functionDefAggIcon,        // 函数定义聚合
+
+    // 过程
+    procedures:          proceduresAggIcon,
+    procedure:           procedureIcon,
+    procedure_subs:      procedureSubsIcon,
+    procedure_info:      procedureInfoAggIcon,
+    procedure_definition: procedureDefAggIcon,
   };
 
   return map[node?.type] || fileGroupIcon;
@@ -69,7 +164,7 @@ export async function loadNodeChildren(node) {
     return { ...node, children: [] };
   }
 
-  const connId = findConnectionId(node?.id);
+  const connId = findConnectionId(node?.id, null);
   if (!connId) {
     console.warn('[loadNodeChildren] 找不到所属连接', node);
     return { ...node, children: [] };
@@ -187,4 +282,3 @@ export function isExpandable(node) {
   return hasLoaded || declared || !!node.virtual;
 }
 
-// =========================================

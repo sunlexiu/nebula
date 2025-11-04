@@ -9,4 +9,3 @@ export function isExpandable(node) {
   return hasLoaded || declared || !!node.virtual;
 }
 
-// =========================================

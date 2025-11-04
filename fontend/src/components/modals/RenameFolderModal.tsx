@@ -82,4 +82,3 @@ const RenameFolderModal = ({ isOpen, onClose, parentId, defaultName = "", onSubm
 
 export default RenameFolderModal;
 
-// =========================================

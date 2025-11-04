@@ -25,5 +25,3 @@ export default function ResultTable({ data }) {
     </div>
   )
 }
-
-// =========================================

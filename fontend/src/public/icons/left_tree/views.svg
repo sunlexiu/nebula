@@ -1,9 +1,8 @@
-<?xml version="1.0" encoding="utf-8"?><!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
-<svg width="800px" height="800px" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="48" height="48" fill="white" fill-opacity="0.01"/>
-<rect x="4" y="4" width="40" height="40" rx="3" fill="#2F88FF" stroke="#000000" stroke-width="4" stroke-linejoin="round"/>
-<rect x="12" y="12" width="8" height="8" fill="#43CCF8" stroke="white" stroke-width="4" stroke-linejoin="round"/>
-<rect x="28" y="12" width="8" height="8" fill="#43CCF8" stroke="white" stroke-width="4" stroke-linejoin="round"/>
-<rect x="12" y="28" width="8" height="8" fill="#43CCF8" stroke="white" stroke-width="4" stroke-linejoin="round"/>
-<rect x="28" y="28" width="8" height="8" fill="#43CCF8" stroke="white" stroke-width="4" stroke-linejoin="round"/>
+<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
+  stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" color="#6B7280">
+
+  <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/>
+  <circle cx="12" cy="12" r="2.5"/>
+  <path d="M7 5h10"/>
+
 </svg>

@@ -67,4 +67,3 @@ const NewGroupModal = ({ isOpen, onClose, parentId, onSubmit = handleNewGroupSub
 
 export default NewGroupModal;
 
-// =========================================
