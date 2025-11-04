@@ -182,30 +182,74 @@ public class TreeService {
         return expandNode(conn, reg, nodeKey, def, entityId);
     }
 
-    private List<Map<String, Object>> queryList(Connection conn, LinkedHashMap<String, NodeDef> reg, String nodeKey, NodeDef def, String parentId, Map<String, Object> params) {
+    private List<Map<String, Object>> queryList(Connection conn,
+            LinkedHashMap<String, NodeDef> reg,
+            String nodeKey, NodeDef def,
+            String parentId, Map<String, Object> params) {
         if (def == null || def.getSqlQuery() == null) return List.of();
-        JdbcTemplate jdbc = connectionService.getJdbcTemplate(conn.getId());
-        String sql = def.getSqlQuery();
-        if (params.containsKey("entityId")) {
-            sql = sql.replace("{entityId}", String.valueOf(params.get("entityId")));
+
+        // 解析上下文：dbName / schemaName（我们在上游把 parentId 设计为 "db" 或 "db.schema"）
+        String ctxDb = null;
+        String ctxSchema = null;
+        if (parentId != null && !parentId.isBlank()) {
+            if ("schemas_real".equals(nodeKey)) {
+                // 展开数据库下的 schemas
+                ctxDb = parentId;
+            } else if (parentId.contains(".")) {
+                String[] segs = parentId.split("\\.", 2);
+                ctxDb = segs[0];
+                ctxSchema = segs.length > 1 ? segs[1] : null;
+            }
         }
+
+        // 按需切库：schemas_real 或更深层（tables/views/functions）都要在目标库上执行
+        JdbcTemplate jdbc = (ctxDb != null && !ctxDb.isBlank() && !ctxDb.equals(conn.getDatabase()))
+                ? connectionService.getJdbcTemplate(conn.getId(), ctxDb)
+                : connectionService.getJdbcTemplate(conn.getId());
+
+        String sql = def.getSqlQuery();
+
+        // 解析 parentId：支持 "db" 或 "db.schema"
+        if (parentId != null && !parentId.isBlank()) {
+            int dot = parentId.indexOf('.');
+            if (dot > 0) {
+                ctxDb = parentId.substring(0, dot);
+                ctxSchema = parentId.substring(dot + 1);
+            } else {
+                ctxDb = parentId; // 只有 db
+            }
+        }
+
+        // 顺序替换：先 parentId（若 SQL 里用到），再 dbName/schemaName
         if (parentId != null) {
             sql = sql.replace("{parentId}", parentId);
         }
-        sql = sql.replace("{dbName}", conn.getDatabase());
+        String effectiveDb = (ctxDb != null && !ctxDb.isBlank()) ? ctxDb : conn.getDatabase();
+        sql = sql.replace("{dbName}", effectiveDb);
+        if (ctxSchema != null) {
+            sql = sql.replace("{schemaName}", ctxSchema);
+        }
 
         List<Map<String, Object>> rows = jdbc.queryForList(sql);
         List<Map<String, Object>> out = new ArrayList<>(rows.size());
+
         for (Map<String, Object> r : rows) {
             Map<String, Object> m = new LinkedHashMap<>();
-            String id = String.valueOf(r.getOrDefault("id", java.util.UUID.randomUUID().toString()));
-            String name = String.valueOf(r.getOrDefault("name", id));
-            String compound = conn.getId() + "::" + nodeKey + "::" + id;   // connId::nodeKey::entityId
+            String leafId = String.valueOf(r.getOrDefault("id", java.util.UUID.randomUUID().toString()));
+            String name   = String.valueOf(r.getOrDefault("name", leafId));
+
+            // 关键：把 parentId 编进实体 id，确保全局唯一（如 db.schema / db.schema.table）
+            String uniqueId = (parentId != null && !parentId.isBlank())
+                    ? parentId + (leafId.startsWith(".") ? leafId : "." + leafId)
+                    : leafId;
+
+            String compound = conn.getId() + "::" + nodeKey + "::" + uniqueId;
             m.put("id", compound);
             m.put("key", compound);
             m.put("name", name);
             m.put("type", def.getType());
             m.put("icon", def.getIcon());
+
             Map<String, Object> cfg = new LinkedHashMap<>();
             cfg.put("type", def.getType());
             if (def.getIcon() != null) cfg.put("icon", def.getIcon());
@@ -216,9 +260,11 @@ public class TreeService {
                 cfg.put("nextLevel", nodeKey);
             }
             m.put("config", cfg);
-            m.put("virtual", false);
-            m.put("connected", conn.getConnected() != null ? conn.getConnected() : Boolean.TRUE);
-            m.put("children", new ArrayList<>());
+
+            // 便于前端动作使用
+            if (effectiveDb != null) m.put("dbName", effectiveDb);
+            if (ctxSchema != null)  m.put("schemaName", ctxSchema);
+
             out.add(m);
         }
         return out;

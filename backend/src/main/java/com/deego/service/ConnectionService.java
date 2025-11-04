@@ -84,6 +84,28 @@ public class ConnectionService {
 		return new JdbcTemplate(ds);
 	}
 
+	// 新增：按数据库名临时/复用数据源获取 JdbcTemplate
+	public JdbcTemplate getJdbcTemplate(String connId, String overrideDb) {
+		if (overrideDb == null || overrideDb.isBlank()) {
+			return getJdbcTemplate(connId);
+		}
+		Connection base = getConnection(connId).orElseThrow(() -> new BizException("Connection not found: " + connId));
+		String key = connId + "::db::" + overrideDb;
+		HikariDataSource ds = dataSources.get(key);
+		if (ds == null || ds.isClosed()) {
+			HikariConfig cfg = new HikariConfig();
+			// 仅演示 PG，你也可以按 dbType 分支
+			String jdbcUrl = "jdbc:postgresql://" + base.getHost() + ":" + base.getPort() + "/" + overrideDb;
+			cfg.setJdbcUrl(jdbcUrl);
+			cfg.setUsername(base.getUsername());
+			cfg.setPassword(base.getPassword());
+			cfg.setMaximumPoolSize(5);
+			ds = new HikariDataSource(cfg);
+			dataSources.put(key, ds);
+		}
+		return new JdbcTemplate(ds);
+	}
+
 	private HikariDataSource createDataSource(Connection conn) {
 		HikariConfig config = new HikariConfig();
 		config.setJdbcUrl("jdbc:postgresql://" + conn.getHost() + ":" + conn.getPort() + "/" + conn.getDatabase());
