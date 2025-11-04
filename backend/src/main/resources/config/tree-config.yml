@@ -1,3 +1,4 @@
+
 treeConfigs:
   POSTGRESQL:
     defaultIcon: "pgsql_icon.svg"
@@ -7,6 +8,7 @@ treeConfigs:
         - { label: "属性", icon: "ℹ️", handler: "showProperties" }
 
     nodes:
+      # ===== Top-level: Roles (kept) =====
       roles_aggregate:
         parent: null
         virtual: true
@@ -18,6 +20,7 @@ treeConfigs:
           menu:
             - { label: "新建角色", icon: "➕", handler: "createRole" }
 
+      # ===== Top-level: Databases (kept) =====
       databases_aggregate:
         parent: null
         virtual: true
@@ -65,6 +68,7 @@ treeConfigs:
         label: "Extensions"
         children: {}
 
+      # ===== Schemas (kept, with id accumulating db + '.' + schema) =====
       schemas_aggregate:
         parent: "db_subs_virtual"
         virtual: true
@@ -79,13 +83,14 @@ treeConfigs:
         sqlQuery: |
           SELECT
             nspname AS name,
-            -- 让 id 带上数据库，保证唯一性 & 让后续上下文可传递
+            -- id 累加： db.schema
             ('{parentId}' || '.' || nspname) AS id
           FROM pg_namespace
           WHERE nspname NOT IN ('pg_catalog','information_schema')
           ORDER BY nspname;
         nextLevel: "schema_subs_virtual"
 
+      # ===== Schema subs: add tables / views / matviews / sequences / functions / procedures =====
       schema_subs_virtual:
         parent: "schemas_real"
         virtual: true
@@ -95,8 +100,12 @@ treeConfigs:
         children:
           tables: "tables_group"
           views: "views_group"
+          materialized views: "matviews_group"
+          sequences: "sequences_group"
           functions: "functions_group"
+          procedures: "procedures_group"
 
+      # ===== Tables =====
       tables_group:
         parent: "schema_subs_virtual"
         virtual: true
@@ -110,15 +119,120 @@ treeConfigs:
         type: "table"
         sqlQuery: |
           SELECT
-          c.relname AS name,
-          -- 继续在 id 里追加表名，形成 db.schema.table
-          ('.' || c.relname) AS id
+            c.relname AS name,
+            -- id 累加： db.schema.table
+            ('.' || c.relname) AS id
           FROM pg_class c
           JOIN pg_namespace n ON n.oid = c.relnamespace
           WHERE c.relkind = 'r'
-          AND n.nspname = '{schemaName}'
+            AND n.nspname = '{schemaName}'
           ORDER BY c.relname;
+        nextLevel: "table_subs_virtual"
 
+      # Table subs (Columns / Constraints / Indexes / Triggers)
+      table_subs_virtual:
+        parent: "tables_real"
+        virtual: true
+        type: "table_subs"
+        label: null
+        icon: null
+        children:
+          columns: "table_columns_aggregate"
+          constraints: "table_constraints_aggregate"
+          indexes: "table_indexes_aggregate"
+          triggers: "table_triggers_aggregate"
+
+      table_columns_aggregate:
+        parent: "table_subs_virtual"
+        virtual: true
+        type: "columns"
+        label: "Columns"
+        nextLevel: "table_columns_real"
+
+      table_columns_real:
+        parent: "table_columns_aggregate"
+        virtual: false
+        type: "column"
+        sqlQuery: |
+          SELECT
+            a.attname AS name,
+            -- id 累加： db.schema.table.column
+            ('.' || a.attname) AS id
+          FROM pg_attribute a
+          JOIN pg_class c ON c.oid = a.attrelid
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = split_part('{parentId}','.',1)
+            AND c.relname = split_part('{parentId}','.',2)
+            AND a.attnum > 0
+            AND NOT a.attisdropped
+          ORDER BY a.attnum;
+
+      table_constraints_aggregate:
+        parent: "table_subs_virtual"
+        virtual: true
+        type: "constraints"
+        label: "Constraints"
+        nextLevel: "table_constraints_real"
+
+      table_constraints_real:
+        parent: "table_constraints_aggregate"
+        virtual: false
+        type: "constraint"
+        sqlQuery: |
+          SELECT
+            con.conname AS name,
+            ('.' || con.conname) AS id
+          FROM pg_constraint con
+          JOIN pg_class c ON c.oid = con.conrelid
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = split_part('{parentId}','.',1)
+            AND c.relname = split_part('{parentId}','.',2)
+          ORDER BY con.conname;
+
+      table_indexes_aggregate:
+        parent: "table_subs_virtual"
+        virtual: true
+        type: "indexes"
+        label: "Indexes"
+        nextLevel: "table_indexes_real"
+
+      table_indexes_real:
+        parent: "table_indexes_aggregate"
+        virtual: false
+        type: "index"
+        sqlQuery: |
+          SELECT
+            i.indexname AS name,
+            ('.' || i.indexname) AS id
+          FROM pg_indexes i
+          WHERE i.schemaname = split_part('{parentId}','.',1)
+            AND i.tablename = split_part('{parentId}','.',2)
+          ORDER BY i.indexname;
+
+      table_triggers_aggregate:
+        parent: "table_subs_virtual"
+        virtual: true
+        type: "triggers"
+        label: "Triggers"
+        nextLevel: "table_triggers_real"
+
+      table_triggers_real:
+        parent: "table_triggers_aggregate"
+        virtual: false
+        type: "trigger"
+        sqlQuery: |
+          SELECT
+            t.tgname AS name,
+            ('.' || t.tgname) AS id
+          FROM pg_trigger t
+          JOIN pg_class c ON c.oid = t.tgrelid
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = split_part('{parentId}','.',1)
+            AND c.relname = split_part('{parentId}','.',2)
+            AND NOT t.tgisinternal
+          ORDER BY t.tgname;
+
+      # ===== Views =====
       views_group:
         parent: "schema_subs_virtual"
         virtual: true
@@ -133,13 +247,212 @@ treeConfigs:
         sqlQuery: |
           SELECT
             c.relname AS name,
+            -- id 累加： db.schema.view
             ('.' || c.relname) AS id
           FROM pg_class c
           JOIN pg_namespace n ON n.oid = c.relnamespace
           WHERE c.relkind = 'v'
             AND n.nspname = '{schemaName}'
           ORDER BY c.relname;
+        nextLevel: "view_subs_virtual"
 
+      view_subs_virtual:
+        parent: "views_real"
+        virtual: true
+        type: "view_subs"
+        label: null
+        icon: null
+        children:
+          columns: "view_columns_aggregate"
+
+      view_columns_aggregate:
+        parent: "view_subs_virtual"
+        virtual: true
+        type: "columns"
+        label: "Columns"
+        nextLevel: "view_columns_real"
+
+      view_columns_real:
+        parent: "view_columns_aggregate"
+        virtual: false
+        type: "column"
+        sqlQuery: |
+          SELECT
+            column_name AS name,
+            ('.' || column_name) AS id
+          FROM information_schema.columns
+          WHERE table_schema = split_part('{parentId}','.',1)
+            AND table_name   = split_part('{parentId}','.',2)
+          ORDER BY ordinal_position;
+
+      # ===== Materialized Views =====
+      matviews_group:
+        parent: "schema_subs_virtual"
+        virtual: true
+        type: "matviews"
+        label: "Materialized Views"
+        nextLevel: "matviews_real"
+
+      matviews_real:
+        parent: "matviews_group"
+        virtual: false
+        type: "materialized_view"
+        sqlQuery: |
+          SELECT
+            c.relname AS name,
+            -- id 累加： db.schema.matview
+            ('.' || c.relname) AS id
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE c.relkind = 'm'
+            AND n.nspname = '{schemaName}'
+          ORDER BY c.relname;
+        nextLevel: "matview_subs_virtual"
+
+      matview_subs_virtual:
+        parent: "matviews_real"
+        virtual: true
+        type: "matview_subs"
+        label: null
+        icon: null
+        children:
+          columns: "matview_columns_aggregate"
+          indexes: "matview_indexes_aggregate"
+
+      matview_columns_aggregate:
+        parent: "matview_subs_virtual"
+        virtual: true
+        type: "columns"
+        label: "Columns"
+        nextLevel: "matview_columns_real"
+
+      matview_columns_real:
+        parent: "matview_columns_aggregate"
+        virtual: false
+        type: "column"
+        sqlQuery: |
+          SELECT
+            a.attname AS name,
+            ('.' || a.attname) AS id
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          JOIN pg_attribute a ON a.attrelid = c.oid
+          WHERE c.relkind = 'm'
+            AND n.nspname = split_part('{parentId}','.',1)
+            AND c.relname = split_part('{parentId}','.',2)
+            AND a.attnum > 0
+            AND NOT a.attisdropped
+          ORDER BY a.attnum;
+
+      matview_indexes_aggregate:
+        parent: "matview_subs_virtual"
+        virtual: true
+        type: "indexes"
+        label: "Indexes"
+        nextLevel: "matview_indexes_real"
+
+      matview_indexes_real:
+        parent: "matview_indexes_aggregate"
+        virtual: false
+        type: "index"
+        sqlQuery: |
+          SELECT
+            i.indexname AS name,
+            ('.' || i.indexname) AS id
+          FROM pg_indexes i
+          WHERE i.schemaname = split_part('{parentId}','.',1)
+            AND i.tablename = split_part('{parentId}','.',2)
+          ORDER BY i.indexname;
+
+      # ===== Sequences =====
+      sequences_group:
+        parent: "schema_subs_virtual"
+        virtual: true
+        type: "sequences"
+        label: "Sequences"
+        nextLevel: "sequences_real"
+
+      sequences_real:
+        parent: "sequences_group"
+        virtual: false
+        type: "sequence"
+        sqlQuery: |
+          SELECT
+            c.relname AS name,
+            -- id 累加： db.schema.sequence
+            ('.' || c.relname) AS id
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE c.relkind = 'S'
+            AND n.nspname = '{schemaName}'
+          ORDER BY c.relname;
+        nextLevel: "sequence_subs_virtual"
+
+      sequence_subs_virtual:
+        parent: "sequences_real"
+        virtual: true
+        type: "sequence_subs"
+        label: null
+        icon: null
+        children:
+          properties: "sequence_props_aggregate"
+
+      sequence_props_aggregate:
+        parent: "sequence_subs_virtual"
+        virtual: true
+        type: "properties"
+        label: "Properties"
+        nextLevel: "sequence_props_real"
+
+      sequence_props_real:
+        parent: "sequence_props_aggregate"
+        virtual: false
+        type: "property"
+        sqlQuery: |
+          SELECT
+            ('data_type = ' || s.data_type) AS name,
+            ('.data_type') AS id
+          FROM information_schema.sequences s
+          WHERE s.sequence_schema = split_part('{parentId}','.',1)
+            AND s.sequence_name   = split_part('{parentId}','.',2)
+          UNION ALL
+          SELECT
+            ('start_value = ' || s.start_value) AS name,
+            ('.start_value') AS id
+          FROM information_schema.sequences s
+          WHERE s.sequence_schema = split_part('{parentId}','.',1)
+            AND s.sequence_name   = split_part('{parentId}','.',2)
+          UNION ALL
+          SELECT
+            ('minimum_value = ' || s.minimum_value) AS name,
+            ('.minimum_value') AS id
+          FROM information_schema.sequences s
+          WHERE s.sequence_schema = split_part('{parentId}','.',1)
+            AND s.sequence_name   = split_part('{parentId}','.',2)
+          UNION ALL
+          SELECT
+            ('maximum_value = ' || s.maximum_value) AS name,
+            ('.maximum_value') AS id
+          FROM information_schema.sequences s
+          WHERE s.sequence_schema = split_part('{parentId}','.',1)
+            AND s.sequence_name   = split_part('{parentId}','.',2)
+          UNION ALL
+          SELECT
+            ('increment = ' || s.increment) AS name,
+            ('.increment') AS id
+          FROM information_schema.sequences s
+          WHERE s.sequence_schema = split_part('{parentId}','.',1)
+            AND s.sequence_name   = split_part('{parentId}','.',2)
+          UNION ALL
+          SELECT
+            ('cycle = ' || s.cycle_option) AS name,
+            ('.cycle') AS id
+          FROM information_schema.sequences s
+          WHERE s.sequence_schema = split_part('{parentId}','.',1)
+            AND s.sequence_name   = split_part('{parentId}','.',2)
+          ORDER BY name;
+
+      # ===== Functions =====
       functions_group:
         parent: "schema_subs_virtual"
         virtual: true
@@ -153,14 +466,146 @@ treeConfigs:
         type: "function"
         sqlQuery: |
           SELECT
-          p.proname AS name,
-          -- 函数用带参数签名可能重复，这里保持简单：db.schema.func
-          ('.' || p.proname) AS id
+            p.proname AS name,
+            -- id 累加： db.schema.func
+            ('.' || p.proname) AS id
           FROM pg_proc p
           JOIN pg_namespace n ON n.oid = p.pronamespace
           WHERE n.nspname = '{schemaName}'
+            AND p.prokind = 'f'
           ORDER BY p.proname;
+        nextLevel: "function_subs_virtual"
 
+      function_subs_virtual:
+        parent: "functions_real"
+        virtual: true
+        type: "function_subs"
+        label: null
+        icon: null
+        children:
+          info: "function_info_aggregate"
+          definition: "function_definition_aggregate"
+
+      function_info_aggregate:
+        parent: "function_subs_virtual"
+        virtual: true
+        type: "info"
+        label: "Info"
+        nextLevel: "function_info_real"
+
+      function_info_real:
+        parent: "function_info_aggregate"
+        virtual: false
+        type: "property"
+        sqlQuery: |
+          SELECT
+            ('arguments: ' || pg_get_function_arguments(p.oid)) AS name,
+            ('.arguments') AS id
+          FROM pg_proc p
+          WHERE p.oid::text = '{parentId}'
+          UNION ALL
+          SELECT
+            ('returns: ' || pg_get_function_result(p.oid)) AS name,
+            ('.result') AS id
+          FROM pg_proc p
+          WHERE p.oid::text = '{parentId}';
+
+      function_definition_aggregate:
+        parent: "function_subs_virtual"
+        virtual: true
+        type: "definition"
+        label: "Definition"
+        nextLevel: "function_definition_real"
+
+      function_definition_real:
+        parent: "function_definition_aggregate"
+        virtual: false
+        type: "definition"
+        sqlQuery: |
+          SELECT
+            ('definition: ' || left(pg_get_functiondef(p.oid), 120) || '…') AS name,
+            ('.definition') AS id
+          FROM pg_proc p
+          WHERE p.oid::text = '{parentId}';
+
+      # ===== Procedures =====
+      procedures_group:
+        parent: "schema_subs_virtual"
+        virtual: true
+        type: "procedures"
+        label: "Procedures"
+        nextLevel: "procedures_real"
+
+      procedures_real:
+        parent: "procedures_group"
+        virtual: false
+        type: "procedure"
+        sqlQuery: |
+          SELECT
+            p.proname AS name,
+            -- id 累加： db.schema.proc
+            ('.' || p.proname) AS id
+          FROM pg_proc p
+          JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname = '{schemaName}'
+            AND p.prokind = 'p'
+          ORDER BY p.proname;
+        nextLevel: "procedure_subs_virtual"
+
+      procedure_subs_virtual:
+        parent: "procedures_real"
+        virtual: true
+        type: "procedure_subs"
+        label: null
+        icon: null
+        children:
+          info: "procedure_info_aggregate"
+          definition: "procedure_definition_aggregate"
+
+      procedure_info_aggregate:
+        parent: "procedure_subs_virtual"
+        virtual: true
+        type: "info"
+        label: "Info"
+        nextLevel: "procedure_info_real"
+
+      procedure_info_real:
+        parent: "procedure_info_aggregate"
+        virtual: false
+        type: "property"
+        sqlQuery: |
+          SELECT
+            ('arguments: ' || pg_get_function_arguments(p.oid)) AS name,
+            ('.arguments') AS id
+          FROM pg_proc p
+          WHERE p.oid::text = '{parentId}'
+          UNION ALL
+          SELECT
+            ('language: ' || l.lanname) AS name,
+            ('.language') AS id
+          FROM pg_proc p
+          JOIN pg_language l ON l.oid = p.prolang
+          WHERE p.oid::text = '{parentId}';
+
+      procedure_definition_aggregate:
+        parent: "procedure_subs_virtual"
+        virtual: true
+        type: "definition"
+        label: "Definition"
+        nextLevel: "procedure_definition_real"
+
+      procedure_definition_real:
+        parent: "procedure_definition_aggregate"
+        virtual: false
+        type: "definition"
+        sqlQuery: |
+          SELECT
+            ('definition: ' || left(pg_get_functiondef(p.oid), 120) || '…') AS name,
+            ('.definition') AS id
+          FROM pg_proc p
+          WHERE p.oid::text = '{parentId}';
+
+      # ===== Users (kept) =====
       users_real:
         parent: "roles_aggregate"
         virtual: false

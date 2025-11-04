@@ -1,10 +1,10 @@
 package com.deego.service;
 
 import com.deego.exception.BizException;
+import com.deego.manager.ConnectionManager;
 import com.deego.model.Connection;
 import com.deego.repository.ConnectionRepository;
 import com.deego.utils.IdWorker;
-import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -17,6 +17,8 @@ import java.util.Optional;
 
 @Service
 public class ConnectionService {
+	@Autowired
+	private ConnectionManager connectionManager;
 	@Autowired
 	private ConnectionRepository connectionRepository;
 
@@ -74,57 +76,25 @@ public class ConnectionService {
 	}
 
 	public JdbcTemplate getJdbcTemplate(String id) {
-		HikariDataSource ds = dataSources.get(id);
-		if (ds == null) {
-			Optional<Connection> connOpt = getConnection(id);
-			if (connOpt.isPresent()) {
-				ds = createDataSource(connOpt.get());
-			}
-		}
-		return new JdbcTemplate(ds);
+		com.deego.model.Connection c = getConnection(id)
+				.orElseThrow(() -> new com.deego.exception.BizException("Connection not found: " + id));
+		com.deego.exec.DbExecutor ex = connectionManager.acquireExecutor(c, null);
+		if (ex instanceof com.deego.exec.JdbcExecutor j) return j.jdbc();
+		throw new com.deego.exception.BizException("Not a relational executor for connection " + id);
 	}
 
-	// 新增：按数据库名临时/复用数据源获取 JdbcTemplate
-	public JdbcTemplate getJdbcTemplate(String connId, String overrideDb) {
-		if (overrideDb == null || overrideDb.isBlank()) {
-			return getJdbcTemplate(connId);
-		}
-		Connection base = getConnection(connId).orElseThrow(() -> new BizException("Connection not found: " + connId));
-		String key = connId + "::db::" + overrideDb;
-		HikariDataSource ds = dataSources.get(key);
-		if (ds == null || ds.isClosed()) {
-			HikariConfig cfg = new HikariConfig();
-			// 仅演示 PG，你也可以按 dbType 分支
-			String jdbcUrl = "jdbc:postgresql://" + base.getHost() + ":" + base.getPort() + "/" + overrideDb;
-			cfg.setJdbcUrl(jdbcUrl);
-			cfg.setUsername(base.getUsername());
-			cfg.setPassword(base.getPassword());
-			cfg.setMaximumPoolSize(5);
-			ds = new HikariDataSource(cfg);
-			dataSources.put(key, ds);
-		}
-		return new JdbcTemplate(ds);
-	}
-
-	private HikariDataSource createDataSource(Connection conn) {
-		HikariConfig config = new HikariConfig();
-		config.setJdbcUrl("jdbc:postgresql://" + conn.getHost() + ":" + conn.getPort() + "/" + conn.getDatabase());
-		config.setUsername(conn.getUsername());
-		config.setPassword(conn.getPassword());
-		config.setDriverClassName("org.postgresql.Driver");
-		HikariDataSource ds = new HikariDataSource(config);
-		dataSources.put(conn.getId(), ds);
+	private com.zaxxer.hikari.HikariDataSource createDataSource(com.deego.model.Connection conn) {
+		com.zaxxer.hikari.HikariDataSource ds =
+				connectionManager.createEphemeralJdbcDataSource(conn, conn.getDatabase());
+		dataSources.put(conn.getId(), ds);   // 保持你现有的 map 语义不变
 		return ds;
 	}
 
-	private HikariDataSource createTempDataSource(Connection conn) {
-		HikariConfig config = new HikariConfig();
-		config.setJdbcUrl("jdbc:postgresql://" + conn.getHost() + ":" + conn.getPort() + "/" + conn.getDatabase());
-		config.setUsername(conn.getUsername());
-		config.setPassword(conn.getPassword());
-		config.setDriverClassName("org.postgresql.Driver");
-		return new HikariDataSource(config);
+	private com.zaxxer.hikari.HikariDataSource createTempDataSource(com.deego.model.Connection conn) {
+		// 纯临时，不入缓存
+		return connectionManager.createEphemeralJdbcDataSource(conn, conn.getDatabase());
 	}
+
 
 	private void closeDataSource(String id) {
 		HikariDataSource ds = dataSources.remove(id);
@@ -132,4 +102,12 @@ public class ConnectionService {
 			ds.close();
 		}
 	}
+
+	public org.springframework.jdbc.core.JdbcTemplate getJdbcTemplate(String id, String overrideDb) {
+		com.deego.model.Connection c = getConnection(id).orElseThrow(() -> new com.deego.exception.BizException("Connection not found: " + id));
+		com.deego.exec.DbExecutor ex = connectionManager.acquireExecutor(c, overrideDb);
+		if (ex instanceof com.deego.exec.JdbcExecutor j) return j.jdbc();
+		throw new com.deego.exception.BizException("Not a relational executor for connection " + id);
+	}
+
 }

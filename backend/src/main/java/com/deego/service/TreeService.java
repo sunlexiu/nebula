@@ -8,7 +8,6 @@ import com.deego.model.Connection;
 import com.deego.model.Folder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -99,7 +98,7 @@ public class TreeService {
                     .filter(e -> e.getValue().getParent() == null)
                     .sorted(Comparator.comparingInt(e -> Optional.ofNullable(e.getValue().getPosition()).orElse(0)))
                     .map(e -> toNodeMap(conn, e.getKey(), e.getValue(), null))
-                    .collect(Collectors.toList());
+                    .toList();
         }
         List<String> segs = new ArrayList<>(Arrays.asList(path.split("/")));
         String nodeKey = segs.get(0);
@@ -183,89 +182,57 @@ public class TreeService {
     }
 
     private List<Map<String, Object>> queryList(Connection conn,
-            LinkedHashMap<String, NodeDef> reg,
-            String nodeKey, NodeDef def,
-            String parentId, Map<String, Object> params) {
+                                                LinkedHashMap<String, NodeDef> reg,
+                                                String nodeKey, NodeDef def,
+                                                String parentId, Map<String, Object> params) {
         if (def == null || def.getSqlQuery() == null) return List.of();
 
-        // 解析上下文：dbName / schemaName（我们在上游把 parentId 设计为 "db" 或 "db.schema"）
-        String ctxDb = null;
-        String ctxSchema = null;
-        if (parentId != null && !parentId.isBlank()) {
-            if ("schemas_real".equals(nodeKey)) {
-                // 展开数据库下的 schemas
-                ctxDb = parentId;
-            } else if (parentId.contains(".")) {
-                String[] segs = parentId.split("\\.", 2);
-                ctxDb = segs[0];
-                ctxSchema = segs.length > 1 ? segs[1] : null;
-            }
-        }
-
-        // 按需切库：schemas_real 或更深层（tables/views/functions）都要在目标库上执行
-        JdbcTemplate jdbc = (ctxDb != null && !ctxDb.isBlank() && !ctxDb.equals(conn.getDatabase()))
-                ? connectionService.getJdbcTemplate(conn.getId(), ctxDb)
-                : connectionService.getJdbcTemplate(conn.getId());
-
-        String sql = def.getSqlQuery();
-
-        // 解析 parentId：支持 "db" 或 "db.schema"
+        String ctxDb = null, ctxSchema = null;
         if (parentId != null && !parentId.isBlank()) {
             int dot = parentId.indexOf('.');
             if (dot > 0) {
                 ctxDb = parentId.substring(0, dot);
                 ctxSchema = parentId.substring(dot + 1);
             } else {
-                ctxDb = parentId; // 只有 db
+                ctxDb = parentId;
             }
         }
 
-        // 顺序替换：先 parentId（若 SQL 里用到），再 dbName/schemaName
-        if (parentId != null) {
-            sql = sql.replace("{parentId}", parentId);
-        }
+        String sql = def.getSqlQuery();
+        if (params.containsKey("entityId")) sql = sql.replace("{entityId}", String.valueOf(params.get("entityId")));
+        if (parentId != null) sql = sql.replace("{parentId}", parentId);
         String effectiveDb = (ctxDb != null && !ctxDb.isBlank()) ? ctxDb : conn.getDatabase();
         sql = sql.replace("{dbName}", effectiveDb);
-        if (ctxSchema != null) {
-            sql = sql.replace("{schemaName}", ctxSchema);
-        }
+        if (ctxSchema != null) sql = sql.replace("{schemaName}", ctxSchema);
 
-        List<Map<String, Object>> rows = jdbc.queryForList(sql);
-        List<Map<String, Object>> out = new ArrayList<>(rows.size());
+        org.springframework.jdbc.core.JdbcTemplate jdbc =
+            (ctxDb != null && !ctxDb.isBlank() && !ctxDb.equals(conn.getDatabase()))
+                ? connectionService.getJdbcTemplate(conn.getId(), ctxDb)
+                : connectionService.getJdbcTemplate(conn.getId());
 
-        for (Map<String, Object> r : rows) {
-            Map<String, Object> m = new LinkedHashMap<>();
-            String leafId = String.valueOf(r.getOrDefault("id", java.util.UUID.randomUUID().toString()));
-            String name   = String.valueOf(r.getOrDefault("name", leafId));
-
-            // 关键：把 parentId 编进实体 id，确保全局唯一（如 db.schema / db.schema.table）
-            String uniqueId = (parentId != null && !parentId.isBlank())
-                    ? parentId + (leafId.startsWith(".") ? leafId : "." + leafId)
-                    : leafId;
-
-            String compound = conn.getId() + "::" + nodeKey + "::" + uniqueId;
-            m.put("id", compound);
-            m.put("key", compound);
-            m.put("name", name);
-            m.put("type", def.getType());
-            m.put("icon", def.getIcon());
-
-            Map<String, Object> cfg = new LinkedHashMap<>();
+        java.util.List<java.util.Map<String, Object>> rows = jdbc.queryForList(sql);
+        java.util.List<java.util.Map<String, Object>> out = new java.util.ArrayList<>(rows.size());
+        for (java.util.Map<String, Object> r : rows) {
+            java.util.Map<String, Object> m2 = new java.util.LinkedHashMap<>();
+            String id = String.valueOf(r.getOrDefault("id", java.util.UUID.randomUUID().toString()));
+            String name = String.valueOf(r.getOrDefault("name", id));
+            String compound = conn.getId() + "::" + nodeKey + "::" + id;
+            m2.put("id", compound);
+            m2.put("key", compound);
+            m2.put("name", name);
+            m2.put("type", def.getType());
+            m2.put("icon", def.getIcon());
+            java.util.Map<String, Object> cfg = new java.util.LinkedHashMap<>();
             cfg.put("type", def.getType());
             if (def.getIcon() != null) cfg.put("icon", def.getIcon());
             if (def.getActions() != null) cfg.put("actions", def.getActions());
-            if (def.getNextLevel() != null) {
-                cfg.put("nextLevel", def.getNextLevel());
-            } else if (!def.isVirtual() && def.getSqlQuery() != null) {
-                cfg.put("nextLevel", nodeKey);
-            }
-            m.put("config", cfg);
-
-            // 便于前端动作使用
-            if (effectiveDb != null) m.put("dbName", effectiveDb);
-            if (ctxSchema != null)  m.put("schemaName", ctxSchema);
-
-            out.add(m);
+            if (def.getNextLevel() != null) cfg.put("nextLevel", def.getNextLevel());
+            else if (!def.isVirtual() && def.getSqlQuery() != null) cfg.put("nextLevel", nodeKey);
+            m2.put("config", cfg);
+            m2.put("virtual", false);
+            m2.put("connected", conn.getConnected() != null ? conn.getConnected() : Boolean.TRUE);
+            m2.put("children", new java.util.ArrayList<>());
+            out.add(m2);
         }
         return out;
     }
@@ -303,3 +270,5 @@ public class TreeService {
         return parentKey + "/" + entityId + "::" + childKey;
     }
 }
+
+// =========================================
