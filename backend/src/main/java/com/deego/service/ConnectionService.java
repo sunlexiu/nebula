@@ -1,6 +1,7 @@
 package com.deego.service;
 
 import com.deego.exception.BizException;
+import com.deego.exec.DbExecutor;
 import com.deego.manager.ConnectionManager;
 import com.deego.model.Connection;
 import com.deego.repository.ConnectionRepository;
@@ -26,6 +27,16 @@ public class ConnectionService {
 
 	public List<Connection> getAllConnections() {
 		return connectionRepository.findAll();
+	}
+
+	public DbExecutor getExecutor(String connId) {
+		Connection c = getConnection(connId).orElseThrow(() -> new BizException("Connection not found: " + connId));
+		return connectionManager.acquireExecutor(c, c.getDatabase());
+	}
+
+	/* 供 ConfigController 拉根节点 */
+	public List<Connection> getRootConnections() {
+		return connectionRepository.findByParentIdIsNull();
 	}
 
 	public Connection createConnection(Connection conn) {

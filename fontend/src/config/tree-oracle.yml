@@ -1,0 +1,71 @@
+tree:
+  - key: databases_aggregate
+    label: Databases
+    type: databases
+    virtual: true
+    position: 1
+    icon: /icons/databases.svg
+    nextLevel: dbs_real
+    actions:
+      primary: { handler: connectAndExpand, icon: ⚡, label: 连接 }
+      menu:
+        - { label: 新建数据库, handler: createNewDatabase, icon: ➕ }
+
+  - key: dbs_real
+    parent: databases_aggregate
+    type: database
+    virtual: false
+    icon: /icons/database.svg
+    nextLevel: schemas_aggregate
+    actions:
+      menu:
+        - { label: 刷新, handler: refreshDatabase, icon: 🔄 }
+        - { label: 新建表, handler: createNewTable, icon: 📊 }
+        - { type: separator }
+        - { label: 删除数据库, handler: deleteDatabase, icon: 🗑️, variant: danger }
+        - { label: 属性, handler: showProperties, icon: ℹ️ }
+
+  - key: schemas_aggregate
+    parent: dbs_real
+    label: Schemas
+    type: schemas
+    virtual: true
+    icon: /icons/schemas.svg
+    nextLevel: schemas_real
+
+  - key: schemas_real
+    parent: schemas_aggregate
+    type: schema
+    virtual: false
+    icon: /icons/schema.svg
+    nextLevel: tables_group
+    actions:
+      menu:
+        - { label: 刷新, handler: refreshSchema, icon: 🔄 }
+        - { label: 新建表, handler: createNewTable, icon: 📊 }
+        - { type: separator }
+        - { label: 删除Schema, handler: deleteSchema, icon: 🗑️, variant: danger }
+        - { label: 属性, handler: showProperties, icon: ℹ️ }
+
+  - key: tables_group
+    parent: schemas_real
+    label: Tables
+    type: tables
+    virtual: true
+    icon: /icons/tables.svg
+    nextLevel: tables_real
+
+  - key: tables_real
+    parent: tables_group
+    type: table
+    virtual: false
+    icon: /icons/table.svg
+    actions:
+      menu:
+        - { label: 预览数据, handler: previewTable, icon: 📊 }
+        - { label: 编辑结构, handler: editTableStructure, icon: ✏️ }
+        - { label: 生成SQL, handler: generateTableSQL, icon: 💾 }
+        - { label: 导出数据, handler: exportTableData, icon: 📤 }
+        - { type: separator }
+        - { label: 删除表, handler: deleteTable, icon: 🗑️, variant: danger }
+        - { label: 属性, handler: showProperties, icon: ℹ️ }

@@ -1,35 +1,30 @@
-export type NodeType =
-  | 'folder' | 'connection' | 'database' | 'schema'
-  | 'table' | 'view' | 'function' | 'role' | 'publication';
-
-export interface BaseNode {
-  id: string;
-  name: string;
-  config?: NodeConfig;
-  children?: TreeNode[];
+export interface ActionItem {
+  label?: string;
+  handler?: string;
+  icon?: string;
+  type?: 'separator';
+  variant?: 'danger' | 'default';
+  primary?: boolean;
 }
 
-export type TreeNode =
-  | (BaseNode & { type: 'folder'; allowDrop?: boolean })
-  | (BaseNode & { type: 'connection'; connected?: boolean })
-  | (BaseNode & { type: Exclude<NodeType, 'folder' | 'connection'> });
+export type ActionMap = Record<string, ActionItem[]>;
 
-export type ActionId =
-  | 'connectAndExpand' | 'refresh' | 'newConnection' | 'newFolder'
-  | 'deleteDatabase' | 'deleteSchema' | 'deleteTable' | 'deleteView' | 'deleteFunction'
-  | 'renameFolder' | 'editConnection' | 'runSql' | 'stop';
-
-export interface NodeAction {
-  id: ActionId | string;
+export interface TreeNodeConfig {
+  key: string;
   label: string;
-  confirm?: { title: string; message: string; variant?: 'danger' | 'default' };
+  type: string;
+  virtual?: boolean;
+  position?: number;
+  icon?: string;
+  nextLevel?: string;
+  parent?: string;
+  children?: Record<string, string>;
+  actions?: {
+    primary?: ActionItem;
+    menu?: ActionItem[];
+  };
 }
 
-export interface NodeConfig {
-  actions?: {
-    primary?: { handler: ActionId | string };
-    menu?: Array<{ handler: ActionId | string; label?: string }>;
-  };
-  nextLevel?: string;
-  allowDrop?: boolean;
+export interface TreeConfig {
+  tree: TreeNodeConfig[];
 }

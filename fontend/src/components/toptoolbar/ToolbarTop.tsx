@@ -1,15 +1,16 @@
 import React from 'react';
 import '../../css/ToolbarTop.css';
-import NewFileIcon from '../../public/icons/toptoolbar/new_folder_2_color.svg';
-import ConnectIcon from '../../public/icons/toptoolbar/new_connection_3_color.svg';
-import QueryIcon from '../../public/icons/toptoolbar/query_3.svg';
-import SearchIcon from '../../public/icons/toptoolbar/new_folder_1.svg'; // 假设图标
-import ExecuteIcon from '../../public/icons/toptoolbar/new_folder_1.svg'; // 假设图标
-import RefreshIcon from '../../public/icons/toptoolbar/refresh.svg'; // 假设刷新图标
 import { useTabsStore } from '../../stores/useTabsStore';
 import { useTreeStore } from '../../stores/useTreeStore';
 import { openNewGroup, openNewConnection } from '../modals/modalActions'; // 导入 actions
 import { useModal } from '../modals/ModalProvider'; // 修复：导入 useModal Hook
+
+const NewFileIcon = '/icons/toptoolbar/new_folder_2_color.svg';
+const ConnectIcon = '/icons/toptoolbar/new_connection_3_color.svg';
+const QueryIcon = '/icons/toptoolbar/query_3.svg';
+const SearchIcon = '/icons/toptoolbar/new_folder_1.svg';
+const ExecuteIcon = '/icons/toptoolbar/new_folder_1.svg';
+const RefreshIcon = '/icons/toptoolbar/refresh.svg';
 
 const ToolbarTop = () => {
   const addTab = useTabsStore((state) => state.addTab);

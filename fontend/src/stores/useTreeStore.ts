@@ -1,56 +1,71 @@
 import { create } from 'zustand';
-import { findNode } from '../utils/treeUtils';  // 导入辅助函数
+import { request } from '@/lib/request';
+import type { TreeNode } from '@/types/tree';
+import { baseActionMap } from '@/actions/actionMap';
 
-export const useTreeStore = create((set, get) => ({
+interface State {
+  treeData: TreeNode[];               // 只存 folder / connection 实例
+  refreshTree: () => Promise<void>;
+  setTreeData: (data: TreeNode[]) => void;
+  updateTreePath: (id: string, updater: (old: TreeNode) => TreeNode) => void;
+  deleteNode: (id: string) => void;
+}
+
+export const useTreeStore = create<State>((set) => ({
   treeData: [],
-  setTreeData: (data) => set({ treeData: data }),
+  actionMap: baseActionMap,
+
+  // 专门用于 folder 展开 / 收起
+  toggleFolderExpand: (nodeId: string) =>
+    set((state) => ({
+      treeData: updateTreeNode(state.treeData, nodeId, (node) =>
+        node.type === 'folder'
+          ? { ...node, expanded: !node.expanded }
+          : node
+      ),
+    })),
+
+  // 加载孩子（用于 connection / meta）
+  loadNodeChildren: async (nodeId: string) => {
+    const state = get();
+    const node = findNodeById(state.treeData, nodeId);
+    if (!node) return;
+
+    const updated = await loadNodeChildren(node);
+    set({
+      treeData: updateTreeNode(state.treeData, nodeId, () => updated),
+    });
+  },
+
+  /* ① 首页：只拿 folder + connection 实例 */
   refreshTree: async () => {
-    try {
-      const response = await fetch('/api/config/tree');
-      if (!response.ok) throw new Error('Failed to fetch tree data');
-      const { data } = await response.json();
-      // data 中的节点已带 config（后端注入）
-      set({ treeData: data || [] });
-    } catch (error) {
-      console.error('Error fetching tree data:', error);
-      set({ treeData: [] });
-    }
+    const res = await request<ApiResponse<TreeNode[]>>('/api/config/tree');
+    set({ treeData: res.data?.data ?? [] });
   },
-  // 新增：为连接加载配置（在 connectDatabase 时调用）
-  loadTreeConfig: async (connId) => {
-    const treeConfigStore = window.treeConfigStore || { getState: () => ({ loadConfigForConnection: async () => {} }) };  // 全局 fallback
-    await treeConfigStore.getState().loadConfigForConnection(connId);
-  },
-  updateTreePath: (targetId, updaterFn) => {
-    set((state) => {
-      const newTree = JSON.parse(JSON.stringify(state.treeData));
-      const targetNode = findNode(newTree, targetId);
-      if (targetNode) {
-        const updated = updaterFn({ ...targetNode });
-        Object.assign(targetNode, updated);
-      }
-      return { treeData: newTree };
-    });
-  },
-  deleteNode: (nodeId) => {
-    set((state) => {
-      const newTree = JSON.parse(JSON.stringify(state.treeData));
-      function deleteRecursive(nodes) {
-        if (!Array.isArray(nodes)) return false;
-        for (let i = 0; i < nodes.length; i++) {
-          if (nodes[i] && nodes[i].id === nodeId) {
-            nodes.splice(i, 1);
-            return true;
-          }
-          if (nodes[i] && nodes[i].children && deleteRecursive(nodes[i].children)) {
-            return true;
-          }
-        }
-        return false;
-      }
-      deleteRecursive(newTree);
-      return { treeData: newTree };
-    });
-  },
+
+  setTreeData: (data) => set({ treeData: data }),
+
+  updateTreePath: (id, updater) =>
+    set((s) => ({ treeData: updateNode(s.treeData, id, updater) })),
+
+  deleteNode: (id) =>
+    set((s) => ({ treeData: removeNode(s.treeData, id) })),
 }));
 
+/* ---------- 工具 ---------- */
+function updateNode(nodes: TreeNode[], id: string, updater: (n: TreeNode) => TreeNode): TreeNode[] {
+  return nodes.map((n) => {
+    if (n.id === id) return updater(n);
+    if (n.children?.length) return { ...n, children: updateNode(n.children, id, updater) };
+    return n;
+  });
+}
+
+function removeNode(nodes: TreeNode[], id: string): TreeNode[] {
+  const next: TreeNode[] = [];
+  for (const n of nodes) {
+    if (n.id === id) continue;
+    next.push(n.children?.length ? { ...n, children: removeNode(n.children, id) } : n);
+  }
+  return next;
+}

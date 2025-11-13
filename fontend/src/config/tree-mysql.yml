@@ -1,0 +1,496 @@
+tree:
+  # ------------------------------------------------
+  #  顶层虚拟聚合
+  # ------------------------------------------------
+  - key: roles_aggregate
+    label: Login/Group Roles
+    type: roles
+    virtual: true
+    position: 1
+    icon: /icons/left_tree/roles.svg
+    actions:
+      menu:
+        - { label: 新建角色, handler: createRole, icon: ➕ }
+
+  - key: databases_aggregate
+    label: Databases
+    type: databases
+    virtual: true
+    position: 2
+    icon: /icons/left_tree/databases.svg
+    nextLevel: dbs_real
+    actions:
+      primary: { handler: connectAndExpand, icon: ⚡, label: 连接 }
+      menu:
+        - { label: 新建数据库, handler: createNewDatabase, icon: ➕ }
+
+  # ------------------------------------------------
+  #  数据库级（真实）
+  # ------------------------------------------------
+  - key: dbs_real
+    parent: databases_aggregate
+    type: database
+    virtual: false
+    icon: /icons/left_tree/database.svg
+    nextLevel: db_subs_virtual
+    actions:
+      menu:
+        - { label: 刷新, handler: refreshDatabase, icon: 🔄 }
+        - { label: 新建 Schema, handler: createNewSchema, icon: 📁 }
+        - { label: 导出结构, handler: exportDatabase, icon: 📤 }
+        - { type: separator }
+        - { label: 删除数据库, handler: deleteDatabase, icon: 🗑️, variant: danger }
+        - { label: 属性, handler: showProperties, icon: ℹ️ }
+
+  # 数据库内虚拟分组（casts / extensions / schemas）
+  - key: db_subs_virtual
+    parent: dbs_real
+    type: db_subs
+    virtual: true
+    icon: /icons/left_tree/db_subs.svg
+    children:
+      casts: casts_virtual
+      extensions: extensions_virtual
+      schemas: schemas_aggregate
+
+  - key: casts_virtual
+    parent: db_subs_virtual
+    type: casts
+    label: Casts
+    virtual: true
+    icon: /icons/left_tree/casts.svg
+    children: {}
+
+  - key: extensions_virtual
+    parent: db_subs_virtual
+    type: extensions
+    label: Extensions
+    virtual: true
+    icon: /icons/left_tree/extensions.svg
+    children: {}
+
+  # ------------------------------------------------
+  #  Schema 级
+  # ------------------------------------------------
+  - key: schemas_aggregate
+    parent: db_subs_virtual
+    label: Schemas
+    type: schemas
+    virtual: true
+    icon: /icons/left_tree/schemas.svg
+    nextLevel: schemas_real
+
+  - key: schemas_real
+    parent: schemas_aggregate
+    type: schema
+    virtual: false
+    icon: /icons/left_tree/schema.svg
+    nextLevel: schema_subs_virtual
+    actions:
+      menu:
+        - { label: 刷新, handler: refreshSchema, icon: 🔄 }
+        - { label: 新建表, handler: createNewTable, icon: 📊 }
+        - { label: 导出结构, handler: exportSchema, icon: 📤 }
+        - { type: separator }
+        - { label: 删除 Schema, handler: deleteSchema, icon: 🗑️, variant: danger }
+        - { label: 属性, handler: showProperties, icon: ℹ️ }
+
+  # Schema 内虚拟分组
+  - key: schema_subs_virtual
+    parent: schemas_real
+    type: schema_subs
+    virtual: true
+    icon: /icons/left_tree/schema_subs.svg
+    children:
+      tables: tables_group
+      views: views_group
+      matviews: matviews_group
+      sequences: sequences_group
+      functions: functions_group
+      procedures: procedures_group
+
+  # ------------------------------------------------
+  #  Table 级
+  # ------------------------------------------------
+  - key: tables_group
+    parent: schema_subs_virtual
+    label: Tables
+    type: tables
+    virtual: true
+    icon: /icons/left_tree/tables.svg
+    nextLevel: tables_real
+
+  - key: tables_real
+    parent: tables_group
+    type: table
+    virtual: false
+    icon: /icons/left_tree/table.svg
+    nextLevel: table_subs_virtual
+    actions:
+      menu:
+        - { label: 预览数据, handler: previewTable, icon: 📊 }
+        - { label: 编辑结构, handler: editTableStructure, icon: ✏️ }
+        - { label: 生成 SQL, handler: generateTableSQL, icon: 💾 }
+        - { label: 导出数据, handler: exportTableData, icon: 📤 }
+        - { type: separator }
+        - { label: 删除表, handler: deleteTable, icon: 🗑️, variant: danger }
+        - { label: 属性, handler: showProperties, icon: ℹ️ }
+
+  # Table 子项虚拟分组
+  - key: table_subs_virtual
+    parent: tables_real
+    type: table_subs
+    virtual: true
+    icon: /icons/left_tree/table_subs.svg
+    children:
+      columns: table_columns_aggregate
+      constraints: table_constraints_aggregate
+      indexes: table_indexes_aggregate
+      triggers: table_triggers_aggregate
+
+  - key: table_columns_aggregate
+    parent: table_subs_virtual
+    label: Columns
+    type: columns
+    virtual: true
+    icon: /icons/left_tree/columns.svg
+    nextLevel: table_columns_real
+
+  - key: table_columns_real
+    parent: table_columns_aggregate
+    type: column
+    virtual: false
+    icon: /icons/left_tree/column.svg
+
+  - key: table_constraints_aggregate
+    parent: table_subs_virtual
+    label: Constraints
+    type: constraints
+    virtual: true
+    icon: /icons/left_tree/constraints.svg
+    nextLevel: table_constraints_real
+
+  - key: table_constraints_real
+    parent: table_constraints_aggregate
+    type: constraint
+    virtual: false
+    icon: /icons/left_tree/constraint.svg
+
+  - key: table_indexes_aggregate
+    parent: table_subs_virtual
+    label: Indexes
+    type: indexes
+    virtual: true
+    icon: /icons/left_tree/indexes.svg
+    nextLevel: table_indexes_real
+
+  - key: table_indexes_real
+    parent: table_indexes_aggregate
+    type: index
+    virtual: false
+    icon: /icons/left_tree/index.svg
+
+  - key: table_triggers_aggregate
+    parent: table_subs_virtual
+    label: Triggers
+    type: triggers
+    virtual: true
+    icon: /icons/left_tree/triggers.svg
+    nextLevel: table_triggers_real
+
+  - key: table_triggers_real
+    parent: table_triggers_aggregate
+    type: trigger
+    virtual: false
+    icon: /icons/left_tree/trigger.svg
+
+  # ------------------------------------------------
+  #  View 级
+  # ------------------------------------------------
+  - key: views_group
+    parent: schema_subs_virtual
+    label: Views
+    type: views
+    virtual: true
+    icon: /icons/left_tree/views.svg
+    nextLevel: views_real
+
+  - key: views_real
+    parent: views_group
+    type: view
+    virtual: false
+    icon: /icons/left_tree/view.svg
+    nextLevel: view_subs_virtual
+    actions:
+      menu:
+        - { label: 查看定义, handler: viewDefinition, icon: 👁️ }
+        - { label: 编辑视图, handler: editView, icon: ✏️ }
+        - { label: 生成 SQL, handler: generateViewSQL, icon: 💾 }
+        - { type: separator }
+        - { label: 删除视图, handler: deleteView, icon: 🗑️, variant: danger }
+        - { label: 属性, handler: showProperties, icon: ℹ️ }
+
+  - key: view_subs_virtual
+    parent: views_real
+    type: view_subs
+    virtual: true
+    icon: /icons/left_tree/view_subs.svg
+    children:
+      columns: view_columns_aggregate
+
+  - key: view_columns_aggregate
+    parent: view_subs_virtual
+    label: Columns
+    type: columns
+    virtual: true
+    icon: /icons/left_tree/view_columns.svg
+    nextLevel: view_columns_real
+
+  - key: view_columns_real
+    parent: view_columns_aggregate
+    type: column
+    virtual: false
+    icon: /icons/left_tree/view_column.svg
+
+  # ------------------------------------------------
+  #  Materialized View 级
+  # ------------------------------------------------
+  - key: matviews_group
+    parent: schema_subs_virtual
+    label: Materialized Views
+    type: matviews
+    virtual: true
+    icon: /icons/left_tree/matviews.svg
+    nextLevel: matviews_real
+
+  - key: matviews_real
+    parent: matviews_group
+    type: materialized_view
+    virtual: false
+    icon: /icons/left_tree/matview.svg
+    nextLevel: matview_subs_virtual
+    actions:
+      menu:
+        - { label: 刷新物化视图, handler: refreshMaterializedView, icon: 🔄 }
+        - { type: separator }
+        - { label: 删除物化视图, handler: deleteView, icon: 🗑️, variant: danger }
+        - { label: 属性, handler: showProperties, icon: ℹ️ }
+
+  - key: matview_subs_virtual
+    parent: matviews_real
+    type: matview_subs
+    virtual: true
+    icon: /icons/left_tree/matview_subs.svg
+    children:
+      columns: matview_columns_aggregate
+      indexes: matview_indexes_aggregate
+
+  - key: matview_columns_aggregate
+    parent: matview_subs_virtual
+    label: Columns
+    type: columns
+    virtual: true
+    icon: /icons/left_tree/matview_columns.svg
+    nextLevel: matview_columns_real
+
+  - key: matview_columns_real
+    parent: matview_columns_aggregate
+    type: column
+    virtual: false
+    icon: /icons/left_tree/matview_column.svg
+
+  - key: matview_indexes_aggregate
+    parent: matview_subs_virtual
+    label: Indexes
+    type: indexes
+    virtual: true
+    icon: /icons/left_tree/matview_indexes.svg
+    nextLevel: matview_indexes_real
+
+  - key: matview_indexes_real
+    parent: matview_indexes_aggregate
+    type: index
+    virtual: false
+    icon: /icons/left_tree/matview_index.svg
+
+  # ------------------------------------------------
+  #  Sequence 级
+  # ------------------------------------------------
+  - key: sequences_group
+    parent: schema_subs_virtual
+    label: Sequences
+    type: sequences
+    virtual: true
+    icon: /icons/left_tree/sequences.svg
+    nextLevel: sequences_real
+
+  - key: sequences_real
+    parent: sequences_group
+    type: sequence
+    virtual: false
+    icon: /icons/left_tree/sequence.svg
+    nextLevel: sequence_subs_virtual
+    actions:
+      menu:
+        - { label: 属性, handler: showProperties, icon: ℹ️ }
+
+  - key: sequence_subs_virtual
+    parent: sequences_real
+    type: sequence_subs
+    virtual: true
+    icon: /icons/left_tree/sequence_subs.svg
+    children:
+      properties: sequence_props_aggregate
+
+  - key: sequence_props_aggregate
+    parent: sequence_subs_virtual
+    label: Properties
+    type: properties
+    virtual: true
+    icon: /icons/left_tree/sequence_props.svg
+    nextLevel: sequence_props_real
+
+  - key: sequence_props_real
+    parent: sequence_props_aggregate
+    type: property
+    virtual: false
+    icon: /icons/left_tree/property.svg
+
+  # ------------------------------------------------
+  #  Function 级
+  # ------------------------------------------------
+  - key: functions_group
+    parent: schema_subs_virtual
+    label: Functions
+    type: functions
+    virtual: true
+    icon: /icons/left_tree/functions.svg
+    nextLevel: functions_real
+
+  - key: functions_real
+    parent: functions_group
+    type: function
+    virtual: false
+    icon: /icons/left_tree/function.svg
+    nextLevel: function_subs_virtual
+    actions:
+      menu:
+        - { label: 编辑函数, handler: editFunction, icon: ✏️ }
+        - { label: 查看源码, handler: viewFunctionSource, icon: 👁️ }
+        - { label: 执行测试, handler: testFunction, icon: 🔬 }
+        - { type: separator }
+        - { label: 删除函数, handler: deleteFunction, icon: 🗑️, variant: danger }
+        - { label: 属性, handler: showProperties, icon: ℹ️ }
+
+  - key: function_subs_virtual
+    parent: functions_real
+    type: function_subs
+    virtual: true
+    icon: /icons/left_tree/function_subs.svg
+    children:
+      info: function_info_aggregate
+      definition: function_definition_aggregate
+
+  - key: function_info_aggregate
+    parent: function_subs_virtual
+    label: Info
+    type: info
+    virtual: true
+    icon: /icons/left_tree/function_info.svg
+    nextLevel: function_info_real
+
+  - key: function_info_real
+    parent: function_info_aggregate
+    type: property
+    virtual: false
+    icon: /icons/left_tree/property.svg
+
+  - key: function_definition_aggregate
+    parent: function_subs_virtual
+    label: Definition
+    type: definition
+    virtual: true
+    icon: /icons/left_tree/function_definition.svg
+    nextLevel: function_definition_real
+
+  - key: function_definition_real
+    parent: function_definition_aggregate
+    type: definition
+    virtual: false
+    icon: /icons/left_tree/function_definition.svg
+
+  # ------------------------------------------------
+  #  Procedure 级
+  # ------------------------------------------------
+  - key: procedures_group
+    parent: schema_subs_virtual
+    label: Procedures
+    type: procedures
+    virtual: true
+    icon: /icons/left_tree/procedures.svg
+    nextLevel: procedures_real
+
+  - key: procedures_real
+    parent: procedures_group
+    type: procedure
+    virtual: false
+    icon: /icons/left_tree/procedure.svg
+    nextLevel: procedure_subs_virtual
+    actions:
+      menu:
+        - { label: 编辑过程, handler: editFunction, icon: ✏️ }
+        - { label: 查看源码, handler: viewFunctionSource, icon: 👁️ }
+        - { type: separator }
+        - { label: 删除过程, handler: deleteFunction, icon: 🗑️, variant: danger }
+        - { label: 属性, handler: showProperties, icon: ℹ️ }
+
+  - key: procedure_subs_virtual
+    parent: procedures_real
+    type: procedure_subs
+    virtual: true
+    icon: /icons/left_tree/procedure_subs.svg
+    children:
+      info: procedure_info_aggregate
+      definition: procedure_definition_aggregate
+
+  - key: procedure_info_aggregate
+    parent: procedure_subs_virtual
+    label: Info
+    type: info
+    virtual: true
+    icon: /icons/left_tree/procedure_info.svg
+    nextLevel: procedure_info_real
+
+  - key: procedure_info_real
+    parent: procedure_info_aggregate
+    type: property
+    virtual: false
+    icon: /icons/left_tree/property.svg
+
+  - key: procedure_definition_aggregate
+    parent: procedure_subs_virtual
+    label: Definition
+    type: definition
+    virtual: true
+    icon: /icons/left_tree/procedure_definition.svg
+    nextLevel: procedure_definition_real
+
+  - key: procedure_definition_real
+    parent: procedure_definition_aggregate
+    type: definition
+    virtual: false
+    icon: /icons/left_tree/procedure_definition.svg
+
+  # ------------------------------------------------
+  #  角色（顶层真实）
+  # ------------------------------------------------
+  - key: users_real
+    parent: roles_aggregate
+    type: role
+    virtual: false
+    icon: /icons/left_tree/role.svg
+    actions:
+      menu:
+        - { label: 属性, handler: showRoleProperties, icon: ℹ️ }
+        - { type: separator }
+        - { label: 删除角色, handler: deleteRole, icon: 🗑️, variant: danger }

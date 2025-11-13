@@ -1,29 +1,9 @@
 import React, { useState, memo } from 'react';
-import { useModal } from '../modals/ModalProvider';          // ← 1. 引入 useModal
+import { useModal } from '../modals/ModalProvider';
 import { useTreeStore } from '../../stores/useTreeStore';
-import { actionHandlers, connectDatabase } from '../../actions/dbActions';
-import {
-  getExpandIcon,
-  getNodeIcon,
-  loadNodeChildren,
-  isExpandable
-} from '../../utils/treeUtils';
-import { getPrimaryAction } from '../../actions/dbActions';
-import {
-  getThemeColors,
-  nodeBaseStyles,
-  nodeHoverStyles,
-  expandIconStyles,
-  nodeIconStyles,
-  nodeNameStyles,
-  typeLabelStyles,
-  actionButtonStyles,
-  indicatorBarStyles,
-  childIndicatorStyles,
-  actionContainerStyles,
-  dragOverStyles,
-  dragSourceStyles,
-} from './styles';
+import { actionHandlers } from '../../actions/dbActions';
+import { getExpandIcon, getNodeIcon, loadNodeChildren } from '../../utils/treeUtils';
+import { getThemeColors, nodeBaseStyles, expandIconStyles, nodeIconStyles, nodeNameStyles, typeLabelStyles, actionButtonStyles, indicatorBarStyles, childIndicatorStyles, actionContainerStyles, dragOverStyles, dragSourceStyles } from './styles';
 
 const TreeNode = memo(({
   node,
@@ -52,17 +32,17 @@ const TreeNode = memo(({
   const isDragging = dragSourceId === node.id;
   const isDragOver = dragOverNodeId === node.id;
   const hasChildren = node.children && node.children.length > 0;
-  const isExpandable = hasChildren || node.config?.nextLevel || node.virtual || node.type === 'connection' || node.type === 'database' || node.type === 'schema' || node.type.includes('_group');
+  const isExpandable = hasChildren || node.virtual || node.config?.nextLevel;
   const isDraggable = node.type === 'folder' || node.type === 'connection';
   const isDropTarget = node.type === 'folder' || node.config?.allowDrop;
-  const primaryAction = getPrimaryAction(node);
-  const theme = getThemeColors(node.type || node.config?.type);
+  const { actionMap } = useTreeStore();
+  const primaryAction = actionMap[node.type]?.[0] || null;
+  const theme = getThemeColors(node.type);
   const { updateTreePath } = useTreeStore();
   const isExpanded = node.expanded;
   const isConnected = node.connected;
   if (isConnected) theme.accentColor = '#10b981';
 
-  /* -------------- 样式 -------------- */
   const combinedStyles = {
     ...nodeBaseStyles,
     ...(isDragging && dragSourceStyles),
@@ -77,32 +57,24 @@ const TreeNode = memo(({
     paddingRight: (isHovered || isActive) ? '4px' : '8px'
   };
 
-  /* -------------- 拖拽事件 -------------- */
-  const handleDragStart = (e) => {
+  const handleDragStart = (e: React.DragEvent) => {
     if (isDraggable) {
       setDragSourceId(node.id);
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', node.id);
     }
   };
-
-  const handleDragOver = (e) => {
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
-    if (isDropTarget && dragSourceId && dragSourceId !== node.id) {
-      setDragOverNodeId(node.id);
-    }
+    if (isDropTarget && dragSourceId && dragSourceId !== node.id) setDragOverNodeId(node.id);
   };
-
-  const handleDragLeave = (e) => {
+  const handleDragLeave = (e: React.DragEvent) => {
     e.stopPropagation();
-    if (isDropTarget && dragOverNodeId === node.id) {
-      setDragOverNodeId(null);
-    }
+    if (isDropTarget && dragOverNodeId === node.id) setDragOverNodeId(null);
   };
-
-  const handleDrop = (e) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (isDropTarget && dragSourceId && dragSourceId !== node.id) {
@@ -111,55 +83,36 @@ const TreeNode = memo(({
     setDragOverNodeId(null);
   };
 
-  /* -------------- 单击展开 / 加载 -------------- */
-  const handleClick = async (e) => {
-    e.stopPropagation();
-    if (isExpandable) {
-      if (!hasChildren) {
+    const handleClick = async () => {
+      if (isExpandable) {
         setIsLoading(true);
         try {
           const updated = await loadNodeChildren(node);
-          if (updated && updated.children) {
-            updateTreePath(node.id, (current) => ({
-              ...current,
-              children: updated.children,
-              expanded: true
-            }));
-          }
-          setExpandedKeys((prev) => new Map(prev).set(node.id, true));
-        } catch (error) {
-          console.error('加载失败:', error);
+          updateTreePath(node.id, () => updated);
         } finally {
           setIsLoading(false);
         }
-      } else {
-        setExpandedKeys((prev) => new Map(prev).set(node.id, !prev.get(node.id)));
       }
+    };
+
+  const handlePrimaryAction = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (primaryAction && !activeMoreMenuNode) {
+      await actionHandlers.dynamicHandler(primaryAction.handler, node, {
+        setExpandedKeys,
+        openModal,
+      });
     }
   };
 
-
-  /* -------------- 主动作（连接/刷新/预览...） -------------- */
-const handlePrimaryAction = async (e) => {
-  e.stopPropagation();
-  if (primaryAction && !activeMoreMenuNode) {
-    await actionHandlers.dynamicHandler(primaryAction.handler, node, {
-      setExpandedKeys,
-      openModal,
-    });
-  }
-};
-
-  /* -------------- 更多菜单 -------------- */
-  const handleMoreMenu = (e) => {
+  const handleMoreMenu = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!activeMoreMenuNode) {
       setActiveMoreMenuNode(node.id);
       onMoreMenu(e, node);
     }
   };
-
-  const handleContextMenu = (e) => {
+  const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     handleMoreMenu(e);
@@ -218,16 +171,16 @@ const handlePrimaryAction = async (e) => {
               disabled={!!activeMoreMenuNode}
               onMouseEnter={(e) => {
                 if (!activeMoreMenuNode) {
-                  e.target.style.background = 'white';
-                  e.target.style.transform = 'scale(1.05)';
-                  e.target.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.15)';
+                  e.currentTarget.style.background = 'white';
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                  e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.15)';
                 }
               }}
               onMouseLeave={(e) => {
                 if (!activeMoreMenuNode) {
-                  e.target.style.background = 'rgba(255, 255, 255, 0.8)';
-                  e.target.style.transform = 'scale(1)';
-                  e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
                 }
               }}
             >
@@ -237,26 +190,22 @@ const handlePrimaryAction = async (e) => {
 
           <button
             onClick={handleMoreMenu}
-            style={{
-              ...actionButtonStyles(theme),
-              color: '#666',
-              fontSize: '14px'
-            }}
+            style={{ ...actionButtonStyles(theme), color: '#666', fontSize: '14px' }}
             disabled={!!activeMoreMenuNode && activeMoreMenuNode !== node.id}
             onMouseEnter={(e) => {
               if (!activeMoreMenuNode || activeMoreMenuNode === node.id) {
-                e.target.style.background = 'white';
-                e.target.style.transform = 'scale(1.05)';
-                e.target.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.15)';
-                e.target.style.color = theme.accentColor;
+                e.currentTarget.style.background = 'white';
+                e.currentTarget.style.transform = 'scale(1.05)';
+                e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.15)';
+                e.currentTarget.style.color = theme.accentColor;
               }
             }}
             onMouseLeave={(e) => {
               if (!activeMoreMenuNode || activeMoreMenuNode === node.id) {
-                e.target.style.background = 'rgba(255, 255, 255, 0.8)';
-                e.target.style.transform = 'scale(1)';
-                e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
-                e.target.style.color = '#666';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)';
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                e.currentTarget.style.color = '#666';
               }
             }}
           >
@@ -273,6 +222,4 @@ const handlePrimaryAction = async (e) => {
 });
 
 TreeNode.displayName = 'TreeNode';
-
 export default TreeNode;
-

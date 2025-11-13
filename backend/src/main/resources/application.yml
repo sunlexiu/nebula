@@ -15,10 +15,6 @@ spring:
     console:
       enabled: true
 
-# YAML 配置路径（classpath）
-deego:
-  tree-config: classpath:config/tree-config.yml
-
 logging:
   level:
     com.deego: DEBUG

@@ -1,46 +1,40 @@
 package com.deego.controller;
 
 import com.deego.common.ApiResponse;
-import com.deego.service.TreeService;
+import com.deego.service.MetaService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/meta")
+@RequestMapping("/api/meta")
 public class MetaController {
-	@Autowired
-	private TreeService treeService;
 
+	@Autowired
+	private MetaService metaService;
+
+	/* 真实节点列表：顶层 */
 	@GetMapping("/{connId}/children")
 	public ApiResponse<List<Map<String, Object>>> top(@PathVariable String connId) {
-		var rs = treeService.loadChildren(connId, null);
-		return ApiResponse.ok(rs);
+		return ApiResponse.ok(metaService.listDatabases(connId));
 	}
 
-	// 单段：/api/meta/{connId}/{nodeKey}/children   和   /meta/{connId}/{nodeKey}/children
+	/* 真实节点列表：单段路径 */
 	@GetMapping("/{connId}/{nodeKey}/children")
-	public ApiResponse<List<Map<String, Object>>> children1(
+	public ApiResponse<List<Map<String, Object>>> children(
 			@PathVariable String connId,
-			@PathVariable String nodeKey
-	) {
-		var rs = treeService.loadChildren(connId, nodeKey);
-		return ApiResponse.ok(rs);
+			@PathVariable String nodeKey) {
+		return ApiResponse.ok(metaService.listChildren(connId, nodeKey));
 	}
 
-	// 双段：/api/meta/{connId}/{nodeKey}/{entityId}/children   和   /meta/{connId}/{nodeKey}/{entityId}/children
+	/* 真实节点列表：双段路径 */
 	@GetMapping("/{connId}/{nodeKey}/{entityId}/children")
-	public ApiResponse<List<Map<String, Object>>> children2(
+	public ApiResponse<List<Map<String, Object>>> children(
 			@PathVariable String connId,
 			@PathVariable String nodeKey,
-			@PathVariable String entityId
-	) {
-		var rs = treeService.loadChildren(connId, nodeKey + "/" + entityId);
-		return ApiResponse.ok(rs);
+			@PathVariable String entityId) {
+		return ApiResponse.ok(metaService.listChildren(connId, nodeKey + "/" + entityId));
 	}
 }

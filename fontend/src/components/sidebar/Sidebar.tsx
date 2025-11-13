@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import TreeContainer from './TreeContainer';
 import MoreActionsMenu from './MoreActionsMenu';
-import deegoLogo from '../../public/icons/deego_1.svg';
 import { useTreeStore } from '../../stores/useTreeStore';
 import { useModal } from '../modals/ModalProvider';
 import {
@@ -44,6 +43,8 @@ import {
 } from '../../actions/dbActions';
 import { useDragDrop } from './hooks/useDragDrop';
 import { findNode } from '../../utils/treeUtils';
+
+const deegoLogo = '/icons/deego_1.svg';
 
 const Sidebar = ({ treeData }) => {
   const [expandedKeys, setExpandedKeys] = useState(new Map());

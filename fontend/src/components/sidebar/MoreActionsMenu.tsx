@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getAllActions } from '../../actions/dbActions';
+import { useTreeStore } from '../../stores/useTreeStore';
 import toast from 'react-hot-toast';
 
 const MoreActionsMenu = ({
@@ -40,12 +40,12 @@ const MoreActionsMenu = ({
   deleteTable,
   deleteView,
   deleteFunction
-}) => {
-  const [hoveredItem, setHoveredItem] = useState(null);
-  // 修复：传入所有必要 props 到 getAllActions
-  const actions = getAllActions(node.type, node, setExpandedKeys, openNewGroup, openNewConnection, openConfirm, openRenameFolder, openEditConnection, refreshFolder, deleteFolder, refreshConnection, connectDatabase, disconnectDatabase, refreshDatabase, refreshSchema, createNewSchema, exportDatabase, createNewTable, exportSchema, previewTable, editTableStructure, generateTableSQL, exportTableData, viewDefinition, editView, generateViewSQL, editFunction, viewFunctionSource, testFunction, showProperties, deleteConnection, deleteDatabase, deleteSchema, deleteTable, deleteView, deleteFunction);
+}: any) => {
+  const [hoveredItem, setHoveredItem] = useState<number | null>(null);
+  const { actionMap } = useTreeStore();
+  const actions = actionMap[node.type] || [];
 
-  const handleAction = (action) => {
+  const handleAction = (action: any) => {
     try {
       if (typeof action === 'function') {
         action();
@@ -59,10 +59,7 @@ const MoreActionsMenu = ({
     onClose();
   };
 
-  const flipStyle = position.flip ? {
-    borderTop: '2px solid #e0e0e0',
-    borderBottom: '1px solid #e0e0e0'
-  } : {};
+  const flipStyle = position.flip ? { borderTop: '2px solid #e0e0e0', borderBottom: '1px solid #e0e0e0' } : {};
 
   return (
     <div
@@ -89,11 +86,7 @@ const MoreActionsMenu = ({
           return (
             <div
               key={`sep-${index}`}
-              style={{
-                height: '1px',
-                background: '#e0e0e0',
-                margin: '4px 0'
-              }}
+              style={{ height: '1px', background: '#e0e0e0', margin: '4px 0' }}
             />
           );
         }
@@ -118,7 +111,15 @@ const MoreActionsMenu = ({
             onMouseLeave={() => setHoveredItem(null)}
             onClick={(e) => {
               e.stopPropagation();
-              handleAction(item.action);
+              handleAction(() => {
+                // 动态调用 actionHandlers
+                import('../../actions/dbActions').then((mod) => {
+                  mod.actionHandlers.dynamicHandler(item.handler, node, {
+                    setExpandedKeys,
+                    openModal: openConfirm
+                  });
+                });
+              });
             }}
           >
             <span style={{ fontSize: '14px', width: '16px' }}>{item.icon}</span>
@@ -131,4 +132,3 @@ const MoreActionsMenu = ({
 };
 
 export default MoreActionsMenu;
-

@@ -5,23 +5,21 @@ import EditorPanel from '../editor/EditorPanel';
 import { useResize } from '../../hooks/useResize';
 import { useTreeStore } from '../../stores/useTreeStore';
 import { useTabsStore } from '../../stores/useTabsStore';
-import FormatIcon from '../../public/icons/toptoolbar/format_1.svg';
-import RunIcon from '../../public/icons/toptoolbar/run_1.svg';
-import StopIcon from '../../public/icons/toptoolbar/stop_1.svg';
 import { openNewGroup, openNewConnection } from '../modals/modalActions'; // 从模态 actions 导入
+
+const FORMAT_ICON = '/icons/toptoolbar/format_1.svg';
+const RUN_ICON = '/icons/toptoolbar/run_1.svg';
+const STOP_ICON = '/icons/toptoolbar/stop_1.svg';
 
 const AppLayout = () => {
   const sidebarRef = useRef(null); // 确保 ref 存在
   const { sidebarWidth, editorHeight, handleSidebarMouseDown, handleEditorMouseDown } = useResize(undefined, undefined, sidebarRef); // 传入 sidebarRef
-  const { treeData, refreshTree } = useTreeStore();
+  const treeData = useTreeStore((s) => s.treeData);
+  const refreshTree = useTreeStore((s) => s.refreshTree);
   const { tabs, activeTabId, updateQuery, executeQuery, formatQuery, addTab, closeTab, checkTabOverflow, handleTabScroll } = useTabsStore();
   const tabsContainerRef = useRef(null);
   const [showTabScroll, setShowTabScroll] = React.useState(false);
   const activeTab = tabs.find((t) => t.id === activeTabId) || { query: '', results: [] };
-
-  useEffect(() => {
-    refreshTree(); // 初始化树数据
-  }, [refreshTree]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => setShowTabScroll(checkTabOverflow(tabsContainerRef)), 100);
@@ -52,13 +50,13 @@ const AppLayout = () => {
         <div className="toolbar">
           <div className="toolbar-left">
             <button className="btn btn-icon" title="美化sql" onClick={handleFormat}>
-              <img src={FormatIcon} alt="美化sql" className="icon" />
+              <img src={FORMAT_ICON} alt="美化sql" className="icon" />
             </button>
             <button className="btn btn-icon" title="运行" onClick={handleRun}>
-              <img src={RunIcon} alt="运行" className="icon" />
+              <img src={RUN_ICON} alt="运行" className="icon" />
             </button>
             <button className="btn btn-icon" title="停止" onClick={handleRun}>
-              <img src={StopIcon} alt="停止" className="icon" />
+              <img src={STOP_ICON} alt="停止" className="icon" />
             </button>
           </div>
         </div>

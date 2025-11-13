@@ -839,3 +839,23 @@ body.dragging * {
     transform: translateY(0) scale(1);
   }
 }
+
+.empty-tree {
+  padding: 20px;
+  text-align: center;
+  color: #999;
+  font-size: 14px;
+}
+
+.tree-container.drag-over {
+  border: 2px dashed #0b69ff;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.tree-children {
+  margin-left: 2px;
+  padding-left: 1px;
+  border-left: 1px solid #e0e7ff;
+  margin-top: 1px;
+}
