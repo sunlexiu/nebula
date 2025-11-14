@@ -145,3 +145,19 @@ export const patchConnectionNode = (node: TreeNode): TreeNode => {
   }
   return node;
 };
+
+export const loadDatabasesForConnection = async (node: any): Promise<any[]> => {
+  const connId = node.id;
+  const res = await fetch(`/api/meta/${encodeURIComponent(connId)}/databases`);
+  if (!res.ok) throw new Error('加载数据库列表失败');
+  const data = await res.json();
+  return data.map((db: string) => ({
+    id: `${connId}::${db}`,
+    name: db,
+    type: 'database',
+    connected: true,
+    dbType: node.dbType,
+    children: [],
+    virtual: false,
+  }));
+};

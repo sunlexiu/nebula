@@ -39,7 +39,8 @@ const MoreActionsMenu = ({
   deleteSchema,
   deleteTable,
   deleteView,
-  deleteFunction
+  deleteFunction,
+  openModal
 }: any) => {
   const [hoveredItem, setHoveredItem] = useState<number | null>(null);
   const { actionMap } = useTreeStore();
@@ -116,7 +117,7 @@ const MoreActionsMenu = ({
                 import('../../actions/dbActions').then((mod) => {
                   mod.actionHandlers.dynamicHandler(item.handler, node, {
                     setExpandedKeys,
-                    openModal: openConfirm
+                    openModal,
                   });
                 });
               });

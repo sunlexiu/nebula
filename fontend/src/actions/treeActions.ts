@@ -2,9 +2,10 @@ import toast from 'react-hot-toast';
 import { findNode } from '../utils/treeUtils';
 import { useTreeStore } from '../stores/useTreeStore';
 import { useTreeConfigStore } from '../stores/useTreeConfigStore';  // 新增
+import { openConfirm} from '../components/modals/modalActions';
 
-// handleNewGroupSubmit 和 handleNewConnectionSubmit 保持原样
-export const handleNewGroupSubmit = async (groupName, parentId) => {
+
+export const handleNewGroupSubmit = async (groupName: string, parentId: string | null) => {
   try {
     const response = await fetch('/api/config/folders', {
       method: 'POST',
@@ -13,7 +14,7 @@ export const handleNewGroupSubmit = async (groupName, parentId) => {
     });
     if (!response.ok) throw new Error('Failed to create group');
     await response.json();
-    useTreeStore.getState().refreshTree();
+    useTreeStore.getState().refreshTree();  // 统一刷新树
     toast.success('新建分组成功');
   } catch (err) {
     console.error('Error creating group:', err);
@@ -22,7 +23,7 @@ export const handleNewGroupSubmit = async (groupName, parentId) => {
   }
 };
 
-export const handleNewConnectionSubmit = async (connectionData, parentId) => {
+export const handleNewConnectionSubmit = async (connectionData: any, parentId: string | null) => {
   try {
     const response = await fetch('/api/config/connections', {
       method: 'POST',
@@ -31,7 +32,7 @@ export const handleNewConnectionSubmit = async (connectionData, parentId) => {
     });
     if (!response.ok) throw new Error('Failed to create connection');
     await response.json();
-    useTreeStore.getState().refreshTree();
+    useTreeStore.getState().refreshTree();  // 统一刷新树
     toast.success('新建连接成功');
   } catch (err) {
     console.error('Error creating connection:', err);
@@ -149,73 +150,47 @@ export const deleteNode = (treeData, nodeId) => {
   return newTree;
 };
 
-// 删除文件夹：不变
-export const deleteFolder = async (node, openModal) => {
-  if (typeof openModal !== 'function') {
-    console.error('openModal must be a function');
-    return;
-  }
-  const localOpenConfirm = (title, message, onConfirm, variant = 'danger') => {
-    openModal('confirm', {
-      title,
-      message,
-      onConfirm,
-      variant
+
+// 重命名文件夹
+export const renameFolder = async (nodeId: string, newName: string) => {  // 移除 openModal 参数，因为模态不需它
+  if (!newName.trim()) throw new Error('文件夹名称不能为空');
+  try {
+    const response = await fetch(`/api/config/folders/${nodeId}`, {
+      method: 'PUT',  // 明确使用 PUT 更新
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName.trim() })
     });
-  };
-
-  localOpenConfirm(
-    `删除文件夹`,
-    `确定要删除文件夹 "${node.name}" 及其所有子项吗？此操作不可恢复。`,
-    async () => {
-      try {
-        const response = await fetch(`/api/config/folders/${node.id}`, { method: 'DELETE' });
-        if (!response.ok) throw new Error('Failed to delete folder');
-        useTreeStore.getState().deleteNode(node.id);
-        toast.success(`文件夹 "${node.name}" 已删除`);
-      } catch (error) {
-        toast.error('删除失败，请重试');
-      }
-    },
-    'danger'
-  );
-};
-
-// 重命名文件夹：不变
-export const renameFolder = (node, openModal) => {
-  if (typeof openModal !== 'function') {
-    console.error('openModal must be a function');
-    return;
+    if (!response.ok) throw new Error('Failed to rename folder');
+    // 更新树状态
+    const { updateTreePath } = useTreeStore.getState();
+    updateTreePath(nodeId, (current: any) => ({ ...current, name: newName.trim() }));
+    toast.success(`文件夹已重命名为 "${newName}"`);
+  } catch (error) {
+    console.error('Rename folder error:', error);
+    toast.error('重命名失败，请重试');
+    throw error;
   }
-  openModal('renameFolder', {
-    id: node.id,
-    name: node.name,
-    onSubmit: async (newName) => {
-      if (!newName || newName.trim() === '') {
-        throw new Error('文件夹名称不能为空');
-      }
-      try {
-        const response = await fetch(`/api/config/folders`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: newName.trim(), id: node.id, type: 'folder' })
-        });
-        if (!response.ok) throw new Error('Failed to rename folder');
-        useTreeStore.getState().updateTreePath(node.id, (current) => ({
-          ...current,
-          name: newName.trim()
-        }));
-        toast.success(`文件夹已重命名为 "${newName}"`);
-      } catch (error) {
-        console.error('Rename folder error:', error);
-        throw error;
-      }
-    }
-  });
 };
 
-// 刷新文件夹：不变
-export const refreshFolder = (node) => {
-  toast(`刷新文件夹: ${node.name}`);
-  // 实际调用 API 刷新子项
+// 刷新文件夹
+export const refreshFolder = async (node: any, setExpandedKeys?: Function) => {
+  try {
+    const response = await fetch(`/api/config/folders/${node.id}/refresh`, { method: 'POST' });
+    if (!response.ok) throw new Error('Failed to refresh folder');
+    const updatedChildren = await response.json(); // 假设返回 { children: [...] }
+    const { updateTreePath } = useTreeStore.getState();
+    updateTreePath(node.id, (curr: any) => ({
+      ...curr,
+      children: updatedChildren.children || [],
+      expanded: true
+    }));
+    toast.success(`刷新文件夹: ${node.name}`);
+    setExpandedKeys?.((prev: Map<string, boolean>) => new Map(prev).set(node.id, true));
+    // 可选：刷新整个树以确保一致性
+    // useTreeStore.getState().refreshTree();
+  } catch (error) {
+    console.error('Refresh folder error:', error);
+    toast.error('刷新失败，请重试');
+  }
 };
+

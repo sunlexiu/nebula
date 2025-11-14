@@ -58,34 +58,6 @@ public class ConfigController {
 		return ResponseEntity.ok(ans);
 	}
 
-	/* 递归拼 folder 节点，同时把直属 connection 塞进 children */
-	private List<Map<String, Object>> buildFolderTree(String parentId,
-			Map<String, List<Folder>> folderMap,
-			Map<String, List<Connection>> connMap) {
-		return folderMap.getOrDefault(parentId, List.of()).stream().map(f -> {
-			Map<String, Object> dto = beanUtils.beanToMap(f);
-			dto.put("type", "folder");
-			List<Map<String, Object>> children = new ArrayList<>();
-
-			// 子 folder
-			children.addAll(buildFolderTree(f.getId(), folderMap, connMap));
-			// 直属 connection
-			children.addAll(connMap.getOrDefault(f.getId(), List.of())
-								   .stream().map(this::toConnectionMap).toList());
-
-			dto.put("children", children);
-			return dto;
-		}).toList();
-	}
-
-	private Map<String, Object> toConnectionMap(Connection c) {
-		Map<String, Object> m = beanUtils.beanToMap(c);
-		m.put("type", "connection");
-		m.put("connected", c.getConnected() != null ? c.getConnected() : false);
-		m.put("children", List.of());
-		return m;
-	}
-
 	/* ② folder 增删改 */
 	@PostMapping("/folders")
 	public ResponseEntity<Folder> createOrUpdateFolder(@RequestBody Folder folder) {
@@ -95,6 +67,12 @@ public class ConfigController {
 	@DeleteMapping("/folders/{id}")
 	public ResponseEntity<Void> deleteFolder(@PathVariable String id) {
 		folderService.deleteFolder(id);
+		return ResponseEntity.noContent().build();
+	}
+
+	@PutMapping("/folders/{id}")
+	public ResponseEntity<Void> updateFolder(@PathVariable String id, @RequestBody Folder folder) {
+		folderService.rename(id, folder.getName());
 		return ResponseEntity.noContent().build();
 	}
 
@@ -132,4 +110,34 @@ public class ConfigController {
 								.map(c -> ResponseEntity.ok(connectionService.testConnection(c)))
 								.orElseGet(() -> ResponseEntity.notFound().build());
 	}
+
+
+	/* 递归拼 folder 节点，同时把直属 connection 塞进 children */
+	private List<Map<String, Object>> buildFolderTree(String parentId,
+			Map<String, List<Folder>> folderMap,
+			Map<String, List<Connection>> connMap) {
+		return folderMap.getOrDefault(parentId, List.of()).stream().map(f -> {
+			Map<String, Object> dto = beanUtils.beanToMap(f);
+			dto.put("type", "folder");
+			List<Map<String, Object>> children = new ArrayList<>();
+
+			// 子 folder
+			children.addAll(buildFolderTree(f.getId(), folderMap, connMap));
+			// 直属 connection
+			children.addAll(connMap.getOrDefault(f.getId(), List.of())
+								   .stream().map(this::toConnectionMap).toList());
+
+			dto.put("children", children);
+			return dto;
+		}).toList();
+	}
+
+	private Map<String, Object> toConnectionMap(Connection c) {
+		Map<String, Object> m = beanUtils.beanToMap(c);
+		m.put("type", "connection");
+		m.put("connected", c.getConnected() != null ? c.getConnected() : false);
+		m.put("children", List.of());
+		return m;
+	}
+
 }

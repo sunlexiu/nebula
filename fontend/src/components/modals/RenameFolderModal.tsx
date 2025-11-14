@@ -1,8 +1,10 @@
+// src/components/modals/RenameFolderModal.tsx
 import React, { useState, useEffect } from "react";
 import '../../css/NewGroupModal.css'; // 复用样式
 import toast from 'react-hot-toast';
+import { renameFolder } from '../../actions/treeActions'; // ← 新增：导入完善后的 renameFolder
 
-const RenameFolderModal = ({ isOpen, onClose, parentId, defaultName = "", onSubmit }) => {
+const RenameFolderModal = ({ isOpen, onClose, defaultName = "", nodeId, onSubmit }) => {
   const [groupName, setGroupName] = useState(defaultName || "");
   const [error, setError] = useState(null);
 
@@ -15,22 +17,20 @@ const RenameFolderModal = ({ isOpen, onClose, parentId, defaultName = "", onSubm
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e) => {
+ const handleSubmit = async (e) => {
     e.preventDefault();
     if (!groupName.trim()) {
-      setError("文件夹名称不能为空");
-      return;
+        setError("文件夹名称不能为空");
+        return;
     }
-
     try {
-      await onSubmit(groupName, parentId);
-      toast.success("重命名成功");
-      setGroupName("");
-      onClose();
+        await onSubmit(groupName);
+        setGroupName("");
+        onClose();
     } catch (err) {
-      console.error("Error renaming folder:", err);
-      setError("重命名文件夹失败，请重试。");
-      toast.error("重命名失败");
+        console.error("Error renaming folder:", err);
+        setError("重命名文件夹失败，请重试。");
+        toast.error("重命名失败");
     }
   };
 
@@ -81,4 +81,3 @@ const RenameFolderModal = ({ isOpen, onClose, parentId, defaultName = "", onSubm
 };
 
 export default RenameFolderModal;
-

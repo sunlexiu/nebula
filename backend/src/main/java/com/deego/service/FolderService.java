@@ -5,6 +5,8 @@ import com.deego.repository.FolderRepository;
 import com.deego.utils.IdWorker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -22,6 +24,12 @@ public class FolderService {
 			folder.setId(IdWorker.getIdStr());
 		}
 		return folderRepository.save(folder);
+	}
+
+	@Transactional
+	public void rename(String id, String newName) {
+		Folder f = folderRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("文件夹不存在"));
+		f.setName(newName);
 	}
 
 	public Optional<Folder> getFolder(String id) {

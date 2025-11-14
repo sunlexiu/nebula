@@ -6,15 +6,12 @@ import MoreActionsMenu from './MoreActionsMenu';
 import { useTreeStore } from '../../stores/useTreeStore';
 import { useModal } from '../modals/ModalProvider';
 import {
-  openNewGroup,
-  openNewConnection,
-  openConfirm,
-  openRenameFolder,
-  openEditConnection
+  openNewGroup, openRenameFolder,
+  openNewConnection, openEditConnection,
+  openConfirm
 } from '../modals/modalActions';
-import { refreshFolder, deleteFolder } from '../../actions/treeActions';
 import {
-  connectDatabase,
+  connectAndExpand,refreshFolder, deleteFolder,
   disconnectDatabase,
   refreshConnection,
   deleteConnection,
@@ -153,7 +150,7 @@ const Sidebar = ({ treeData }) => {
         openConfirm={(title, message, onConfirm, variant) => openConfirm(title, message, onConfirm, variant, openModal)}
         openRenameFolder={openRenameFolderModal}
         openEditConnection={openEditConnectionModal}
-        refreshFolder={(node) => refreshFolder(node)}
+        refreshFolder={(node, setExpandedKeys) => refreshFolder(node, setExpandedKeys)}
         deleteFolder={(node) => deleteFolder(node, openModal)}
         refreshConnection={(node, setExpandedKeys) => refreshConnection(node, setExpandedKeys)}
         connectDatabase={(node) => connectDatabase(node)} // 已集成配置加载
@@ -181,6 +178,7 @@ const Sidebar = ({ treeData }) => {
         deleteTable={(node) => deleteTable(node, openModal)}
         deleteView={(node) => deleteView(node, openModal)}
         deleteFunction={(node) => deleteFunction(node, openModal)}
+        openModal={openModal}
       />,
       document.body
     );

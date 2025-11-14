@@ -84,6 +84,16 @@ const TreeNode = memo(({
   };
 
     const handleClick = async () => {
+     if (node.type === 'folder') {
+        // Folder 类型：仅切换展开/收起，不加载子项
+        setExpandedKeys((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(node.id, !newMap.get(node.id));
+          return newMap;
+        });
+        return;
+      }
+
       if (isExpandable) {
         setIsLoading(true);
         try {
@@ -93,7 +103,7 @@ const TreeNode = memo(({
           setIsLoading(false);
         }
       }
-    };
+   };
 
   const handlePrimaryAction = async (e: React.MouseEvent) => {
     e.stopPropagation();

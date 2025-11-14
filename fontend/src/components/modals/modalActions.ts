@@ -1,7 +1,6 @@
 import toast from 'react-hot-toast';
-import { updateConnection } from '../../actions/dbActions';
 import { useTreeStore } from '../../stores/useTreeStore';
-import { actionHandlers } from '../../actions/dbActions';  // 新增导入动态 handler
+import { actionHandlers, updateConnection } from '../../actions/dbActions';
 
 // openNewGroup 接收 openModal 参数
 export const openNewGroup = (parentId = null, openModal) => {
@@ -43,24 +42,21 @@ export const openConfirm = (title, message, onConfirm, variant = 'danger', openM
 };
 
 // openRenameFolder 接收 openModal 参数
-export const openRenameFolder = (node, openModal) => {
+export const openRenameFolder = (node: any, openModal: Function) => {
   if (typeof openModal !== 'function') {
     console.error('openModal must be a function');
     return;
   }
   openModal('renameFolder', {
     defaultName: node.name,
-    onSubmit: async (newName) => {
+    nodeId: node.id,  // 新增：传递 node.id 用于 API
+    onSubmit: async (newName: string) => {
       if (!newName || newName.trim() === '') {
         throw new Error('文件夹名称不能为空');
       }
       try {
-        const response = await fetch(`/api/config/folders`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: newName.trim(), id: node.id , type: 'folder'})
-        });
-        if (!response.ok) throw new Error('Failed to rename folder');
+        const { renameFolder } = await import('../../actions/treeActions');
+        await renameFolder(node.id, newName);  // 调用 PUT 更新
         toast.success(`文件夹已重命名为 "${newName}"`);
       } catch (error) {
         toast.error('重命名失败，请重试');
@@ -71,19 +67,15 @@ export const openRenameFolder = (node, openModal) => {
 };
 
 // openEditConnection 接收 openModal 参数，使用 config
-export const openEditConnection = (connection, openModal) => {
-  if (typeof openModal !== 'function') {
-    console.error('openModal must be a function');
-    return;
-  }
+export const openEditConnection = (connection: any, openModal: Function) => {
+  if (typeof openModal !== 'function') return;
   openModal('editConnection', {
     connection,
-    onSubmit: async (payload) => {
-      const { updateTreePath } = useTreeStore.getState();
+    onSubmit: async (payload: any) => {
+      const { updateConnection } = await import('../../actions/connectionActions');
       await updateConnection(payload);
-      // 新增：更新后重新加载 config
-      await useTreeStore.getState().loadTreeConfig(payload.id);
-    }
+      useTreeStore.getState().refreshTree(); // 保存后刷新树
+    },
   });
 };
 

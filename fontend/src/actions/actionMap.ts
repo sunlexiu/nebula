@@ -2,13 +2,13 @@ import { ActionMap } from '../types/tree';
 
 export const baseActionMap: ActionMap = {
   folder: [
-    { label: '新建文件夹', handler: 'openNewGroup', icon: '📁' },
     { label: '新建连接', handler: 'openNewConnection', icon: '🔌' },
     { type: 'separator' },
-    { label: '刷新', handler: 'refreshFolder', icon: '🔄' },
-    { type: 'separator' },
-    { label: '删除文件夹', handler: 'deleteFolder', icon: '🗑️', variant: 'danger' },
-    { label: '重命名', handler: 'openRenameFolder', icon: '✏️' },
+    { label: '新建分组', handler: 'openNewGroup', icon: '📁' },
+    { label: '删除分组', handler: 'deleteFolder', icon: '🗑️', variant: 'danger' },
+    { label: '重命名', handler: 'openRenameFolder', icon: '✏️' }
+//     { label: '刷新', handler: 'refreshFolder', icon: '🔄' },
+//     { type: 'separator' },
   ],
   connection: [
     { label: '连接', handler: 'connectAndExpand', icon: '⚡', primary: true },

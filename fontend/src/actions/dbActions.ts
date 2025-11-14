@@ -1,200 +1,73 @@
 /********************************************************************
- * 通用数据库动作实现 + 动作分发器
- * 后端仅保留 /api/db/{handler} 作为兜底
+ * 通用数据库动作实现 + 动作分发器（最终精简版）
+ * - 所有具体函数独立到专用模块。
+ * - 只剩：模板工厂、分发器、工具、re-export。
  *******************************************************************/
+// 类型定义
+type ActionHandler = (node: any, openModal?: Function, setExpandedKeys?: Function) => Promise<void> | void;
+type Options = { setExpandedKeys?: Function; openModal?: Function };
 import toast from 'react-hot-toast';
 import { useTreeStore } from '../stores/useTreeStore';
-import { useModal } from '../components/modals/ModalProvider';
-import { openConfirm } from '../components/modals/modalActions';
 import { findConnectionId } from '../utils/treeUtils';
-
-/* ========================= 通用动作实现 ========================= */
-export const refreshDatabase = async (node: any, setExpandedKeys?: Function) => {
-  if (!node.connected) return;
-  const { updateTreePath } = useTreeStore.getState();
-  const { loadNodeChildren } = await import('../utils/treeUtils');
-  const updated = await loadNodeChildren(node);
-  updateTreePath(node.id, () => ({ ...updated, expanded: true }));
-  toast.success(`刷新数据库: ${node.name}`);
-  setExpandedKeys?.((prev: Map<string, boolean>) => new Map(prev).set(node.id, true));
-};
-
-export const createNewSchema = (node: any) => toast(`新建Schema在数据库: ${node.name}`);
-export const exportDatabase = (node: any) => toast(`导出数据库: ${node.name}`);
-
-export const deleteDatabase = async (node: any, openModal?: Function) => {
-  if (typeof openModal !== 'function') return toast.error('模态打开失败');
-  openConfirm(
-    `删除数据库`,
-    `确定要删除数据库 "${node.name}" 吗？此操作不可恢复。`,
-    async () => {
-      try {
-        const connectionId = findConnectionId(node.id, useTreeStore.getState().treeData);
-        const res = await fetch('/api/db/delete-database', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ connectionId, dbName: node.name }),
-        });
-        if (!res.ok) throw new Error('Failed to delete database');
-        useTreeStore.getState().deleteNode(node.id);
-        toast.success(`数据库 "${node.name}" 已删除`);
-      } catch (e: any) {
-        toast.error('删除失败，请重试');
-      }
-    },
-    'danger',
-    openModal
-  );
-};
-
-export const refreshSchema = async (node: any, setExpandedKeys?: Function) => {
-  if (!node.connected) return;
-  const { updateTreePath } = useTreeStore.getState();
-  const { loadNodeChildren } = await import('../utils/treeUtils');
-  const updated = await loadNodeChildren(node);
-  updateTreePath(node.id, () => ({ ...updated, expanded: true }));
-  toast.success(`刷新 Schema: ${node.name}`);
-  setExpandedKeys?.((prev: Map<string, boolean>) => new Map(prev).set(node.id, true));
-};
-
-export const createNewTable = (node: any) => toast(`新建表在架构: ${node.name}`);
-export const exportSchema = (node: any) => toast(`导出架构: ${node.name}`);
-
-export const previewTable = (node: any) => toast(`预览表: ${node.name}`);
-export const editTableStructure = (node: any) => toast(`编辑表结构: ${node.name}`);
-export const generateTableSQL = (node: any) => toast(`生成SQL: ${node.name}`);
-export const exportTableData = (node: any) => toast(`导出数据: ${node.name}`);
-
-export const viewDefinition = (node: any) => toast(`查看定义: ${node.name}`);
-export const editView = (node: any) => toast(`编辑视图: ${node.name}`);
-export const generateViewSQL = (node: any) => toast(`生成视图SQL: ${node.name}`);
-
-export const editFunction = (node: any) => toast(`编辑函数: ${node.name}`);
-export const viewFunctionSource = (node: any) => toast(`查看源码: ${node.name}`);
-export const testFunction = (node: any) => toast(`测试函数: ${node.name}`);
-
+import { openConfirm } from '../components/modals/modalActions';
+/* ========================= 通用模板工厂 ========================= */
+// 删除模板：适用于 schema/table/view/function 等（objectType 差异）
+const createDeleteHandler = (objectType: string, title: string, successMsgTemplate: (name: string) => string): ActionHandler =>
+  async (node: any, openModal?: Function) => {
+    if (typeof openModal !== 'function') return;
+    openConfirm(
+      title,
+      `确定要删除${objectType} "${node.name}" 吗？此操作不可恢复。`,
+      async () => {
+        try {
+          const connectionId = findConnectionId(node.id, useTreeStore.getState().treeData);
+          const dbName = node.dbName || 'default';
+          const schemaName = node.schemaName || 'public';
+          const res = await fetch('/api/db/delete-object', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ connectionId, dbName, schemaName, objectName: node.name, objectType }),
+          });
+          if (!res.ok) throw new Error(`Failed to delete ${objectType}`);
+          useTreeStore.getState().deleteNode(node.id);
+          toast.success(successMsgTemplate(node.name));
+        } catch (e: any) {
+          toast.error('删除失败，请重试');
+        }
+      },
+      'danger',
+      openModal
+    );
+  };
+// 刷新模板：适用于 database/schema 等
+const createRefreshHandler = (successMsg: (name: string) => string): ActionHandler =>
+  async (node: any, setExpandedKeys?: Function) => {
+    if (!node.connected) return;
+    const { updateTreePath } = useTreeStore.getState();
+    const { loadNodeChildren } = await import('../utils/treeUtils');
+    const updated = await loadNodeChildren(node);
+    updateTreePath(node.id, () => ({ ...updated, expanded: true }));
+    toast.success(successMsg(node.name));
+    setExpandedKeys?.((prev: Map<string, boolean>) => new Map(prev).set(node.id, true));
+  };
+// 占位工厂：通用 toast 反馈（未来扩展）
+const createPlaceholderHandler = (msg: (name: string) => string) => (node: any) => toast(msg(node.name));
+// 通用属性查看（所有节点共享）
 export const showProperties = (node: any) => {
   toast(
     `节点属性:\nID: ${node.id}\n类型: ${node.type}\n名称: ${node.name}\n连接状态: ${node.connected ? '已连接' : '未连接'}`,
     { duration: 4000 }
   );
 };
-
-export const deleteSchema = async (node: any, openModal?: Function) => {
-  if (typeof openModal !== 'function') return;
-  openConfirm(
-    `删除Schema`,
-    `确定要删除Schema "${node.name}" 吗？此操作不可恢复。`,
-    async () => {
-      try {
-        const connectionId = findConnectionId(node.id, useTreeStore.getState().treeData);
-        const dbName = node.dbName || 'default';
-        const res = await fetch('/api/db/delete-schema', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ connectionId, dbName, schemaName: node.name }),
-        });
-        if (!res.ok) throw new Error('Failed to delete schema');
-        useTreeStore.getState().deleteNode(node.id);
-        toast.success(`Schema "${node.name}" 已删除`);
-      } catch (e: any) {
-        toast.error('删除失败，请重试');
-      }
-    },
-    'danger',
-    openModal
-  );
-};
-
-export const deleteTable = async (node: any, openModal?: Function) => {
-  if (typeof openModal !== 'function') return;
-  openConfirm(
-    `删除表`,
-    `确定要删除表 "${node.name}" 吗？此操作不可恢复。`,
-    async () => {
-      try {
-        const connectionId = findConnectionId(node.id, useTreeStore.getState().treeData);
-        const dbName = node.dbName || 'default';
-        const schemaName = node.schemaName || 'public';
-        const res = await fetch('/api/db/delete-object', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ connectionId, dbName, schemaName, objectName: node.name, objectType: 'table' }),
-        });
-        if (!res.ok) throw new Error('Failed to delete table');
-        useTreeStore.getState().deleteNode(node.id);
-        toast.success(`表 "${node.name}" 已删除`);
-      } catch (e: any) {
-        toast.error('删除失败，请重试');
-      }
-    },
-    'danger',
-    openModal
-  );
-};
-
-export const deleteView = async (node: any, openModal?: Function) => {
-  if (typeof openModal !== 'function') return;
-  openConfirm(
-    `删除视图`,
-    `确定要删除视图 "${node.name}" 吗？此操作不可恢复。`,
-    async () => {
-      try {
-        const connectionId = findConnectionId(node.id, useTreeStore.getState().treeData);
-        const dbName = node.dbName || 'default';
-        const schemaName = node.schemaName || 'public';
-        const res = await fetch('/api/db/delete-object', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ connectionId, dbName, schemaName, objectName: node.name, objectType: 'view' }),
-        });
-        if (!res.ok) throw new Error('Failed to delete view');
-        useTreeStore.getState().deleteNode(node.id);
-        toast.success(`视图 "${node.name}" 已删除`);
-      } catch (e: any) {
-        toast.error('删除失败，请重试');
-      }
-    },
-    'danger',
-    openModal
-  );
-};
-
-export const deleteFunction = async (node: any, openModal?: Function) => {
-  if (typeof openModal !== 'function') return;
-  openConfirm(
-    `删除函数`,
-    `确定要删除函数 "${node.name}" 吗？此操作不可恢复。`,
-    async () => {
-      try {
-        const connectionId = findConnectionId(node.id, useTreeStore.getState().treeData);
-        const dbName = node.dbName || 'default';
-        const schemaName = node.schemaName || 'public';
-        const res = await fetch('/api/db/delete-object', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ connectionId, dbName, schemaName, objectName: node.name, objectType: 'function' }),
-        });
-        if (!res.ok) throw new Error('Failed to delete function');
-        useTreeStore.getState().deleteNode(node.id);
-        toast.success(`函数 "${node.name}" 已删除`);
-      } catch (e: any) {
-        toast.error('删除失败，请重试');
-      }
-    },
-    'danger',
-    openModal
-  );
-};
-
-/* ------- 分发器 ------- */
-export const actionHandlers = {
-  connectAndExpand: async (node: any, openModal?: Function, setExpandedKeys?: Function) => {
+/* ========================= 动作分发器 ========================= */
+export const actionHandlers: Record<string, ActionHandler> = {
+  // 连接展开（内置）
+  connectAndExpand: async (node: any, _openModal?: Function, setExpandedKeys?: Function) => {
     if (node.connected) {
       setExpandedKeys?.((prev: Map<string, boolean>) => new Map(prev).set(node.id, true));
       return;
     }
-    const { connectDatabase } = await import('./connectionActions');
+    const { connectDatabase } = await import('./impl/connectionActions');
     const ok = await connectDatabase(node);
     if (ok) {
       const { loadDatabasesForConnection } = await import('../utils/treeUtils');
@@ -209,7 +82,6 @@ export const actionHandlers = {
       setExpandedKeys?.((prev) => new Map(prev).set(node.id, true));
     }
   },
-
   defaultAction: (node: any, setExpandedKeys?: Function) => {
     if (node.type === 'connection') {
       actionHandlers.connectAndExpand(node, undefined, setExpandedKeys);
@@ -217,99 +89,58 @@ export const actionHandlers = {
     }
     toast(`未知默认动作: ${node.name}`);
   },
-
-  refreshDatabase,
-  createNewSchema,
-  exportDatabase,
-  deleteDatabase,
-  refreshSchema,
-  createNewTable,
-  exportSchema,
-  previewTable,
-  editTableStructure,
-  generateTableSQL,
-  exportTableData,
-  viewDefinition,
-  editView,
-  generateViewSQL,
-  editFunction,
-  viewFunctionSource,
-  testFunction,
+  // 通用（引用模板）
   showProperties,
-  deleteSchema,
-  deleteTable,
-  deleteView,
-  deleteFunction,
-
-  /* PG 特有 */
-  refreshMaterializedView: (node: any) => toast(`刷新物化视图: ${node.name}`),
-  viewPublication: (node: any) => toast(`查看 Publication: ${node.name}`),
-  createPublication: (node: any) => toast(`新建 Publication 在连接: ${node.name}`),
-  deletePublication: async (node: any, openModal?: Function) => {
-    if (typeof openModal !== 'function') return;
-    openConfirm(
-      `删除 Publication`,
-      `确定要删除 Publication "${node.name}" 吗？此操作不可恢复。`,
-      async () => {
-        try {
-          const connectionId = findConnectionId(node.id, useTreeStore.getState().treeData);
-          const res = await fetch('/api/db/delete-publication', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ connectionId, pubName: node.name }),
-          });
-          if (!res.ok) throw new Error('Failed to delete publication');
-          useTreeStore.getState().deleteNode(node.id);
-          toast.success(`Publication "${node.name}" 已删除`);
-        } catch (e: any) {
-          toast.error('删除失败，请重试');
-        }
-      },
-      'danger',
-      openModal
-    );
+  // 文件夹/其他（动态委托）
+  openNewGroup: async (node: any, openModal?: Function) => {
+    const { openNewGroup } = await import('./impl/folderActions');
+    openNewGroup(node.id, openModal);
   },
-  showRoleProperties: (node: any) => toast(`角色属性: ${node.name}`),
-  createRole: (node: any) => toast(`新建角色: ${node.name}`),
-  deleteRole: async (node: any, openModal?: Function) => {
-    if (typeof openModal !== 'function') return;
-    openConfirm(
-      `删除角色`,
-      `确定要删除角色 "${node.name}" 吗？此操作不可恢复。`,
-      async () => {
-        try {
-          const connectionId = findConnectionId(node.id, useTreeStore.getState().treeData);
-          const res = await fetch('/api/db/delete-role', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ connectionId, roleName: node.name }),
-          });
-          if (!res.ok) throw new Error('Failed to delete role');
-          useTreeStore.getState().deleteNode(node.id);
-          toast.success(`角色 "${node.name}" 已删除`);
-        } catch (e: any) {
-          toast.error('删除失败，请重试');
-        }
-      },
-      'danger',
-      openModal
-    );
+  openRenameFolder: async (node: any, openModal?: Function) => {
+    const { openRenameFolder } = await import('./impl/folderActions');
+    openRenameFolder(node, openModal);
   },
-
-  dynamicHandler: async (handler: string, node: any, options: { setExpandedKeys?: Function; openModal?: Function } = {}) => {
+  // 动态分发器：路由专用模块
+  dynamicHandler: async (handler: string, node: any, options: Options = {}) => {
     const { setExpandedKeys, openModal } = options;
-    const dbType = useTreeStore.getState().dbType.toLowerCase();
-    try {
-      const dbActions = await import(`./${dbType}Actions`);
-      if (typeof dbActions[handler] === 'function') {
-        return dbActions[handler](node, openModal, setExpandedKeys);
-      }
-    } catch {
-      /* 无库级文件 */
+    if (node.type === 'folder' || !node.dbType) {
+      if (actionHandlers[handler]) return actionHandlers[handler](node, openModal, setExpandedKeys);
+      toast.error(`未实现的操作: ${handler}`);
+      return;
     }
-    if (actionHandlers[handler]) {
-      return actionHandlers[handler](node, openModal, setExpandedKeys);
+    // 路由专用模块
+    let moduleActions: any;
+    switch (node.type) {
+//       case 'database':
+//         moduleActions = await import('./databaseActions');
+//         break;
+//       case 'schema':
+//         moduleActions = await import('./schemaActions');
+//         break;
+//       case 'table':
+//         moduleActions = await import('./tableActions');
+//         break;
+//       case 'view':
+//         moduleActions = await import('./viewActions');
+//         break;
+//       case 'function':
+//         moduleActions = await import('./functionActions');
+//         break;
+      default:
+        moduleActions = null;
     }
+    if (moduleActions && typeof moduleActions[handler] === 'function') {
+      return moduleActions[handler](node, openModal, setExpandedKeys);
+    }
+    // DB 类型覆盖 + 通用 + 兜底（原有逻辑）
+    const dbType = useTreeStore.getState().dbType?.toLowerCase();
+    if (dbType) {
+      try {
+        const dbSpecific = await import(`./${dbType}Actions`);
+        if (typeof dbSpecific[handler] === 'function') return dbSpecific[handler](node, openModal, setExpandedKeys);
+      } catch {}
+    }
+    if (actionHandlers[handler]) return actionHandlers[handler](node, openModal, setExpandedKeys);
     try {
       const res = await fetch(`/api/db/${handler}`, {
         method: 'POST',
@@ -323,12 +154,16 @@ export const actionHandlers = {
     }
   },
 };
-
-/* ===================== 对外工具函数 ===================== */
+/* ========================= 工具 + 重新导出 ========================= */
 export const getAllActions = (nodeType: string) => {
   const { actionMap } = useTreeStore.getState();
   return actionMap[nodeType] || [];
 };
-
-/* ===================== 重新导出被 import 的符号 ===================== */
-export { updateConnection, connectDatabase, disconnectDatabase, refreshConnection, deleteConnection } from './connectionActions';
+// 重新导出：统一入口
+export { refreshFolder, deleteFolder, openNewGroup, openRenameFolder } from './impl/folderActions';
+export { updateConnection, connectDatabase, disconnectDatabase, refreshConnection, deleteConnection } from './impl/connectionActions';
+export * from './impl/databaseActions';
+export * from './impl/schemaActions';
+export * from './impl/tableActions';
+export * from './impl/viewActions';
+export * from './impl/functionActions';
