@@ -24,7 +24,7 @@ export const handleNewGroupSubmit = async (groupName: string, parentId: string |
 };
 
 // 文件夹重命名
-export const renameFolder = async (nodeId: string, newName: string) => {  // 移除 openModal 参数，因为模态不需它
+export const renameFolder = async (nodeId: string, newName: string) => {
   if (!newName.trim()) throw new Error('文件夹名称不能为空');
   try {
     const response = await fetch(`/api/config/folders/${nodeId}`, {
