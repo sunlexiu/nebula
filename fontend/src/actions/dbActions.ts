@@ -12,7 +12,6 @@ import { findConnectionId } from '../utils/treeUtils';
 import { openConfirm } from '../components/modals/modalActions';
 
 /* ========================= 通用模板工厂 ========================= */
-// 删除模板：适用于 schema/table/view/function 等（objectType 差异）
 const createDeleteHandler = (objectType: string, title: string, successMsgTemplate: (name: string) => string): ActionHandler =>
   async (node: any, openModal?: Function) => {
     if (typeof openModal !== 'function') return;
@@ -33,6 +32,7 @@ const createDeleteHandler = (objectType: string, title: string, successMsgTempla
           useTreeStore.getState().deleteNode(node.id);
           toast.success(successMsgTemplate(node.name));
         } catch (e: any) {
+          console.error('Delete object error:', e);
           toast.error('删除失败，请重试');
         }
       },
@@ -117,6 +117,9 @@ export const actionHandlers: Record<string, ActionHandler> = {
     // 原有 DB 节点路由...
     let moduleActions: any;
     switch (node.type) {
+        case 'connection':
+            moduleActions = await import('./impl/connectionActions');
+            break;
 //       case 'database':
 //         moduleActions = await import('./databaseActions');
 //         break;

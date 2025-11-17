@@ -1,6 +1,6 @@
 import toast from 'react-hot-toast';
 import { useTreeStore } from '../../stores/useTreeStore';
-import { openNewGroup as openNewGroupModal, openRenameFolder as openRenameFolderModal, openConfirm } from '../../components/modals/modalActions';
+import { openNewGroup as openNewGroupModal, openRenameFolder as openRenameFolderModal, openConfirm } from '@/components/modals/modalActions';
 import { deleteNode } from '../../utils/treeUtils';
 import { handleNewConnectionSubmit } from './connectionActions';
 

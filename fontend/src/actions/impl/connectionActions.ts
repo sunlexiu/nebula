@@ -1,6 +1,7 @@
 import toast from 'react-hot-toast';
-import { useTreeStore } from '../../stores/useTreeStore';
-import { loadDatabasesForConnection } from '../../utils/treeUtils';
+import { useTreeStore } from '@/stores/useTreeStore';
+import { loadDatabasesForConnection } from '@/utils/treeUtils';
+import { openConfirm, openEditConnection as openRenameFolderModal } from '@/components/modals/modalActions';
 
 export const handleNewConnectionSubmit = async (connectionData: any, parentId: string | null) => {
   try {
@@ -114,14 +115,12 @@ export const refreshConnection = async (node: any, setExpandedKeys?: Function) =
     toast.success(`刷新成功: ${node.name}`);
     setExpandedKeys?.((prev: Map<string, boolean>) => new Map(prev).set(node.id, true));
   } catch (e) {
+    console.error('refreshConnection error:', e);
     toast.error('刷新失败');
   }
 };
 
 export const deleteConnection = async (node: any, openModal?: Function) => {
-  // 与 deleteFolder 类似，使用 openConfirm
-  if (typeof openModal !== 'function') return toast.error('模态打开失败');
-  const { openConfirm } = await import('../../components/modals/modalActions');
   openConfirm(
     '删除连接',
     `确定删除连接 "${node.name}" 吗？`,
@@ -131,11 +130,18 @@ export const deleteConnection = async (node: any, openModal?: Function) => {
         if (!res.ok) throw new Error('删除失败');
         useTreeStore.getState().deleteNode(node.id);
         toast.success('连接已删除');
+        // 删除后刷新父级树
+        useTreeStore.getState().refreshTree();
       } catch (e) {
+        console.error('Delete connection error:', e);
         toast.error('删除失败');
       }
     },
     'danger',
     openModal
   );
+};
+
+export const openEditConnection = async (connection: any, openModal?: Function) => {
+  openRenameFolderModal(connection, openModal);
 };

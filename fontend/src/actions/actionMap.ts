@@ -15,10 +15,10 @@ export const baseActionMap: ActionMap = {
     { label: '断开连接', handler: 'disconnectDatabase', icon: '🔌' },
     { type: 'separator' },
     { label: '刷新', handler: 'refreshConnection', icon: '🔄' },
-    { label: '连接设置', handler: 'openEditConnection', icon: '⚙️' },
     { type: 'separator' },
+    { label: '连接设置', handler: 'openEditConnection', icon: '⚙️' },
     { label: '删除连接', handler: 'deleteConnection', icon: '🗑️', variant: 'danger' },
-    { label: '属性', handler: 'showProperties', icon: 'ℹ️' },
+//     { label: '属性', handler: 'showProperties', icon: 'ℹ️' },
   ],
   database: [
     { label: '刷新', handler: 'refreshDatabase', icon: '🔄' },
