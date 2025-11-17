@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import '../../css/NewGroupModal.css'; // 复用样式
 import toast from 'react-hot-toast';
-import { renameFolder } from '../../actions/treeActions';
+import { renameFolder } from '@/actions/treeActions';
 
 const RenameFolderModal = ({ isOpen, onClose, defaultName = "", nodeId, onSubmit }) => {
   const [groupName, setGroupName] = useState(defaultName || "");

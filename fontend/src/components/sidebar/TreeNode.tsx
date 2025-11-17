@@ -1,7 +1,7 @@
 import React, { useState, memo } from 'react';
 import { useModal } from '../modals/ModalProvider';
 import { useTreeStore } from '../../stores/useTreeStore';
-import { actionHandlers } from '../../actions/dbActions';
+import { actionHandlers } from '@/actions/dbActions';
 import { getExpandIcon, getNodeIcon, loadNodeChildren } from '../../utils/treeUtils';
 import { getThemeColors, nodeBaseStyles, expandIconStyles, nodeIconStyles, nodeNameStyles, typeLabelStyles, actionButtonStyles, indicatorBarStyles, childIndicatorStyles, actionContainerStyles, dragOverStyles, dragSourceStyles } from './styles';
 

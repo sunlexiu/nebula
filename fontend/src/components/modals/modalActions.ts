@@ -72,7 +72,7 @@ export const openEditConnection = (connection: any, openModal: Function) => {
   openModal('editConnection', {
     connection,
     onSubmit: async (payload: any) => {
-      const { updateConnection } = await import('../../actions/impl/connectionActions');
+      const { updateConnection } = await import('@/actions/impl/connectionActions');
       await updateConnection(payload);
       useTreeStore.getState().refreshTree(); // 保存后刷新树
     },

@@ -114,7 +114,7 @@ const MoreActionsMenu = ({
               e.stopPropagation();
               handleAction(() => {
                 // 动态调用 actionHandlers
-                import('../../actions/dbActions').then((mod) => {
+                import('@/actions/dbActions').then((mod) => {
                   mod.actionHandlers.dynamicHandler(item.handler, node, {
                     setExpandedKeys,
                     openModal,

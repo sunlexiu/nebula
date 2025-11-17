@@ -37,7 +37,7 @@ import {
   deleteTable,
   deleteView,
   deleteFunction
-} from '../../actions/dbActions';
+} from '@/actions/dbActions';
 import { useDragDrop } from './hooks/useDragDrop';
 import { findNode } from '../../utils/treeUtils';
 

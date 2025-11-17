@@ -2,6 +2,7 @@ import toast from 'react-hot-toast';
 import { useTreeStore } from '../../stores/useTreeStore';
 import { openNewGroup as openNewGroupModal, openRenameFolder as openRenameFolderModal, openConfirm } from '../../components/modals/modalActions';
 import { deleteNode } from '../../utils/treeUtils';
+import { handleNewConnectionSubmit } from './connectionActions';
 
 // 文件夹新建提交处理器
 export const handleNewGroupSubmit = async (groupName: string, parentId: string | null) => {
@@ -104,7 +105,15 @@ export const deleteFolder = async (node: any, openModal?: Function) => {
   );
 };
 
-// folderHandlers
+export const openNewConnection = (parentId: string | null, openModal: Function) => {
+  if (typeof openModal !== 'function') return toast.error('模态打开失败');
+  openModal('newConnection', {
+    parentId,  // 传递给模态，作为默认 parentId
+    onSubmit: handleNewConnectionSubmit,
+    onClose: () => openModal(null),
+  });
+};
+
 export const folderHandlers = {
   openNewGroup: async (node: any, openModal?: Function) => {
     openNewGroup(node.id, openModal);
@@ -117,5 +126,8 @@ export const folderHandlers = {
   },
   deleteFolder: async (node: any, openModal?: Function, setExpandedKeys?: Function) => {
     deleteFolder(node, openModal);
+  },
+  openNewConnection: async (node: any, openModal?: Function) => {
+    openNewConnection(node.id, openModal);
   },
 };

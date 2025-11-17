@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import "../../css/NewConnectionModal.css"; // 保留你现有样式
 import toast from "react-hot-toast";
-import { handleNewConnectionSubmit } from '../../actions/impl/connectionActions';
+import { handleNewConnectionSubmit } from '@/actions/impl/connectionActions';
 
 // 小工具：根据 dbType 给出默认端口
 const defaultPort = (dbType) => ({
