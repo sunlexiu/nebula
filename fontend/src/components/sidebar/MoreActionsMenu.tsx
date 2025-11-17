@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 
 const MoreActionsMenu = ({
   node,
+  actions,  // 新增：接收过滤后的 actions
   position,
   onClose,
   setExpandedKeys,
@@ -44,8 +45,7 @@ const MoreActionsMenu = ({
 }: any) => {
   const [hoveredItem, setHoveredItem] = useState<number | null>(null);
   const { actionMap } = useTreeStore();
-  const actions = actionMap[node.type] || [];
-
+  const menuActions = actions || actionMap[node.type] || [];  // 修改：优先用传入的 actions
   const handleAction = (action: any) => {
     try {
       if (typeof action === 'function') {
@@ -59,9 +59,7 @@ const MoreActionsMenu = ({
     }
     onClose();
   };
-
   const flipStyle = position.flip ? { borderTop: '2px solid #e0e0e0', borderBottom: '1px solid #e0e0e0' } : {};
-
   return (
     <div
       className="more-actions-menu"
@@ -82,7 +80,7 @@ const MoreActionsMenu = ({
         ...flipStyle
       }}
     >
-      {actions.map((item, index) => {
+      {menuActions.map((item, index) => {
         if (item.type === 'separator') {
           return (
             <div
@@ -91,7 +89,6 @@ const MoreActionsMenu = ({
             />
           );
         }
-
         const isHovered = hoveredItem === index;
         return (
           <div

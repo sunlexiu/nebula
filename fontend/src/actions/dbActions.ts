@@ -164,9 +164,21 @@ export const actionHandlers: Record<string, ActionHandler> = {
   },
 };
 /* ========================= 工具 + 重新导出 ========================= */
-export const getAllActions = (nodeType: string) => {
+export const getAllActions = (nodeType: string, node?: any) => {
   const { actionMap } = useTreeStore.getState();
-  return actionMap[nodeType] || [];
+  let actions = actionMap[nodeType] || [];
+
+  // 动态过滤：遍历动作，只保留满足 condition 的（默认 true）
+  if (node) {
+    actions = actions.filter((action) => {
+      if (action.condition) {
+        return action.condition(node);
+      }
+      return true;  // 无 condition 全显示
+    });
+  }
+
+  return actions;
 };
 // 重新导出：统一入口
 export { refreshFolder, deleteFolder, openNewGroup, openRenameFolder } from './impl/folderActions';

@@ -2,23 +2,34 @@ import { ActionMap } from '../types/tree';
 
 export const baseActionMap: ActionMap = {
   folder: [
-    { label: '新建连接', handler: 'openNewConnection', icon: '🔌' },
+    { label: '新建连接', handler: 'openNewConnection', icon: '🔗' },
     { type: 'separator' },
     { label: '新建分组', handler: 'openNewGroup', icon: '📁' },
     { label: '删除分组', handler: 'deleteFolder', icon: '🗑️', variant: 'danger' },
     { label: '重命名', handler: 'openRenameFolder', icon: '✏️' }
-//     { label: '刷新', handler: 'refreshFolder', icon: '🔄' },
 //     { type: 'separator' },
+//     { label: '刷新', handler: 'refreshFolder', icon: '🔄' },
+
   ],
   connection: [
-    { label: '连接', handler: 'connectAndExpand', icon: '⚡', primary: true },
-    { label: '断开连接', handler: 'disconnectDatabase', icon: '🔌' },
+    {
+      label: '连接',
+      handler: 'connectAndExpand',
+      icon: '⚡',
+      primary: true,
+      condition: (node: any) => !node.connected
+    },
+    {
+      label: '断开连接',
+      handler: 'disconnectDatabase',
+      icon: '🔌',
+      condition: (node: any) => node.connected
+    },
     { type: 'separator' },
     { label: '刷新', handler: 'refreshConnection', icon: '🔄' },
     { type: 'separator' },
     { label: '连接设置', handler: 'openEditConnection', icon: '⚙️' },
     { label: '删除连接', handler: 'deleteConnection', icon: '🗑️', variant: 'danger' },
-//     { label: '属性', handler: 'showProperties', icon: 'ℹ️' },
   ],
   database: [
     { label: '刷新', handler: 'refreshDatabase', icon: '🔄' },

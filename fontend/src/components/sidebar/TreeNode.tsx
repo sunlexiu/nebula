@@ -1,7 +1,7 @@
 import React, { useState, memo } from 'react';
 import { useModal } from '../modals/ModalProvider';
 import { useTreeStore } from '../../stores/useTreeStore';
-import { actionHandlers } from '@/actions/dbActions';
+import { actionHandlers, getAllActions } from '@/actions/dbActions';  // 新增：导入 getAllActions
 import { getExpandIcon, getNodeIcon, loadNodeChildren } from '../../utils/treeUtils';
 import { getThemeColors, nodeBaseStyles, expandIconStyles, nodeIconStyles, nodeNameStyles, typeLabelStyles, actionButtonStyles, indicatorBarStyles, childIndicatorStyles, actionContainerStyles, dragOverStyles, dragSourceStyles } from './styles';
 
@@ -35,13 +35,15 @@ const TreeNode = memo(({
   const isExpandable = hasChildren || node.virtual || node.config?.nextLevel;
   const isDraggable = node.type === 'folder' || node.type === 'connection';
   const isDropTarget = node.type === 'folder' || node.config?.allowDrop;
-  const { actionMap } = useTreeStore();
-  const primaryAction = actionMap[node.type]?.[0] || null;
   const theme = getThemeColors(node.type);
   const { updateTreePath } = useTreeStore();
   const isExpanded = node.expanded;
   const isConnected = node.connected;
   if (isConnected) theme.accentColor = '#10b981';
+
+  // 新增：获取过滤后的动作列表
+  const filteredActions = getAllActions(node.type, node);
+  const primaryAction = filteredActions.find(action => action.primary) || filteredActions[0] || null;
 
   const combinedStyles = {
     ...nodeBaseStyles,
@@ -119,7 +121,8 @@ const TreeNode = memo(({
     e.stopPropagation();
     if (!activeMoreMenuNode) {
       setActiveMoreMenuNode(node.id);
-      onMoreMenu(e, node);
+      // 修改：传递 filteredActions 给 onMoreMenu（父组件用它渲染菜单）
+      onMoreMenu(e, node, filteredActions);
     }
   };
   const handleContextMenu = (e: React.MouseEvent) => {

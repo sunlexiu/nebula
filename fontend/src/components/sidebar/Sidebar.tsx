@@ -46,6 +46,7 @@ const deegoLogo = '/icons/deego_1.svg';
 const Sidebar = ({ treeData }) => {
   const [expandedKeys, setExpandedKeys] = useState(new Map());
   const [showMoreMenu, setShowMoreMenu] = useState(null);
+  const [menuActions, setMenuActions] = useState([]);  // 新增：存储过滤后的动作列表
   const [moreMenuPosition, setMoreMenuPosition] = useState({ x: 0, y: 0, flip: false });
   const [activeMoreMenuNode, setActiveMoreMenuNode] = useState(null);
   const [hoveredNode, setHoveredNode] = useState(null);
@@ -62,6 +63,7 @@ const Sidebar = ({ treeData }) => {
         setShowMoreMenu(null);
         setMoreMenuPosition({ x: 0, y: 0, flip: false });
         setActiveMoreMenuNode(null);
+        setMenuActions([]);  // 新增：重置菜单动作
       }
     };
     document.addEventListener('click', handleClickOutside);
@@ -75,6 +77,7 @@ const Sidebar = ({ treeData }) => {
         setShowMoreMenu(null);
         setActiveMoreMenuNode(null);
         setMoreMenuPosition({ x: 0, y: 0, flip: false });
+        setMenuActions([]);  // 新增：重置菜单动作
       }
     };
     document.addEventListener('keydown', onKey);
@@ -87,6 +90,7 @@ const Sidebar = ({ treeData }) => {
       setShowMoreMenu(null);
       setActiveMoreMenuNode(null);
       setMoreMenuPosition({ x: 0, y: 0, flip: false });
+      setMenuActions([]);  // 新增：重置菜单动作
     };
     window.addEventListener('scroll', close, true);
     window.addEventListener('resize', close);
@@ -96,7 +100,7 @@ const Sidebar = ({ treeData }) => {
     };
   }, [showMoreMenu]);
 
-  const handleMoreMenu = (e, node) => {
+  const handleMoreMenu = (e, node, actions = []) => {  // 修改：接收第三个参数 actions
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     const baseY = rect.bottom;
@@ -127,6 +131,7 @@ const Sidebar = ({ treeData }) => {
     setMoreMenuPosition({ x: e.clientX + 5, y: adjustedY, flip });
     setShowMoreMenu(node.id);
     setActiveMoreMenuNode(node.id);
+    setMenuActions(actions);  // 新增：存储过滤后的动作
   };
 
   const openRenameFolderModal = (node) => openRenameFolder(node, openModal);
@@ -139,10 +144,12 @@ const Sidebar = ({ treeData }) => {
     return createPortal(
       <MoreActionsMenu
         node={node}
+        actions={menuActions}  // 新增：传递过滤后的动作列表
         position={moreMenuPosition}
         onClose={() => {
           setShowMoreMenu(null);
           setActiveMoreMenuNode(null);
+          setMenuActions([]);  // 新增：重置
         }}
         setExpandedKeys={setExpandedKeys}
         openNewGroup={(parentId) => openNewGroup(parentId, openModal)}
@@ -257,4 +264,3 @@ const Sidebar = ({ treeData }) => {
 };
 
 export default Sidebar;
-

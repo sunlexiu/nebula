@@ -59,9 +59,18 @@ export const connectDatabase = async (node: any) => {
     (async () => {
       const r = await fetch(`/api/config/connections/${encodeURIComponent(node.id)}/test`, { method: 'GET' });
       if (!r.ok) {
-        const msg = await r.text();
-        throw new Error(msg || '连接失败');
-      }
+          const msgText = await r.text();
+          let extractedMsg = msgText || '连接失败';
+          try {
+            const errJson = JSON.parse(msgText);
+            if (errJson && typeof errJson.message === 'string') {
+              extractedMsg = errJson.message;
+            }
+          } catch (error) {
+            console.warn('Failed to parse error JSON:', error);
+          }
+          throw new Error(extractedMsg);
+        }
       // 连接成功 → 更新状态 + 加载数据库列表
       const dbKids = await loadDatabasesForConnection(node);
       updateTreePath(node.id, (curr: any) => ({

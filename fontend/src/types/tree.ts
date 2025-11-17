@@ -5,6 +5,7 @@ export interface ActionItem {
   type?: 'separator';
   variant?: 'danger' | 'default';
   primary?: boolean;
+  condition?: (node: any) => boolean;
 }
 
 export type ActionMap = Record<string, ActionItem[]>;
