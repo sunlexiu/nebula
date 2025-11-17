@@ -1,6 +1,7 @@
 import toast from 'react-hot-toast';
-import { useTreeStore } from '../../stores/useTreeStore';
-import { actionHandlers, updateConnection } from '../../actions/dbActions';
+import { useTreeStore } from '@/stores/useTreeStore';
+import { handleNewGroupSubmit } from '@/actions/impl/folderActions';
+import { handleNewConnectionSubmit } from '@/actions/impl/connectionActions';
 
 // openNewGroup 接收 openModal 参数
 export const openNewGroup = (parentId = null, openModal) => {
@@ -55,12 +56,11 @@ export const openRenameFolder = (node: any, openModal: Function) => {
         throw new Error('文件夹名称不能为空');
       }
       try {
-        const { renameFolder } = await import('../../actions/treeActions');
-        await renameFolder(node.id, newName);  // 调用 PUT 更新
-        toast.success(`文件夹已重命名为 "${newName}"`);
+        const { renameFolder } = await import('@/actions/impl/folderActions');
+        await renameFolder(node.id, newName);
       } catch (error) {
         toast.error('重命名失败，请重试');
-        throw error; // 让模态框处理错误
+        throw error;
       }
     }
   });

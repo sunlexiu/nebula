@@ -2,6 +2,29 @@ import toast from 'react-hot-toast';
 import { useTreeStore } from '../../stores/useTreeStore';
 import { loadDatabasesForConnection } from '../../utils/treeUtils';
 
+export const handleNewConnectionSubmit = async (connectionData: any, parentId: string | null) => {
+  try {
+    const response = await fetch('/api/config/connections', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...connectionData, type: 'connection', parentId }),
+    });
+    if (!response.ok) throw new Error('Failed to create connection');
+    await response.json();
+    useTreeStore.getState().refreshTree();  // 统一刷新树
+    toast.success('新建连接成功');
+  } catch (err) {
+    console.error('Error creating connection:', err);
+    toast.error('创建连接失败');
+    throw err;
+  }
+};
+
+export const openNewConnection = (parentId: string | null, openModal: Function) => {
+  if (typeof openModal !== 'function') return toast.error('模态打开失败');
+  openNewConnectionModal(parentId, openModal, handleNewConnectionSubmit);  // 传递 submit 给模态
+};
+
 export const updateConnection = async (payload: any) => {
   const { updateTreePath } = useTreeStore.getState();
   return toast.promise(

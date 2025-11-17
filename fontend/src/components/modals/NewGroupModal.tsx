@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import toast from 'react-hot-toast';
-import { handleNewGroupSubmit } from '../../actions/treeActions'; // 移到 actions
+import { handleNewGroupSubmit } from '../../actions/impl/folderActions';
 
 const NewGroupModal = ({ isOpen, onClose, parentId, onSubmit = handleNewGroupSubmit }) => {
   const [groupName, setGroupName] = useState("");

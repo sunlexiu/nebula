@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import { useTreeStore } from '../stores/useTreeStore';
 import { findConnectionId } from '../utils/treeUtils';
 import { openConfirm } from '../components/modals/modalActions';
+
 /* ========================= 通用模板工厂 ========================= */
 // 删除模板：适用于 schema/table/view/function 等（objectType 差异）
 const createDeleteHandler = (objectType: string, title: string, successMsgTemplate: (name: string) => string): ActionHandler =>
@@ -89,26 +90,31 @@ export const actionHandlers: Record<string, ActionHandler> = {
     }
     toast(`未知默认动作: ${node.name}`);
   },
-  // 通用（引用模板）
+  // 通用（引用模板） - 只剩这些通用部分
   showProperties,
-  // 文件夹/其他（动态委托）
-  openNewGroup: async (node: any, openModal?: Function) => {
-    const { openNewGroup } = await import('./impl/folderActions');
-    openNewGroup(node.id, openModal);
-  },
-  openRenameFolder: async (node: any, openModal?: Function) => {
-    const { openRenameFolder } = await import('./impl/folderActions');
-    openRenameFolder(node, openModal);
-  },
-  // 动态分发器：路由专用模块
+  // 动态分发器：路由专用模块（整合 folder 路由）
   dynamicHandler: async (handler: string, node: any, options: Options = {}) => {
     const { setExpandedKeys, openModal } = options;
-    if (node.type === 'folder' || !node.dbType) {
+    // 新增：folder 类型统一路由（整合原 actionHandlers 中的 folder 委托）
+    if (node.type === 'folder') {
+      try {
+        const { folderHandlers } = await import('./impl/folderActions');
+        if (typeof folderHandlers[handler] === 'function') {
+          return folderHandlers[handler](node, openModal, setExpandedKeys);
+        }
+      } catch (e) {
+        console.error('Failed to load folderHandlers:', e);
+      }
+      toast.error(`未实现的操作: ${handler}`);
+      return;
+    }
+    if (!node.dbType) {
+      // 非 folder、非 DB：兜底通用
       if (actionHandlers[handler]) return actionHandlers[handler](node, openModal, setExpandedKeys);
       toast.error(`未实现的操作: ${handler}`);
       return;
     }
-    // 路由专用模块
+    // 原有 DB 节点路由...
     let moduleActions: any;
     switch (node.type) {
 //       case 'database':

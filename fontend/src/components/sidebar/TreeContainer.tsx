@@ -1,8 +1,7 @@
 /* src/components/sidebar/TreeContainer.tsx */
 import React, { useMemo } from 'react';
 import TreeNode from './TreeNode';
-import { moveNode } from '@/actions/treeActions';
-import { patchConnectionNode } from '@/utils/treeUtils';
+import { patchConnectionNode, moveNode } from '@/utils/treeUtils';
 import type { TreeNode as TNode } from '@/types/tree';
 
 interface Props {
