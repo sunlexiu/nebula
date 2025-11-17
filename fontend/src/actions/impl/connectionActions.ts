@@ -58,19 +58,18 @@ export const connectDatabase = async (node: any) => {
   return toast.promise(
     (async () => {
       const r = await fetch(`/api/config/connections/${encodeURIComponent(node.id)}/test`, { method: 'GET' });
-      if (!r.ok) {
-          const msgText = await r.text();
-          let extractedMsg = msgText || '连接失败';
-          try {
-            const errJson = JSON.parse(msgText);
-            if (errJson && typeof errJson.message === 'string') {
-              extractedMsg = errJson.message;
-            }
-          } catch (error) {
-            console.warn('Failed to parse error JSON:', error);
-          }
-          throw new Error(extractedMsg);
-        }
+     if (!r.ok) {
+       try {
+         const errJson = await r.json();
+         throw new Error(errJson?.message || '连接失败');
+       } catch (error) {
+         if (error instanceof SyntaxError) {
+           console.warn('Failed to parse error JSON:', error);
+           throw new Error('连接失败');
+         }
+         throw error;
+       }
+     }
       // 连接成功 → 更新状态 + 加载数据库列表
       const dbKids = await loadDatabasesForConnection(node);
       updateTreePath(node.id, (curr: any) => ({
@@ -85,7 +84,6 @@ export const connectDatabase = async (node: any) => {
     })(),
     {
       loading: '连接中...',
-      success: '连接成功',
       error: (e) => e.message || '连接失败',
     }
   );

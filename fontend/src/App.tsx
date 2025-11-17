@@ -16,7 +16,7 @@ export default function App() {
   return (
     <ModalProvider>
       <AppLayout />
-      <Toaster position="top-right" />
+      <Toaster position="top-center" />
     </ModalProvider>
   );
 }
