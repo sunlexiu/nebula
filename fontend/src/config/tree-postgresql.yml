@@ -4,7 +4,7 @@ tree:
     type: roles
     virtual: true
     position: 1
-    icon: /icons/roles.svg
+    icon: /icons/left_tree/roles.svg
     actions:
       menu:
         - { label: 新建角色, handler: createRole, icon: ➕ }
@@ -14,7 +14,7 @@ tree:
     type: databases
     virtual: true
     position: 2
-    icon: /icons/databases.svg
+    icon: /icons/left_tree/databases.svg
     nextLevel: dbs_real
     actions:
       primary: { handler: connectAndExpand, icon: ⚡, label: 连接 }
@@ -29,7 +29,7 @@ tree:
     parent: databases_aggregate
     type: database
     virtual: false
-    icon: /icons/database.svg
+    icon: /icons/left_tree/database.svg
     nextLevel: db_subs_virtual
     actions:
       menu:
@@ -54,14 +54,14 @@ tree:
     parent: db_subs_virtual
     type: casts
     virtual: true
-    icon: /icons/casts.svg
+    icon: /icons/left_tree/casts.svg
     children: {}
 
   - key: extensions_virtual
     parent: db_subs_virtual
     type: extensions
     virtual: true
-    icon: /icons/extensions.svg
+    icon: /icons/left_tree/extensions.svg
     children: {}
 
   - key: schemas_aggregate
@@ -69,7 +69,7 @@ tree:
     label: Schemas
     type: schemas
     virtual: true
-    icon: /icons/schemas.svg
+    icon: /icons/left_tree/schemas.svg
     nextLevel: schemas_real
     actions:
       menu:
@@ -82,7 +82,7 @@ tree:
     parent: schemas_aggregate
     type: schema
     virtual: false
-    icon: /icons/schema.svg
+    icon: /icons/left_tree/schema.svg
     nextLevel: schema_subs_virtual
     actions:
       menu:
@@ -112,14 +112,14 @@ tree:
     label: Tables
     type: tables
     virtual: true
-    icon: /icons/tables.svg
+    icon: /icons/left_tree/tables.svg
     nextLevel: tables_real
 
   - key: tables_real
     parent: tables_group
     type: table
     virtual: false
-    icon: /icons/table.svg
+    icon: /icons/left_tree/table.svg
     nextLevel: table_subs_virtual
     actions:
       menu:
@@ -148,56 +148,56 @@ tree:
     label: Columns
     type: columns
     virtual: true
-    icon: /icons/columns.svg
+    icon: /icons/left_tree/columns.svg
     nextLevel: table_columns_real
 
   - key: table_columns_real
     parent: table_columns_aggregate
     type: column
     virtual: false
-    icon: /icons/column.svg
+    icon: /icons/left_tree/column.svg
 
   - key: table_constraints_aggregate
     parent: table_subs_virtual
     label: Constraints
     type: constraints
     virtual: true
-    icon: /icons/constraints.svg
+    icon: /icons/left_tree/constraints.svg
     nextLevel: table_constraints_real
 
   - key: table_constraints_real
     parent: table_constraints_aggregate
     type: constraint
     virtual: false
-    icon: /icons/constraint.svg
+    icon: /icons/left_tree/constraint.svg
 
   - key: table_indexes_aggregate
     parent: table_subs_virtual
     label: Indexes
     type: indexes
     virtual: true
-    icon: /icons/indexes.svg
+    icon: /icons/left_tree/indexes.svg
     nextLevel: table_indexes_real
 
   - key: table_indexes_real
     parent: table_indexes_aggregate
     type: index
     virtual: false
-    icon: /icons/index.svg
+    icon: /icons/left_tree/index.svg
 
   - key: table_triggers_aggregate
     parent: table_subs_virtual
     label: Triggers
     type: triggers
     virtual: true
-    icon: /icons/triggers.svg
+    icon: /icons/left_tree/triggers.svg
     nextLevel: table_triggers_real
 
   - key: table_triggers_real
     parent: table_triggers_aggregate
     type: trigger
     virtual: false
-    icon: /icons/trigger.svg
+    icon: /icons/left_tree/trigger.svg
 
   # ======== 视图 ========
   - key: views_group
@@ -205,14 +205,14 @@ tree:
     label: Views
     type: views
     virtual: true
-    icon: /icons/views.svg
+    icon: /icons/left_tree/views.svg
     nextLevel: views_real
 
   - key: views_real
     parent: views_group
     type: view
     virtual: false
-    icon: /icons/view.svg
+    icon: /icons/left_tree/view.svg
     nextLevel: view_subs_virtual
     actions:
       menu:
@@ -236,14 +236,14 @@ tree:
     label: Columns
     type: columns
     virtual: true
-    icon: /icons/view_columns.svg
+    icon: /icons/left_tree/view_columns.svg
     nextLevel: view_columns_real
 
   - key: view_columns_real
     parent: view_columns_aggregate
     type: column
     virtual: false
-    icon: /icons/view_column.svg
+    icon: /icons/left_tree/view_column.svg
 
   # ======== 物化视图 ========
   - key: matviews_group
@@ -251,14 +251,14 @@ tree:
     label: Materialized Views
     type: matviews
     virtual: true
-    icon: /icons/matviews.svg
+    icon: /icons/left_tree/matviews.svg
     nextLevel: matviews_real
 
   - key: matviews_real
     parent: matviews_group
     type: materialized_view
     virtual: false
-    icon: /icons/matview.svg
+    icon: /icons/left_tree/matview.svg
     nextLevel: matview_subs_virtual
     actions:
       menu:
@@ -281,28 +281,28 @@ tree:
     label: Columns
     type: columns
     virtual: true
-    icon: /icons/matview_columns.svg
+    icon: /icons/left_tree/matview_columns.svg
     nextLevel: matview_columns_real
 
   - key: matview_columns_real
     parent: matview_columns_aggregate
     type: column
     virtual: false
-    icon: /icons/matview_column.svg
+    icon: /icons/left_tree/matview_column.svg
 
   - key: matview_indexes_aggregate
     parent: matview_subs_virtual
     label: Indexes
     type: indexes
     virtual: true
-    icon: /icons/matview_indexes.svg
+    icon: /icons/left_tree/matview_indexes.svg
     nextLevel: matview_indexes_real
 
   - key: matview_indexes_real
     parent: matview_indexes_aggregate
     type: index
     virtual: false
-    icon: /icons/matview_index.svg
+    icon: /icons/left_tree/matview_index.svg
 
   # ======== 序列 ========
   - key: sequences_group
@@ -310,14 +310,14 @@ tree:
     label: Sequences
     type: sequences
     virtual: true
-    icon: /icons/sequences.svg
+    icon: /icons/left_tree/sequences.svg
     nextLevel: sequences_real
 
   - key: sequences_real
     parent: sequences_group
     type: sequence
     virtual: false
-    icon: /icons/sequence.svg
+    icon: /icons/left_tree/sequence.svg
     nextLevel: sequence_subs_virtual
 
   - key: sequence_subs_virtual
@@ -333,14 +333,14 @@ tree:
     label: Properties
     type: properties
     virtual: true
-    icon: /icons/sequence_props.svg
+    icon: /icons/left_tree/sequence_props.svg
     nextLevel: sequence_props_real
 
   - key: sequence_props_real
     parent: sequence_props_aggregate
     type: property
     virtual: false
-    icon: /icons/property.svg
+    icon: /icons/left_tree/property.svg
 
   # ======== 函数 ========
   - key: functions_group
@@ -348,14 +348,14 @@ tree:
     label: Functions
     type: functions
     virtual: true
-    icon: /icons/functions.svg
+    icon: /icons/left_tree/functions.svg
     nextLevel: functions_real
 
   - key: functions_real
     parent: functions_group
     type: function
     virtual: false
-    icon: /icons/function.svg
+    icon: /icons/left_tree/function.svg
     nextLevel: function_subs_virtual
     actions:
       menu:
@@ -380,28 +380,28 @@ tree:
     label: Info
     type: info
     virtual: true
-    icon: /icons/function_info.svg
+    icon: /icons/left_tree/function_info.svg
     nextLevel: function_info_real
 
   - key: function_info_real
     parent: function_info_aggregate
     type: property
     virtual: false
-    icon: /icons/property.svg
+    icon: /icons/left_tree/property.svg
 
   - key: function_definition_aggregate
     parent: function_subs_virtual
     label: Definition
     type: definition
     virtual: true
-    icon: /icons/function_definition.svg
+    icon: /icons/left_tree/function_definition.svg
     nextLevel: function_definition_real
 
   - key: function_definition_real
     parent: function_definition_aggregate
     type: definition
     virtual: false
-    icon: /icons/function_definition.svg
+    icon: /icons/left_tree/function_definition.svg
 
   # ======== 存储过程 ========
   - key: procedures_group
@@ -409,14 +409,14 @@ tree:
     label: Procedures
     type: procedures
     virtual: true
-    icon: /icons/procedures.svg
+    icon: /icons/left_tree/procedures.svg
     nextLevel: procedures_real
 
   - key: procedures_real
     parent: procedures_group
     type: procedure
     virtual: false
-    icon: /icons/procedure.svg
+    icon: /icons/left_tree/procedure.svg
     nextLevel: procedure_subs_virtual
     actions:
       menu:
@@ -440,35 +440,35 @@ tree:
     label: Info
     type: info
     virtual: true
-    icon: /icons/procedure_info.svg
+    icon: /icons/left_tree/procedure_info.svg
     nextLevel: procedure_info_real
 
   - key: procedure_info_real
     parent: procedure_info_aggregate
     type: property
     virtual: false
-    icon: /icons/property.svg
+    icon: /icons/left_tree/property.svg
 
   - key: procedure_definition_aggregate
     parent: procedure_subs_virtual
     label: Definition
     type: definition
     virtual: true
-    icon: /icons/procedure_definition.svg
+    icon: /icons/left_tree/procedure_definition.svg
     nextLevel: procedure_definition_real
 
   - key: procedure_definition_real
     parent: procedure_definition_aggregate
     type: definition
     virtual: false
-    icon: /icons/procedure_definition.svg
+    icon: /icons/left_tree/procedure_definition.svg
 
   # ==================== 角色 ====================
   - key: users_real
     parent: roles_aggregate
     type: role
     virtual: false
-    icon: /icons/role.svg
+    icon: /icons/left_tree/role.svg
     actions:
       menu:
         - { label: 属性, handler: showRoleProperties, icon: ℹ️ }

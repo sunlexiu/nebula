@@ -3,16 +3,19 @@ import { parse } from 'yaml';
 const cache = new Map<string, TreeConfig>();
 
 export async function loadYaml<T>(path: string): Promise<T> {
-  const raw = await import(/* @vite-ignore */ path + '?raw');
+  const raw = await import(/* @vite-ignore */ path );
   return parse(raw.default) as T;
 }
 
 export async function getTreeConfig(dbType: string) {
   const key = dbType.toLowerCase();
   if (cache.has(key)) return cache.get(key)!;
-  const cfg = await loadYaml<TreeConfig>(`../config/tree-${key}.yml`);
-  cache.set(key, cfg);
-  return cfg;
+  const res = await fetch(`/src/config/tree-${key}.yml`);
+  if (!res.ok) throw new Error(`Failed to load tree config: ${key}`);
+  const text = await res.text();
+  const config = parse(text);
+  cache.set(key, config);
+  return config;
 }
 
 /* ---------- 类型 ---------- */

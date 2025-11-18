@@ -64,24 +64,17 @@ export const showProperties = (node: any) => {
 export const actionHandlers: Record<string, ActionHandler> = {
   // 连接展开（内置）
   connectAndExpand: async (node: any, _openModal?: Function, setExpandedKeys?: Function) => {
-    if (node.connected) {
-      setExpandedKeys?.((prev: Map<string, boolean>) => new Map(prev).set(node.id, true));
-      return;
-    }
-    const { connectDatabase } = await import('./impl/connectionActions');
-    const ok = await connectDatabase(node);
-    if (ok) {
-      const { loadDatabasesForConnection } = await import('../utils/treeUtils');
-      const dbKids = await loadDatabasesForConnection({ id: node.id, connected: true });
-      useTreeStore.getState().updateTreePath(node.id, (curr) => ({
-        ...curr,
-        expanded: true,
-        children: dbKids,
-        connected: true,
-        status: 'connected',
-      }));
-      setExpandedKeys?.((prev) => new Map(prev).set(node.id, true));
-    }
+      if (node.connected) {
+        setExpandedKeys?.((prev: Map<string, boolean>) => new Map(prev).set(node.id, true));
+        return;
+      }
+      const { connectDatabase } = await import('./impl/connectionActions');
+      const ok = await connectDatabase(node);
+      if (ok) {
+        // 连接成功后，不在这里加载 children，交给 loadNodeChildren/后端逻辑
+        // 这里只负责把节点标记为展开，以便前端去触发下一步加载
+        setExpandedKeys?.((prev: Map<string, boolean>) => new Map(prev).set(node.id, true));
+      }
   },
   defaultAction: (node: any, setExpandedKeys?: Function) => {
     if (node.type === 'connection') {

@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 /* ===== 现有工具（从原始代码） ===== */
 /* 展开节点：虚拟节点按 YAML 拼装，真实节点走后端 */
 export async function loadNodeChildren(node: TreeNode): Promise<TreeNode> {
-  if (node.type === 'folder') {
+  if (node.type === 'folder' ) {
     return node;
   }
 
@@ -17,7 +17,7 @@ export async function loadNodeChildren(node: TreeNode): Promise<TreeNode> {
 
   /* 第一次展开 connection → 加载 YAML 顶层 */
   if (node.type === 'connection') {
-    const cfg = await getTreeConfig(node.dbType!);
+    const cfg = await getTreeConfig(node.dbType);
     const topNodes = cfg.tree.filter((n) => !n.parent);
     const children = topNodes.map((n) => yamlNodeToTreeNode(n, node.id));
     return { ...node, expanded: true, children };
@@ -25,7 +25,7 @@ export async function loadNodeChildren(node: TreeNode): Promise<TreeNode> {
 
   /* 虚拟节点：按 YAML children / nextLevel 继续虚拟 */
   if (node.virtual) {
-    const cfg = await getTreeConfig(node.dbType!);
+    const cfg = await getTreeConfig(node.dbType);
     const me = cfg.tree.find((n) => n.key === path);
     if (!me) return { ...node, children: [] };
 
@@ -35,7 +35,7 @@ export async function loadNodeChildren(node: TreeNode): Promise<TreeNode> {
         const def = cfg.tree.find((n) => n.key === key)!;
         const tn = yamlNodeToTreeNode(def, node.id);
         /* 用别名当展示名 */
-        return { ...tn, name: alias.replace(/_/g, ' ') };
+        return { ...tn, name: alias.replaceAll('_', ' ') };
       });
       return { ...node, expanded: true, children: kids };
     }
@@ -114,7 +114,10 @@ export function isExpandable(node: TreeNode): boolean {
 /* ===== TreeNode.tsx 专用 ===== */
 export const getExpandIcon = (node: TreeNode): string => {
   const has = (node.children?.length > 0) || node.virtual || node.config?.children || node.config?.nextLevel;
-  return has ? (node.expanded ? '▼' : '▶') : '';
+  if (!has) {
+      return '';
+  }
+  return node.expanded ? '▼' : '▶';
 };
 
 export const getNodeIcon = (node: TreeNode): string => {
@@ -255,7 +258,7 @@ export const toggleExpand = (setExpandedKeys, nodeId, loadChildren = true) => {
 
 // 删除节点（通用）：不变
 export const deleteNode = (treeData, nodeId) => {
-  const newTree = JSON.parse(JSON.stringify(treeData));
+  const newTree = structuredClone(treeData);
   function deleteRecursive(nodes) {
     if (!Array.isArray(nodes)) return false;
     for (let i = 0; i < nodes.length; i++) {
@@ -263,7 +266,7 @@ export const deleteNode = (treeData, nodeId) => {
         nodes.splice(i, 1);
         return true;
       }
-      if (nodes[i] && nodes[i].children && deleteRecursive(nodes[i].children)) {
+      if (nodes[i]?.children && deleteRecursive(nodes[i].children)) {
         return true;
       }
     }
