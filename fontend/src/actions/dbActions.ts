@@ -144,10 +144,24 @@ export const actionHandlers: Record<string, ActionHandler> = {
     // DB 类型覆盖 + 通用 + 兜底（原有逻辑）
     const dbType = useTreeStore.getState().dbType?.toLowerCase();
     if (dbType) {
+      let dbSpecificHandler: any;
+
       try {
-        const dbSpecific = await import(`./${dbType}Actions`);
-        if (typeof dbSpecific[handler] === 'function') return dbSpecific[handler](node, openModal, setExpandedKeys);
-      } catch {}
+        switch (dbType) {
+          case 'postgres':
+          case 'postgresql':
+            dbSpecificHandler = await import( './pgsqlActions');
+            break;
+          default:
+            dbSpecificHandler = null;
+        }
+
+        if (dbSpecificHandler && typeof dbSpecificHandler[handler] === 'function') {
+          return dbSpecificHandler[handler](node, openModal, setExpandedKeys);
+        }
+      } catch (err) {
+        console.warn(`No specific actions for dbType: ${dbType}`, err);
+      }
     }
     if (actionHandlers[handler]) return actionHandlers[handler](node, openModal, setExpandedKeys);
     try {
