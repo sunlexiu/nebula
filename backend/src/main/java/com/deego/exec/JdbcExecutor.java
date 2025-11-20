@@ -20,6 +20,11 @@ public class JdbcExecutor implements DbExecutor {
     }
 
     @Override
+    public List<Map<String, Object>> queryForList(String sql, Object... params) {
+        return jdbc.queryForList(sql, params);
+    }
+
+    @Override
     public int execute(String sql) {
         return jdbc.update(sql);
     }

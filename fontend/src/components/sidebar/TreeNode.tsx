@@ -1,4 +1,5 @@
 import React, { useState, memo } from 'react';
+import toast from 'react-hot-toast';
 import { useModal } from '../modals/ModalProvider';
 import { useTreeStore } from '../../stores/useTreeStore';
 import { actionHandlers, getAllActions } from '@/actions/dbActions';  // 新增：导入 getAllActions
@@ -85,27 +86,36 @@ const TreeNode = memo(({
     setDragOverNodeId(null);
   };
 
-    const handleClick = async () => {
-     if (node.type === 'folder') {
-        // Folder 类型：仅切换展开/收起，不加载子项
-        setExpandedKeys((prev) => {
-          const newMap = new Map(prev);
-          newMap.set(node.id, !newMap.get(node.id));
-          return newMap;
-        });
-        return;
-      }
+  const handleClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
 
-      if (isExpandable) {
-        setIsLoading(true);
-        try {
-          const updated = await loadNodeChildren(node);
-          updateTreePath(node.id, () => updated);
-        } finally {
-          setIsLoading(false);
-        }
+    const willExpand = !isExpanded;  // 即将要变成展开状态？
+
+    if (willExpand && isExpandable && (!node.children || node.children.length === 0)) {
+      // 情况1：当前是收起，且还没加载过子节点 → 需要加载
+      setIsLoading(true);
+      try {
+        const updated = await loadNodeChildren(node);
+        updateTreePath(node.id, () => ({
+          ...updated,
+          expanded: true,   // 确保展开
+        }));
+        setExpandedKeys(prev => new Map(prev).set(node.id, true));
+      } catch (err) {
+        toast.error('加载失败');
+        console.error(err);
+      } finally {
+        setIsLoading(false);
       }
-   };
+    } else {
+      // 情况2：单纯切换展开/收起状态（folder 或 已加载过子节点的 connection/database 等）
+      setExpandedKeys(prev => {
+        const next = new Map(prev);
+        next.set(node.id, willExpand);
+        return next;
+      });
+    }
+  };
 
   const handlePrimaryAction = async (e: React.MouseEvent) => {
     e.stopPropagation();

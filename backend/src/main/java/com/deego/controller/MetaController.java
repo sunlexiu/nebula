@@ -1,6 +1,7 @@
 package com.deego.controller;
 
 import com.deego.common.ApiResponse;
+import com.deego.metadata.DatabaseNodeType;
 import com.deego.service.MetaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -15,26 +16,30 @@ public class MetaController {
 	@Autowired
 	private MetaService metaService;
 
-	/* 真实节点列表：顶层 */
-	@GetMapping("/{connId}/children")
-	public ApiResponse<List<Map<String, Object>>> top(@PathVariable String connId) {
-		return ApiResponse.ok(metaService.listDatabases(connId));
-	}
-
-	/* 真实节点列表：单段路径 */
-	@GetMapping("/{connId}/{nodeKey}/children")
+	/**
+	 * 统一左侧树展开接口
+	 * 示例：
+	 * /api/meta/1/children/database/
+	 * /api/meta/1/children/schema/mydb/
+	 * /api/meta/1/children/table/mydb/public/
+	 */
+	@GetMapping("/{connId}/children/{nodeType}/{path:.+}")
 	public ApiResponse<List<Map<String, Object>>> children(
 			@PathVariable String connId,
-			@PathVariable String nodeKey) {
-		return ApiResponse.ok(metaService.listChildren(connId, nodeKey));
+			@PathVariable DatabaseNodeType nodeType,
+			@PathVariable String path) {
+
+		// Spring 会自动 trim 末尾的 /，我们统一加回来便于处理
+		if (!path.endsWith("/")) {
+			path = path + "/";
+		}
+
+		return ApiResponse.ok(metaService.listChildren(connId, nodeType, path));
 	}
 
-	/* 真实节点列表：双段路径 */
-	@GetMapping("/{connId}/{nodeKey}/{entityId}/children")
-	public ApiResponse<List<Map<String, Object>>> children(
-			@PathVariable String connId,
-			@PathVariable String nodeKey,
-			@PathVariable String entityId) {
-		return ApiResponse.ok(metaService.listChildren(connId, nodeKey + "/" + entityId));
+	// 根节点快捷入口（可选）
+	@GetMapping("/{connId}/children/root")
+	public ApiResponse<List<Map<String, Object>>> root(@PathVariable String connId) {
+		return ApiResponse.ok(metaService.listChildren(connId, DatabaseNodeType.ROOT, ""));
 	}
 }

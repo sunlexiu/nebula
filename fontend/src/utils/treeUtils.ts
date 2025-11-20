@@ -19,7 +19,7 @@ export async function loadNodeChildren(node: TreeNode): Promise<TreeNode> {
   if (node.type === 'connection') {
     const cfg = await getTreeConfig(node.dbType);
     const topNodes = cfg.tree.filter((n) => !n.parent);
-    const children = topNodes.map((n) => yamlNodeToTreeNode(n, node.id));
+    const children = topNodes.map((n) => yamlNodeToTreeNode(n, node));
     return { ...node, expanded: true, children };
   }
 
@@ -33,7 +33,7 @@ export async function loadNodeChildren(node: TreeNode): Promise<TreeNode> {
     if (me.children) {
       const kids = Object.entries(me.children).map(([alias, key]) => {
         const def = cfg.tree.find((n) => n.key === key)!;
-        const tn = yamlNodeToTreeNode(def, node.id);
+        const tn = yamlNodeToTreeNode(def, node);
         /* 用别名当展示名 */
         return { ...tn, name: alias.replaceAll('_', ' ') };
       });
@@ -54,15 +54,15 @@ export async function loadNodeChildren(node: TreeNode): Promise<TreeNode> {
 }
 
 /* 把 YAML 节点转成 TreeNode（虚拟） */
-function yamlNodeToTreeNode(yaml: any, parentId: string): TreeNode {
+function yamlNodeToTreeNode(yaml: any, parent: node): TreeNode {
   return {
-    id: `${parentId}::${yaml.key}`,
+    id: `${parent.id}::${yaml.key}`,
     name: yaml.label || yaml.key,
     type: yaml.type,
     icon: yaml.icon,
     virtual: yaml.virtual ?? false,
     connected: true,
-    dbType: parentId.split('::')[0], // 从 parent 继承
+    dbType: parent.dbType,
     children: [],
     config: { type: yaml.type, actions: yaml.actions },
   };
@@ -74,7 +74,7 @@ async function fetchRealNodes(parent: TreeNode, yamlNext?: any): Promise<TreeNod
   const path = rest.join('/');
   const url = `/api/meta/${encodeURIComponent(connId)}/${path}/children`;
   const { data } = await request<TreeNode[]>(url);
-  return (data ?? []).map((n) => ({ ...n, dbType: parent.dbType }));
+  return (data.data ?? []).map((n) => ({ ...n, dbType: parent.dbType }));
 }
 
 export function findNode(nodes: TreeNode[], id: string): TreeNode | null {
