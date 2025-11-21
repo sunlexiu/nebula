@@ -27,7 +27,6 @@ public class MetaService {
 
 		MetadataProvider provider = factory.getProvider(conn.getDbType());
 
-		// "mydb/public/" → ["mydb", "public"]
 		String[] segments = fullPath.isEmpty() ? new String[0] :
 				fullPath.substring(0, fullPath.length() - 1).split("/");
 
