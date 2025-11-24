@@ -1,5 +1,6 @@
 package com.deego.metadata.postgresql;
 
+import com.deego.enums.DatabaseType;
 import com.deego.exec.DbExecutor;
 import com.deego.metadata.DatabaseNodeType;
 import com.deego.metadata.MetadataProvider;
@@ -16,6 +17,11 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
 
 	@Autowired
 	private ConnectionService connectionService;
+
+	@Override
+	public DatabaseType dbType() {
+		return DatabaseType.POSTGRESQL;
+	}
 
 	@Override
 	public List<Map<String, Object>> listChildren(String connId,

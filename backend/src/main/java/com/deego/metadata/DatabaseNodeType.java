@@ -5,7 +5,6 @@ package com.deego.metadata;
  * 前端和后端必须完全一致
  */
 public enum DatabaseNodeType {
-	ROOT,
 	DATABASE,
 	SCHEMA,
 	TABLE,

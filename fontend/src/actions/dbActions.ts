@@ -181,7 +181,7 @@ export const getAllActions = (nodeType: string, node?: any) => {
       if (action.condition) {
         return action.condition(node);
       }
-      return true;  // 无 condition 全显示
+      return true;
     });
   }
 

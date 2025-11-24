@@ -6,6 +6,7 @@ import com.deego.metadata.MetadataProviderFactory;
 import com.deego.model.Connection;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.ObjectUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -27,7 +28,7 @@ public class MetaService {
 
 		MetadataProvider provider = factory.getProvider(conn.getDbType());
 
-		String[] segments = fullPath.isEmpty() ? new String[0] :
+		String[] segments = ObjectUtils.isEmpty(fullPath) ? new String[0] :
 				fullPath.substring(0, fullPath.length() - 1).split("/");
 
 		return provider.listChildren(connId, conn, nodeType, segments);

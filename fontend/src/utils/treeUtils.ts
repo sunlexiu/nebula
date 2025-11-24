@@ -55,8 +55,10 @@ export async function loadNodeChildren(node: TreeNode): Promise<TreeNode> {
 
 /* 把 YAML 节点转成 TreeNode（虚拟） */
 function yamlNodeToTreeNode(yaml: any, parent: node): TreeNode {
+  const suffix = parent.path ? `${yaml.name}` : `::${yaml.name}`;
   return {
     id: `${parent.id}::${yaml.key}`,
+    path: `${parent.path ?? ''}${yaml.virtual ? '' : suffix}`,
     name: yaml.label || yaml.key,
     type: yaml.type,
     icon: yaml.icon,
@@ -68,11 +70,11 @@ function yamlNodeToTreeNode(yaml: any, parent: node): TreeNode {
   };
 }
 
-/* 真实节点：调后端 /meta/{connId}/{path}/children */
+/* 真实节点：调后端 /meta/{connId}/children/{nodeType}/{path} */
 async function fetchRealNodes(parent: TreeNode, yamlNext?: any): Promise<TreeNode[]> {
   const [connId, ...rest] = parent.id.split('::');
-  const path = rest.join('/');
-  const url = `/api/meta/${encodeURIComponent(connId)}/${path}/children`;
+  const path = parent.path ? `/${parent.path}` : '';
+  const url = `/api/meta/${encodeURIComponent(connId)}/children/${yamlNext.type}${path}`;
   const { data } = await request<TreeNode[]>(url);
   return (data.data ?? []).map((n) => ({ ...n, dbType: parent.dbType }));
 }

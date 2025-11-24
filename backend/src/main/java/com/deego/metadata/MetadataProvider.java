@@ -1,5 +1,6 @@
 package com.deego.metadata;
 
+import com.deego.enums.DatabaseType;
 import com.deego.model.Connection;
 
 import java.util.List;
@@ -10,6 +11,11 @@ import java.util.Map;
  * 每种数据库实现一个子类
  */
 public interface MetadataProvider {
+
+	/**
+	 * 数据库类型
+	 */
+	DatabaseType dbType();
 
 	/**
 	 * 查询下一层子节点

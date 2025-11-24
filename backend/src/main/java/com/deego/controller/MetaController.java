@@ -23,23 +23,12 @@ public class MetaController {
 	 * /api/meta/1/children/schema/mydb/
 	 * /api/meta/1/children/table/mydb/public/
 	 */
-	@GetMapping("/{connId}/children/{nodeType}/{path:.+}")
+	@GetMapping({"/{connId}/children/{type}", "/{connId}/children/{type}/{path:.+}"})
 	public ApiResponse<List<Map<String, Object>>> children(
 			@PathVariable String connId,
-			@PathVariable DatabaseNodeType nodeType,
-			@PathVariable String path) {
-
-		// Spring 会自动 trim 末尾的 /，我们统一加回来便于处理
-		if (!path.endsWith("/")) {
-			path = path + "/";
-		}
-
+			@PathVariable String type,
+			@PathVariable(required = false) String path) {
+		DatabaseNodeType nodeType = DatabaseNodeType.valueOf(type.toUpperCase());
 		return ApiResponse.ok(metaService.listChildren(connId, nodeType, path));
-	}
-
-	// 根节点快捷入口（可选）
-	@GetMapping("/{connId}/children/root")
-	public ApiResponse<List<Map<String, Object>>> root(@PathVariable String connId) {
-		return ApiResponse.ok(metaService.listChildren(connId, DatabaseNodeType.ROOT, ""));
 	}
 }

@@ -1,11 +1,13 @@
 package com.deego.metadata;
 
 import com.deego.enums.DatabaseType;
+import lombok.Getter;
 import org.springframework.stereotype.Component;
 
-import jakarta.annotation.PostConstruct;
-import java.util.HashMap;
+import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * MetadataProvider 工厂
@@ -14,29 +16,13 @@ import java.util.Map;
 @Component
 public class MetadataProviderFactory {
 
-	private final Map<DatabaseType, MetadataProvider> providers = new HashMap<>();
+	@Getter
+	private final Map<DatabaseType, MetadataProvider> providers = new EnumMap<>(DatabaseType.class);
 
-	// 这里会由 Spring 自动注入所有实现类（后面我们加上 @Component）
-	private final Map<String, MetadataProvider> beanMap;
-
-	public MetadataProviderFactory(Map<String, MetadataProvider> beanMap) {
-		this.beanMap = beanMap;
-	}
-
-	@PostConstruct
-	public void init() {
-		beanMap.forEach((beanName, provider) -> {
-			// 通过实现类简单名推断数据库类型（也可以加 @Qualifier 更严谨）
-			if (beanName.contains("PostgreSql")) {
-				providers.put(DatabaseType.POSTGRESQL, provider);
-			} else if (beanName.contains("MySql")) {
-				providers.put(DatabaseType.MYSQL, provider);
-			} else if (beanName.contains("SqlServer")) {
-				providers.put(DatabaseType.SQLSERVER, provider);
-			} else if (beanName.contains("Oracle")) {
-				providers.put(DatabaseType.ORACLE, provider);
-			}
-		});
+	public MetadataProviderFactory(List<MetadataProvider> providerList) {
+		if (Objects.nonNull(providerList)) {
+			providerList.forEach(v -> providers.put(v.dbType(), v));
+		}
 	}
 
 	public MetadataProvider getProvider(String dbTypeValue) {
