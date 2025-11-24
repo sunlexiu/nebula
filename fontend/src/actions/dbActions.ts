@@ -175,17 +175,29 @@ export const getAllActions = (nodeType: string, node?: any) => {
   const { actionMap } = useTreeStore.getState();
   let actions = actionMap[nodeType] || [];
 
-  // 动态过滤：遍历动作，只保留满足 condition 的（默认 true）
-  if (node) {
+  // 优先从 actionMap 读取
+  if (actions) {
     actions = actions.filter((action) => {
       if (action.condition) {
         return action.condition(node);
       }
       return true;
     });
+    return actions;
   }
 
-  return actions;
+  // 从node.config.actions 读取（来自 tree-*.yml）
+  if (node?.config?.actions) {
+    console.info('Using node.config.actions:', node.config.actions);
+    const menuActions = node.config.actions.menu || [];
+    const primaryAction = node.config.actions.primary;
+
+    const all = [...menuActions];
+    if (primaryAction) {
+      all.unshift({ ...primaryAction, primary: true });
+    }
+    return all;
+  }
 };
 // 重新导出：统一入口
 export { refreshFolder, deleteFolder, openNewGroup, openRenameFolder } from './impl/folderActions';

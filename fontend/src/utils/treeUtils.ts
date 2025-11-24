@@ -76,7 +76,7 @@ async function fetchRealNodes(parent: TreeNode, yamlNext?: any): Promise<TreeNod
   const path = parent.path ? `/${parent.path}` : '';
   const url = `/api/meta/${encodeURIComponent(connId)}/children/${yamlNext.type}${path}`;
   const { data } = await request<TreeNode[]>(url);
-  return (data.data ?? []).map((n) => ({ ...n, dbType: parent.dbType }));
+  return (data.data ?? []).map((n) => ({ ...n, dbType: parent.dbType, icon: yamlNext.icon }));
 }
 
 export function findNode(nodes: TreeNode[], id: string): TreeNode | null {
