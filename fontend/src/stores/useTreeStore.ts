@@ -9,6 +9,7 @@ interface State {
   setTreeData: (data: TreeNode[]) => void;
   updateTreePath: (id: string, updater: (old: TreeNode) => TreeNode) => void;
   deleteNode: (id: string) => void;
+  actionMap: Record<string, any>;
 }
 
 export const useTreeStore = create<State>((set) => ({

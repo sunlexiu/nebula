@@ -69,13 +69,13 @@ export const refreshFolder = async (node: any, setExpandedKeys?: Function) => {
 // 文件夹新建（打开模态） - 更新：模态提交调用 handleNewGroupSubmit
 export const openNewGroup = (parentId: string | null, openModal: Function) => {
   if (typeof openModal !== 'function') return toast.error('模态打开失败');
-  openNewGroupModal(parentId, openModal, handleNewGroupSubmit);  // 传递 submit 处理器给模态
+  openNewGroupModal(parentId, openModal);  // 传递 submit 处理器给模态
 };
 
 // 文件夹重命名（打开模态） - 更新：模态提交调用 renameFolder
 export const openRenameFolder = (node: any, openModal: Function) => {
   if (typeof openModal !== 'function') return toast.error('模态打开失败');
-  openRenameFolderModal(node, openModal, renameFolder);  // 传递给模态
+  openRenameFolderModal(node, openModal);  // 传递给模态
 };
 
 // 删除文件夹 - 更新：使用导入的 deleteNode
@@ -115,10 +115,10 @@ export const openNewConnection = (parentId: string | null, openModal: Function) 
 };
 
 export const folderHandlers = {
-  openNewGroup: async (node: any, openModal?: Function) => {
+  openNewGroup: async (node: any, openModal: Function) => {
     openNewGroup(node.id, openModal);
   },
-  openRenameFolder: async (node: any, openModal?: Function) => {
+  openRenameFolder: async (node: any, openModal: Function) => {
     openRenameFolder(node, openModal);
   },
   refreshFolder: async (node: any, openModal?: Function, setExpandedKeys?: Function) => {
@@ -127,7 +127,7 @@ export const folderHandlers = {
   deleteFolder: async (node: any, openModal?: Function, setExpandedKeys?: Function) => {
     deleteFolder(node, openModal);
   },
-  openNewConnection: async (node: any, openModal?: Function) => {
+  openNewConnection: async (node: any, openModal: Function) => {
     openNewConnection(node.id, openModal);
   },
 };

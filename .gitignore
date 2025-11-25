@@ -8,6 +8,7 @@ target/
 .idea/jarRepositories.xml
 .idea/compiler.xml
 .idea/libraries/
+.idea/dictionaries/
 .idea/
 *.iws
 *.iml
@@ -39,8 +40,10 @@ build/
 ### Mac OS ###
 .DS_Store
 /**/node_modules/
+/.idea/
 /frontend/dist-electron/
 /.nebula/
 /frontend/dist/
 /data/
 /fontend/dist/
+

@@ -37,6 +37,20 @@ export const updateConnection = async (connectionData: any) => {
   }
 };
 
+// 连接展开（内置）
+export const connectAndExpand = async (node: any, _openModal?: Function, setExpandedKeys?: Function) => {
+    if (node.connected) {
+        setExpandedKeys?.((prev: Map<string, boolean>) => new Map(prev).set(node.id, true));
+        return;
+    }
+    const ok = await connectDatabase(node);
+    if (ok) {
+        // 连接成功后，不在这里加载 children，交给 loadNodeChildren/后端逻辑
+        // 这里只负责把节点标记为展开，以便前端去触发下一步加载
+        setExpandedKeys?.((prev: Map<string, boolean>) => new Map(prev).set(node.id, true));
+    }
+};
+
 export const connectDatabase = async (node: any) => {
   const { updateTreePath } = useTreeStore.getState();
   if (node.connected) {
@@ -134,6 +148,6 @@ export const deleteConnection = async (node: any, openModal?: Function) => {
   );
 };
 
-export const openEditConnection = async (connection: any, openModal?: Function) => {
+export const openEditConnection = async (connection: any, openModal: Function) => {
   openRenameFolderModal(connection, openModal);
 };

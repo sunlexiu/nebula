@@ -1,4 +1,4 @@
-import React, { useState, memo } from 'react';
+import React, { useState, memo, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useModal } from '../modals/ModalProvider';
 import { useTreeStore } from '../../stores/useTreeStore';
@@ -43,8 +43,24 @@ const TreeNode = memo(({
   if (isConnected) theme.accentColor = '#10b981';
 
   // 新增：获取过滤后的动作列表
-  const filteredActions = getAllActions(node.type, node);
-  const primaryAction = filteredActions.find(action => action.primary) || filteredActions[0] || null;
+    const [filteredActions, setFilteredActions] = useState<any[]>([]);
+    const [primaryAction, setPrimaryAction] = useState<any>(null);
+
+    useEffect(() => {
+        const loadActions = async () => {
+            try {
+                const actions = await getAllActions(node.type, node);
+                setFilteredActions(actions);
+                setPrimaryAction(actions.find(action => action.primary) || actions[0] || null);
+            } catch (error) {
+                console.error('Failed to load actions:', error);
+                setFilteredActions([]);
+                setPrimaryAction(null);
+            }
+        };
+
+        loadActions();
+    }, [node.type, node]);
 
   const combinedStyles = {
     ...nodeBaseStyles,

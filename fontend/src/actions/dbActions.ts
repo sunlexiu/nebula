@@ -1,15 +1,18 @@
+import toast from 'react-hot-toast';
+import { useTreeStore } from '../stores/useTreeStore';
+import { findConnectionId } from '../utils/treeUtils';
+import { openConfirm } from '../components/modals/modalActions';
+import { getTreeConfig } from '@/utils/loadTreeConfig';
 /********************************************************************
  * 通用数据库动作实现 + 动作分发器（最终精简版）
  * - 所有具体函数独立到专用模块。
  * - 只剩：模板工厂、分发器、工具、re-export。
  *******************************************************************/
 // 类型定义
-type ActionHandler = (node: any, openModal?: Function, setExpandedKeys?: Function) => Promise<void> | void;
+type StandardActionHandler = (node: any, openModal?: Function, setExpandedKeys?: Function) => Promise<void> | void;
+type DynamicActionHandler = (node: any, handler?: string, options?: Options) => Promise<void> | void;
+type ActionHandler = StandardActionHandler | DynamicActionHandler;
 type Options = { setExpandedKeys?: Function; openModal?: Function };
-import toast from 'react-hot-toast';
-import { useTreeStore } from '../stores/useTreeStore';
-import { findConnectionId } from '../utils/treeUtils';
-import { openConfirm } from '../components/modals/modalActions';
 
 /* ========================= 通用模板工厂 ========================= */
 const createDeleteHandler = (objectType: string, title: string, successMsgTemplate: (name: string) => string): ActionHandler =>
@@ -20,7 +23,7 @@ const createDeleteHandler = (objectType: string, title: string, successMsgTempla
       `确定要删除${objectType} "${node.name}" 吗？此操作不可恢复。`,
       async () => {
         try {
-          const connectionId = findConnectionId(node.id, useTreeStore.getState().treeData);
+          const connectionId = findConnectionId(node.id);
           const dbName = node.dbName || 'default';
           const schemaName = node.schemaName || 'public';
           const res = await fetch('/api/db/delete-object', {
@@ -62,21 +65,8 @@ export const showProperties = (node: any) => {
 };
 /* ========================= 动作分发器 ========================= */
 export const actionHandlers: Record<string, ActionHandler> = {
-  // 连接展开（内置）
-  connectAndExpand: async (node: any, _openModal?: Function, setExpandedKeys?: Function) => {
-      if (node.connected) {
-        setExpandedKeys?.((prev: Map<string, boolean>) => new Map(prev).set(node.id, true));
-        return;
-      }
-      const { connectDatabase } = await import('./impl/connectionActions');
-      const ok = await connectDatabase(node);
-      if (ok) {
-        // 连接成功后，不在这里加载 children，交给 loadNodeChildren/后端逻辑
-        // 这里只负责把节点标记为展开，以便前端去触发下一步加载
-        setExpandedKeys?.((prev: Map<string, boolean>) => new Map(prev).set(node.id, true));
-      }
-  },
-  defaultAction: (node: any, setExpandedKeys?: Function) => {
+
+  defaultAction: (node: any, _openModal?: Function, setExpandedKeys?: Function) => {
     if (node.type === 'connection') {
       actionHandlers.connectAndExpand(node, undefined, setExpandedKeys);
       return;
@@ -86,7 +76,8 @@ export const actionHandlers: Record<string, ActionHandler> = {
   // 通用（引用模板） - 只剩这些通用部分
   showProperties,
   // 动态分发器：路由专用模块（整合 folder 路由）
-  dynamicHandler: async (handler: string, node: any, options: Options = {}) => {
+  dynamicHandler: async (handler: string, node:any, options: Options = {}) => {
+    if (!handler) return;
     const { setExpandedKeys, openModal } = options;
     // 新增：folder 类型统一路由（整合原 actionHandlers 中的 folder 委托）
     if (node.type === 'folder') {
@@ -103,7 +94,10 @@ export const actionHandlers: Record<string, ActionHandler> = {
     }
     if (!node.dbType) {
       // 非 folder、非 DB：兜底通用
-      if (actionHandlers[handler]) return actionHandlers[handler](node, openModal, setExpandedKeys);
+      const handlerFunc = actionHandlers[handler];
+      if (handlerFunc && typeof handlerFunc === 'function') {
+          return (handlerFunc as StandardActionHandler)(node, openModal, setExpandedKeys);
+      }
       toast.error(`未实现的操作: ${handler}`);
       return;
     }
@@ -134,46 +128,16 @@ export const actionHandlers: Record<string, ActionHandler> = {
     if (moduleActions && typeof moduleActions[handler] === 'function') {
       return moduleActions[handler](node, openModal, setExpandedKeys);
     }
-    // DB 类型覆盖 + 通用 + 兜底（原有逻辑）
-    const dbType = useTreeStore.getState().dbType?.toLowerCase();
-    if (dbType) {
-      let dbSpecificHandler: any;
-
-      try {
-        switch (dbType) {
-          case 'postgres':
-          case 'postgresql':
-            dbSpecificHandler = await import( './pgsqlActions');
-            break;
-          default:
-            dbSpecificHandler = null;
-        }
-
-        if (dbSpecificHandler && typeof dbSpecificHandler[handler] === 'function') {
-          return dbSpecificHandler[handler](node, openModal, setExpandedKeys);
-        }
-      } catch (err) {
-        console.warn(`No specific actions for dbType: ${dbType}`, err);
-      }
-    }
-    if (actionHandlers[handler]) return actionHandlers[handler](node, openModal, setExpandedKeys);
-    try {
-      const res = await fetch(`/api/db/${handler}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId: node.id }),
-      });
-      if (!res.ok) throw new Error('Action failed');
-      toast.success(`${handler} 执行成功`);
-    } catch (e: any) {
-      toast.error(`${handler} 执行失败: ${e.message}`);
-    }
   },
 };
 /* ========================= 工具 + 重新导出 ========================= */
-export const getAllActions = (nodeType: string, node?: any) => {
-  const { actionMap } = useTreeStore.getState();
-  let actions = actionMap[nodeType] || [];
+export const getAllActions= async (nodeType: string, node?: any) => {
+  nodeType = nodeType?.toLowerCase();
+  const cfg = await getTreeConfig(node.dbType);
+  let actions = cfg?.tree?.find((item) => item.type === nodeType)?.actions?.menu;
+  if (!actions) {
+      actions = useTreeStore.getState().actionMap?.[nodeType] || [];
+  }
 
   // 优先从 actionMap 读取
   if (actions) {
@@ -183,21 +147,8 @@ export const getAllActions = (nodeType: string, node?: any) => {
       }
       return true;
     });
-    return actions;
   }
-
-  // 从node.config.actions 读取（来自 tree-*.yml）
-  if (node?.config?.actions) {
-    console.info('Using node.config.actions:', node.config.actions);
-    const menuActions = node.config.actions.menu || [];
-    const primaryAction = node.config.actions.primary;
-
-    const all = [...menuActions];
-    if (primaryAction) {
-      all.unshift({ ...primaryAction, primary: true });
-    }
-    return all;
-  }
+  return actions;
 };
 // 重新导出：统一入口
 export { refreshFolder, deleteFolder, openNewGroup, openRenameFolder } from './impl/folderActions';
