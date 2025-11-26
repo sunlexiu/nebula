@@ -1,7 +1,5 @@
 import toast from 'react-hot-toast';
-import { useTreeStore } from '../../stores/useTreeStore';
-import { findConnectionId } from '../../utils/treeUtils';
-import { openConfirm, createPlaceholderHandler } from '../actions/dbActions';
+import { useTreeStore } from '@/stores/useTreeStore.ts';
 
 // 刷新（用模板）
 export const refreshDatabase = async (node: any, setExpandedKeys?: Function) => {

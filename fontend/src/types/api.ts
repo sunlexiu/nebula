@@ -1,4 +1,4 @@
-export type ApiOk<T> = { ok: true; data: T };
+export type ApiOk<T> = { ok: true; data: {data: T} };
 export type ApiErr = { ok: false; message: string; code?: string | number };
 export type ApiResp<T> = ApiOk<T> | ApiErr;
 
