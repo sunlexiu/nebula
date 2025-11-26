@@ -57,6 +57,7 @@ function yamlNodeToTreeNode(yaml: any, parent: TreeNode): TreeNode {
     const suffix = parent.path ? `${yaml.name}` : `::${yaml.name}`;
     return {
         id: `${parent.id}::${yaml.key}`,
+        parentId: parent.id,
         path: `${parent.path ?? ''}${yaml.virtual ? '' : suffix}`,
         name: yaml.label || yaml.key,
         type: yaml.type,
@@ -65,9 +66,15 @@ function yamlNodeToTreeNode(yaml: any, parent: TreeNode): TreeNode {
         connected: true,
         dbType: parent.dbType,
         children: [],
-        config: {type: yaml.type, actions: yaml.actions},
+        config: {
+            type: yaml.type,
+            actions: yaml.actions,
+            nextLevel: yaml.nextLevel,
+            children: yaml.children
+        },
     };
 }
+
 
 /* 真实节点：调后端 /meta/{connId}/children/{nodeType}/{path} */
 async function fetchRealNodes(parent: TreeNode, yamlNext?: any): Promise<TreeNode[]> {
