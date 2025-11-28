@@ -51,9 +51,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
 			String db = (String) r.get("name");
 			r.put("id", connId + "::database/" + db + "/");
 			r.put("name", db);
-			r.put("type", "DATABASE");
-			r.put("hasChildren", true);
-			r.put("children", List.of());
+			r.put("type", DatabaseNodeType.DATABASE.name().toLowerCase());
 		});
 		return rows;
 	}

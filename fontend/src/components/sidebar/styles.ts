@@ -1,5 +1,6 @@
 // components/sidebar/styles.js
 // 样式和主题配置
+import { CSSProperties } from 'react';
 
 const ACCENT_COLOR = '#0b69ff';
 
@@ -170,7 +171,7 @@ export const moreButtonStyles = (isHovered, theme) => ({
 });
 
 // 左侧指示条样式
-export const indicatorBarStyles = (theme) => ({
+export const indicatorBarStyles = (theme: any): CSSProperties  => ({
   position: 'absolute',
   left: 0,
   top: 0,
@@ -181,7 +182,7 @@ export const indicatorBarStyles = (theme) => ({
 });
 
 // 子项指示器样式
-export const childIndicatorStyles = (theme) => ({
+export const childIndicatorStyles = (theme): CSSProperties => ({
   position: 'absolute',
   right: 6,
   top: '50%',

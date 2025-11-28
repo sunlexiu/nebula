@@ -64,42 +64,30 @@ export const showProperties = (node: any) => {
   );
 };
 /* ========================= 动作分发器 ========================= */
-export const actionHandlers: Record<string, ActionHandler> = {
-
-  defaultAction: (node: any, _openModal?: Function, setExpandedKeys?: Function) => {
-    if (node.type === 'connection') {
-      actionHandlers.connectAndExpand(node, undefined, setExpandedKeys);
-      return;
-    }
-    toast(`未知默认动作: ${node.name}`);
-  },
-  // 通用（引用模板） - 只剩这些通用部分
-  showProperties,
-  // 动态分发器：路由专用模块（整合 folder 路由）
-  dynamicHandler: async (handler: string, node:any, options: Options = {}) => {
+export const dynamicHandler: DynamicActionHandler = async (handler: string, node:any, options: any = {}) => {
     if (!handler) return;
     const { setExpandedKeys, openModal } = options;
     // 新增：folder 类型统一路由（整合原 actionHandlers 中的 folder 委托）
     if (node.type === 'folder') {
-      try {
-        const { folderHandlers } = await import('./impl/folderActions');
-        if (typeof folderHandlers[handler] === 'function') {
-          return folderHandlers[handler](node, openModal, setExpandedKeys);
+        try {
+            const { folderHandlers } = await import('./impl/folderActions');
+            if (typeof folderHandlers[handler] === 'function') {
+                return folderHandlers[handler](node, openModal, setExpandedKeys);
+            }
+        } catch (e) {
+            console.error('Failed to load folderHandlers:', e);
         }
-      } catch (e) {
-        console.error('Failed to load folderHandlers:', e);
-      }
-      toast.error(`未实现的操作: ${handler}`);
-      return;
+        toast.error(`未实现的操作: ${handler}`);
+        return;
     }
     if (!node.dbType) {
-      // 非 folder、非 DB：兜底通用
-      const handlerFunc = actionHandlers[handler];
-      if (handlerFunc && typeof handlerFunc === 'function') {
-          return (handlerFunc as StandardActionHandler)(node, openModal, setExpandedKeys);
-      }
-      toast.error(`未实现的操作: ${handler}`);
-      return;
+        // 非 folder、非 DB：兜底通用
+        const handlerFunc = actionHandlers[handler];
+        if (handlerFunc && typeof handlerFunc === 'function') {
+            return (handlerFunc as StandardActionHandler)(node, openModal, setExpandedKeys);
+        }
+        toast.error(`未实现的操作: ${handler}`);
+        return;
     }
     // 原有 DB 节点路由...
     let moduleActions: any;
@@ -107,8 +95,8 @@ export const actionHandlers: Record<string, ActionHandler> = {
         case 'connection':
             moduleActions = await import('./impl/connectionActions');
             break;
-//       case 'database':
-//         moduleActions = await import('./databaseActions');
+        case 'database':
+            moduleActions = await import('./impl/databaseActions');
 //         break;
 //       case 'schema':
 //         moduleActions = await import('./schemaActions');
@@ -122,13 +110,24 @@ export const actionHandlers: Record<string, ActionHandler> = {
 //       case 'function':
 //         moduleActions = await import('./functionActions');
 //         break;
-      default:
-        moduleActions = null;
+        default:
+            moduleActions = null;
     }
     if (moduleActions && typeof moduleActions[handler] === 'function') {
-      return moduleActions[handler](node, openModal, setExpandedKeys);
+        return moduleActions[handler](node, openModal, setExpandedKeys);
     }
+};
+
+export const actionHandlers: Record<string, StandardActionHandler> = {
+  defaultAction: (node: any, _openModal?: Function, setExpandedKeys?: Function) => {
+    if (node.type === 'connection') {
+      actionHandlers.connectAndExpand(node, undefined, setExpandedKeys);
+      return;
+    }
+    toast(`未知默认动作: ${node.name}`);
   },
+  // 通用（引用模板） - 只剩这些通用部分
+  showProperties,
 };
 /* ========================= 工具 + 重新导出 ========================= */
 export const getAllActions= async (nodeType: string, node?: any) => {

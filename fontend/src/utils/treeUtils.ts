@@ -10,6 +10,7 @@ import {useTreeStore} from "@/stores/useTreeStore.ts";
 
 /* 展开节点：虚拟节点按 YAML 拼装，真实节点走后端 */
 export async function loadNodeChildren(node: TreeNode): Promise<TreeNode> {
+    // 文件夹不参与 DB 元数据加载
     if (node.type === 'folder') {
         return node;
     }
@@ -17,39 +18,60 @@ export async function loadNodeChildren(node: TreeNode): Promise<TreeNode> {
     /* 第一次展开 connection → 加载 YAML 顶层 */
     if (node.type === 'connection' && node.dbType) {
         const cfg = await getTreeConfig(node.dbType);
+        if (!cfg) return { ...node, expanded: true };
+
         const topNodes = cfg.tree.filter((n) => !n.parent);
         const children = topNodes.map((n) => yamlNodeToTreeNode(n, node));
-        return {...node, expanded: true, children};
+        return { ...node, expanded: true, children };
+    }
+
+    const cfg = await getTreeConfig(node.dbType || '');
+    if (!cfg) {
+        // 没有配置，直接认为没有子节点
+        return { ...node, expanded: true, children: [] };
     }
 
     /* 虚拟节点：按 YAML children / nextLevel 继续虚拟 */
     if (node.virtual) {
-        const cfg = await getTreeConfig(node.dbType || '');
         const me = cfg.tree.find((n) => n.type === node.type);
-        if (!me) return {...node, children: []};
+        if (!me) return { ...node, expanded: true, children: [] };
 
-        /* 有 children 映射 */
+        // 1) children 映射 -> 继续虚拟
         if (me.children) {
             const kids = Object.entries(me.children).map(([alias, key]) => {
                 const def = cfg.tree.find((n) => n.key === key)!;
                 const tn = yamlNodeToTreeNode(def, node);
-                /* 用别名当展示名 */
-                return {...tn, name: alias.replace('_', ' ')};
+                // 用别名当展示名（把 databases_aggregate 这种转成 “databases aggregate”）
+                return { ...tn, name: alias};
             });
-            return {...node, expanded: true, children: kids};
+            return { ...node, expanded: true, children: kids };
         }
 
-        /* 有 nextLevel */
+        // 2) nextLevel -> 拉真实节点
         if (me.nextLevel) {
             const next = cfg.tree.find((n) => n.key === me.nextLevel)!;
             const kids = await fetchRealNodes(node, next);
-            return {...node, expanded: true, children: kids};
+            return { ...node, expanded: true, children: kids };
         }
+
+        // 虚拟节点但没有 children/nextLevel
+        return { ...node, expanded: true, children: [] };
     }
 
-    /* 真实节点：走后端 */
-    const kids = await fetchRealNodes(node);
-    return {...node, expanded: true, children: kids};
+    /* 真实节点：根据自己的 type 在 YAML 中找到 nextLevel，再走后端 */
+    const me = cfg.tree.find((n) => n.type === node.type);
+    if (!me?.nextLevel) {
+        // 比如已经是最底层（列）等，就没有下一层了
+        return { ...node, expanded: true, children: [] };
+    }
+
+    const next = cfg.tree.find((n) => n.key === me.nextLevel);
+    if (!next) {
+        return { ...node, expanded: true, children: [] };
+    }
+
+    const kids = await fetchRealNodes(node, next);
+    return { ...node, expanded: true, children: kids };
 }
 
 /* 把 YAML 节点转成 TreeNode（虚拟） */
@@ -75,15 +97,25 @@ function yamlNodeToTreeNode(yaml: any, parent: TreeNode): TreeNode {
     };
 }
 
-
-/* 真实节点：调后端 /meta/{connId}/children/{nodeType}/{path} */
-async function fetchRealNodes(parent: TreeNode, yamlNext?: any): Promise<TreeNode[]> {
+async function fetchRealNodes(parent: TreeNode, yamlNext: any): Promise<TreeNode[]> {
     const [connId] = parent.id.split('::');
     const path = parent.path ? `/${parent.path}` : '';
     const url = `/api/meta/${encodeURIComponent(connId)}/children/${yamlNext.type}${path}`;
     const response = await request<TreeNode[]>(url);
     const data = response.ok ? response.data?.data : [];
-    return (data ?? []).map((n) => ({...n, dbType: parent.dbType, icon: yamlNext.icon}));
+    return (data ?? []).map((n: any) => ({
+        ...n,
+        parentId: parent.id,
+        dbType: parent.dbType,
+        icon: yamlNext.icon || n.icon,
+        virtual: yamlNext.virtual ?? false,
+        config: {
+            type: yamlNext.type,
+            actions: yamlNext.actions,
+            nextLevel: yamlNext.nextLevel,
+            children: yamlNext.children,
+        },
+    }));
 }
 
 export function findNode(nodes: TreeNode[], id: string): TreeNode | null {
@@ -158,23 +190,6 @@ export const patchConnectionNode = (node: TreeNode): TreeNode => {
         };
     }
     return node;
-};
-
-export const loadDatabasesForConnection = async (node: any): Promise<any[]> => {
-    const connId = node.id;
-    const res = await fetch(`/api/meta/${encodeURIComponent(connId)}/children`);
-    if (!res.ok) throw new Error('加载数据库列表失败');
-    const json = await res.json(); // 先解析 JSON
-    const data = json?.data || [];
-    return data.map((db: string) => ({
-        id: `${connId}::${db}`,
-        name: db,
-        type: 'database',
-        connected: true,
-        dbType: node.dbType,
-        children: [],
-        virtual: false,
-    }));
 };
 
 // 移动节点（通用，支持 folder/connection）
