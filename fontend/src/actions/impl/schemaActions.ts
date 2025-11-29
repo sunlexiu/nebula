@@ -1,7 +1,7 @@
 import toast from 'react-hot-toast';
-import { useTreeStore } from '../../stores/useTreeStore';
-import { findConnectionId } from '../../utils/treeUtils';
-import { openConfirm } from '../../components/modals/modalActions';
+import { useTreeStore } from '@/stores/useTreeStore.ts';
+import { findConnectionId } from '@/utils/treeUtils.ts';
+import { openConfirm } from '@/components/modals/modalActions.ts';
 
 export const deleteSchema = async (node: any, openModal?: Function) => {
   if (typeof openModal !== 'function') return;
@@ -10,7 +10,7 @@ export const deleteSchema = async (node: any, openModal?: Function) => {
     `确定要删除Schema "${node.name}" 吗？此操作不可恢复。`,
     async () => {
       try {
-        const connectionId = findConnectionId(node.id, useTreeStore.getState().treeData);
+        const connectionId = findConnectionId(node.id);
         const dbName = node.dbName || 'default';
         const res = await fetch('/api/db/delete-schema', {
           method: 'DELETE',

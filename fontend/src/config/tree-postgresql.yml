@@ -59,7 +59,6 @@ tree:
     type: schemas
     virtual: true
     icon: /icons/left_tree/schemas.svg
-    nextLevel: schemas_real
     actions:
       menu:
         - { label: 新建Schema, handler: createNewSchema, icon: 📁 }

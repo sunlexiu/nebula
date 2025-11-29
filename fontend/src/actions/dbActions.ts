@@ -97,10 +97,10 @@ export const dynamicHandler: DynamicActionHandler = async (handler: string, node
             break;
         case 'database':
             moduleActions = await import('./impl/databaseActions');
-//         break;
-//       case 'schema':
-//         moduleActions = await import('./schemaActions');
-//         break;
+        break;
+      case 'schema':
+        moduleActions = await import('./impl/schemaActions');
+        break;
 //       case 'table':
 //         moduleActions = await import('./tableActions');
 //         break;
