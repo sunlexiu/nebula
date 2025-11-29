@@ -1,9 +1,10 @@
 // src/utils/treeUtils.ts
-import {getTreeConfig} from './loadTreeConfig';
+import {getTreeConfig, loadChildren} from './loadTreeConfig';
 import {request} from '@/lib/request';
 import type {TreeNode} from '@/types/tree';
 import toast from 'react-hot-toast';
 import {useTreeStore} from "@/stores/useTreeStore.ts";
+import * as assert from "node:assert";
 
 
 /* ===== 现有工具（从原始代码） ===== */
@@ -15,6 +16,11 @@ export async function loadNodeChildren(node: TreeNode): Promise<TreeNode> {
         return node;
     }
 
+    if (!node.dbType) {
+        return { ...node, expanded: true, children: [] };
+    }
+
+    node.dbType = node.dbType.toLowerCase();
     /* 第一次展开 connection → 加载 YAML 顶层 */
     if (node.type === 'connection' && node.dbType) {
         const cfg = await getTreeConfig(node.dbType);
@@ -25,53 +31,26 @@ export async function loadNodeChildren(node: TreeNode): Promise<TreeNode> {
         return { ...node, expanded: true, children };
     }
 
-    const cfg = await getTreeConfig(node.dbType || '');
+    const cfg = await getTreeConfig(node.dbType);
     if (!cfg) {
         // 没有配置，直接认为没有子节点
         return { ...node, expanded: true, children: [] };
     }
 
-    /* 虚拟节点：按 YAML children / nextLevel 继续虚拟 */
-    if (node.virtual) {
-        const me = cfg.tree.find((n) => n.type === node.type);
-        if (!me) return { ...node, expanded: true, children: [] };
-
-        // 1) children 映射 -> 继续虚拟
-        if (me.children) {
-            const kids = Object.entries(me.children).map(([alias, key]) => {
-                const def = cfg.tree.find((n) => n.key === key)!;
-                const tn = yamlNodeToTreeNode(def, node);
-                // 用别名当展示名（把 databases_aggregate 这种转成 “databases aggregate”）
-                return { ...tn, name: alias};
-            });
-            return { ...node, expanded: true, children: kids };
-        }
-
-        // 2) nextLevel -> 拉真实节点
-        if (me.nextLevel) {
-            const next = cfg.tree.find((n) => n.key === me.nextLevel)!;
-            const kids = await fetchRealNodes(node, next);
-            return { ...node, expanded: true, children: kids };
-        }
-
-        // 虚拟节点但没有 children/nextLevel
-        return { ...node, expanded: true, children: [] };
-    }
-
-    /* 真实节点：根据自己的 type 在 YAML 中找到 nextLevel，再走后端 */
     const me = cfg.tree.find((n) => n.type === node.type);
-    if (!me?.nextLevel) {
-        // 比如已经是最底层（列）等，就没有下一层了
-        return { ...node, expanded: true, children: [] };
+    if (!me) return { ...node, expanded: true, children: [] };
+
+    const children = await loadChildren(me.key, node.dbType);
+    if (!children) return { ...node, expanded: true, children: [] };
+    // 拉取真实节点信息
+    if (children.length === 1 && !children[0].virtual) {
+        const kids = await fetchRealNodes(node, children[0]);
+        return { ...node, expanded: true, children: kids };
     }
 
-    const next = cfg.tree.find((n) => n.key === me.nextLevel);
-    if (!next) {
-        return { ...node, expanded: true, children: [] };
-    }
-
-    const kids = await fetchRealNodes(node, next);
-    return { ...node, expanded: true, children: kids };
+    const result = children.map((n) => yamlNodeToTreeNode(n, node));
+    // 子级为虚拟节点
+    return { ...node, expanded: true, children: result };
 }
 
 /* 把 YAML 节点转成 TreeNode（虚拟） */
@@ -112,7 +91,7 @@ async function fetchRealNodes(parent: TreeNode, yamlNext: any): Promise<TreeNode
         config: {
             type: yamlNext.type,
             actions: yamlNext.actions,
-            nextLevel: yamlNext.nextLevel,
+            hasChildren: yamlNext.hasChildren,
             children: yamlNext.children,
         },
     }));
@@ -154,7 +133,7 @@ export function isExpandable(node: TreeNode): boolean {
 
 /* ===== TreeNode.tsx 专用 ===== */
 export const getExpandIcon = (node: TreeNode): string => {
-    const has = !!node.children?.length || node.virtual || node.config?.children || node.config?.nextLevel;
+    const has = !!node.children?.length || node.virtual || node.config?.children || node.config?.hasChildren;
     if (!has) {
         return '';
     }

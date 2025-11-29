@@ -33,6 +33,7 @@ export interface TreeNode {
             menu?: ActionItem[];
         };
         nextLevel?: string;
+        hasChildren?: boolean;
         children?: Record<string, string>;
         [key: string]: any;
     };

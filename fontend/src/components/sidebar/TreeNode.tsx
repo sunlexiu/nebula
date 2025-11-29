@@ -67,7 +67,7 @@ const TreeNode = memo(({
     const isDragging = dragSourceId === node.id;
     const isDragOver = dragOverNodeId === node.id;
     const hasChildren = node.children && node.children.length > 0;
-    const isExpandable = hasChildren || node.virtual || node.config?.nextLevel;
+    const isExpandable = hasChildren || node.virtual || node.config?.hasChildren;
     const isDraggable = node.type === 'folder' || node.type === 'connection';
     const isDropTarget = node.type === 'folder' || node.config?.allowDrop;
     const theme = getThemeColors(node.type);

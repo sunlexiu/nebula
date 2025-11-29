@@ -21,15 +21,7 @@ export const useTreeConfigStore = create((set, get) => ({
       return null;
     }
   },
-  // 通用：根据节点 config 获取下一层配置
-  getNextLevelConfig: (currentConfig, subType) => {
-    if (!currentConfig.nextLevel) return null;
-    const next = currentConfig.nextLevel;
-    if (subType && next.subTypes) {  // YAML 中 nextLevel 可有 subTypes
-      return next.subTypes[subType] || next;
-    }
-    return next;
-  },
+
   // 获取聚合分组配置
   getGroupByConfigs: (config) => config.groupBy || {},
   // 获取 extraLevels（并行层）

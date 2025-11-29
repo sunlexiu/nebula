@@ -30,7 +30,6 @@ tree:
     type: database
     virtual: false
     icon: /icons/left_tree/database.svg
-    nextLevel: db_subs_virtual
     actions:
       menu:
         - { label: 刷新, handler: refreshDatabase, icon: 🔄 }
@@ -40,32 +39,22 @@ tree:
         - { label: 删除数据库, handler: deleteDatabase, icon: 🗑️, variant: danger }
         - { label: 属性, handler: showProperties, icon: ℹ️ }
 
-  - key: db_subs_virtual
-    parent: dbs_real
-    type: db_subs
-    virtual: true
-    icon: null
-    children:
-      casts: casts_virtual
-      extensions: extensions_virtual
-      schemas: schemas_aggregate
-
   - key: casts_virtual
-    parent: db_subs_virtual
+    parent: dbs_real
     type: casts
     virtual: true
     icon: /icons/left_tree/casts.svg
     children: {}
 
   - key: extensions_virtual
-    parent: db_subs_virtual
+    parent: dbs_real
     type: extensions
     virtual: true
     icon: /icons/left_tree/extensions.svg
     children: {}
 
   - key: schemas_aggregate
-    parent: db_subs_virtual
+    parent: dbs_real
     label: Schemas
     type: schemas
     virtual: true

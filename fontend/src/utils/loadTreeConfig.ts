@@ -19,8 +19,30 @@ export async function getTreeConfig(dbType: string) {
   if (!res.ok) throw new Error(`Failed to load tree config: ${key}`);
   const text = await res.text();
   const config = parse(text);
+  config.tree.forEach((item: any) => {
+    if (!item.parent) {
+      return ;
+    }
+
+    const parent = config.tree.find((n: any) => n.key === item.parent);
+    if (parent) {
+      parent.hasChildren = true;
+    }
+  });
   cache.set(key, config);
   return config;
+}
+
+export async function loadNodeConfig(dbType: string, nodeType: string) {
+  const config = await getTreeConfig(dbType);
+  if (!config) return null;
+  return config.tree.find((item: { type: string; }) => item.type === nodeType);
+}
+
+export async function loadChildren(parentId: string, dbType: string): Promise<any[]> {
+  const config = await getTreeConfig(dbType);
+  if (!config) return [];
+  return  config.tree.filter((item: { parent: string; }) => item.parent == parentId);
 }
 
 /* ---------- 类型 ---------- */
@@ -32,7 +54,8 @@ export interface TreeConfig {
     virtual?: boolean;
     position?: number;
     icon?: string;
-    nextLevel?: string;
+    nextLevel: string;
+    hasChildren?: boolean;
     parent?: string;
     children?: Record<string, string>;
     actions?: { primary?: any; menu?: any[] };
