@@ -28,7 +28,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
 			Connection connection,
 			DatabaseNodeType nodeType,
 			String[] pathSegments) {
-		DbExecutor executor = connectionService.getExecutor(connId);
+		DbExecutor executor = connectionService.getExecutor(connId, pathSegments[0]);
 
 		return switch (nodeType) {
 			case DATABASE -> listDatabases(connId, executor);

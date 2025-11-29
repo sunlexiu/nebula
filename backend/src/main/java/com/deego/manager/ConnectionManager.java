@@ -8,6 +8,7 @@ import com.deego.pool.*;
 import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.stereotype.Component;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.util.ObjectUtils;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,7 +28,7 @@ public class ConnectionManager {
 
     public DbExecutor acquireExecutor(Connection conn, String targetDb) {
         DatabaseType type = DatabaseType.fromValue(conn.getDbType());
-        String db = (targetDb == null || targetDb.isBlank()) ? conn.getDatabase() : targetDb;
+        String db = ObjectUtils.isEmpty(targetDb) ? conn.getDatabase() : targetDb;
         PoolProvider<?> provider = providers.get(type);
         if (provider == null) {
             throw new IllegalArgumentException("No PoolProvider for dbType=" + type);

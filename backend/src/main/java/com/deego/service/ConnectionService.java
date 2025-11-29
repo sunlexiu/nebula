@@ -10,6 +10,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.util.ObjectUtils;
 
 import java.util.HashMap;
 import java.util.List;
@@ -32,6 +33,14 @@ public class ConnectionService {
 	public DbExecutor getExecutor(String connId) {
 		Connection c = getConnection(connId).orElseThrow(() -> new BizException("Connection not found: " + connId));
 		return connectionManager.acquireExecutor(c, c.getDatabase());
+	}
+
+	public DbExecutor getExecutor(String connId, String database) {
+		Connection c = getConnection(connId).orElseThrow(() -> new BizException("Connection not found: " + connId));
+		if (ObjectUtils.isEmpty(database)) {
+			database = c.getDatabase();
+		}
+		return connectionManager.acquireExecutor(c, database);
 	}
 
 	/* 供 ConfigController 拉根节点 */

@@ -7,9 +7,11 @@ import com.deego.model.Connection;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class MetaService {
@@ -20,17 +22,13 @@ public class MetaService {
 	@Autowired
 	private MetadataProviderFactory factory;
 
-	public List<Map<String, Object>> listChildren(String connId,
-			DatabaseNodeType nodeType,
-			String fullPath) {
-		Connection conn = connectionService.getConnection(connId)
-										   .orElseThrow(() -> new IllegalArgumentException("Connection not found: " + connId));
-
+	public List<Map<String, Object>> listChildren(String connId, DatabaseNodeType nodeType, String fullPath) {
+		Connection conn = connectionService.getConnection(connId).orElseThrow(() -> new IllegalArgumentException("Connection not found: " + connId));
 		MetadataProvider provider = factory.getProvider(conn.getDbType());
-
-		String[] segments = ObjectUtils.isEmpty(fullPath) ? new String[0] :
-				fullPath.substring(0, fullPath.length() - 1).split("/");
-
+		fullPath = Objects.isNull(fullPath) ?
+				"" :
+				StringUtils.trimLeadingCharacter(StringUtils.trimTrailingCharacter(fullPath, '/'), '/');
+		String[] segments = fullPath.split("/");
 		return provider.listChildren(connId, conn, nodeType, segments);
 	}
 }
