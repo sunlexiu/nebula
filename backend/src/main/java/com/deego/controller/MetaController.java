@@ -23,7 +23,7 @@ public class MetaController {
 	 * /api/meta/1/children/schema/mydb/
 	 * /api/meta/1/children/table/mydb/public/
 	 */
-	@GetMapping({"/{connId}/children/{type}", "/{connId}/children/{type}/{path:.+}"})
+	@GetMapping({"/{connId}/children/{type}", "/{connId}/children/{type}/{*path}"})
 	public ApiResponse<List<Map<String, Object>>> children(
 			@PathVariable String connId,
 			@PathVariable String type,

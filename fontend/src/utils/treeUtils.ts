@@ -87,6 +87,7 @@ async function fetchRealNodes(parent: TreeNode, yamlNext: any): Promise<TreeNode
         parentId: parent.id,
         path: `${parent.path}/${n.name}`,
         dbType: parent.dbType,
+        type: yamlNext.type,
         icon: yamlNext.icon || n.icon,
         virtual: yamlNext.virtual ?? false,
         config: {

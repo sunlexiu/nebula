@@ -39,19 +39,19 @@ tree:
         - { label: 删除数据库, handler: deleteDatabase, icon: 🗑️, variant: danger }
         - { label: 属性, handler: showProperties, icon: ℹ️ }
 
-  - key: casts_virtual
-    parent: dbs_real
-    type: casts
-    virtual: true
-    icon: /icons/left_tree/casts.svg
-    children: {}
+#  - key: casts_virtual
+#    parent: dbs_real
+#    type: casts
+#    virtual: true
+#    icon: /icons/left_tree/casts.svg
+#    children: {}
 
-  - key: extensions_virtual
-    parent: dbs_real
-    type: extensions
-    virtual: true
-    icon: /icons/left_tree/extensions.svg
-    children: {}
+#  - key: extensions_virtual
+#    parent: dbs_real
+#    type: extensions
+#    virtual: true
+#    icon: /icons/left_tree/extensions.svg
+#    children: {}
 
   - key: schemas_aggregate
     parent: dbs_real
@@ -71,7 +71,6 @@ tree:
     type: schema
     virtual: false
     icon: /icons/left_tree/schema.svg
-    nextLevel: schema_subs_virtual
     actions:
       menu:
         - { label: 刷新, handler: refreshSchema, icon: 🔄 }
@@ -81,22 +80,9 @@ tree:
         - { label: 删除Schema, handler: deleteSchema, icon: 🗑️, variant: danger }
         - { label: 属性, handler: showProperties, icon: ℹ️ }
 
-  - key: schema_subs_virtual
-    parent: schemas_real
-    type: schema_subs
-    virtual: true
-    icon: null
-    children:
-      tables: tables_group
-      views: views_group
-      matviews: matviews_group
-      sequences: sequences_group
-      functions: functions_group
-      procedures: procedures_group
-
   # ======== 表 ========
   - key: tables_group
-    parent: schema_subs_virtual
+    parent: schemas_real
     label: Tables
     type: tables
     virtual: true
@@ -108,7 +94,7 @@ tree:
     type: table
     virtual: false
     icon: /icons/left_tree/table.svg
-    nextLevel: table_subs_virtual
+    nextLevel: tables_real
     actions:
       menu:
         - { label: 预览数据, handler: previewTable, icon: 📊 }
@@ -119,20 +105,8 @@ tree:
         - { label: 删除表, handler: deleteTable, icon: 🗑️, variant: danger }
         - { label: 属性, handler: showProperties, icon: ℹ️ }
 
-  # 表子项（列、约束、索引、触发器）
-  - key: table_subs_virtual
-    parent: tables_real
-    type: table_subs
-    virtual: true
-    icon: null
-    children:
-      columns: table_columns_aggregate
-      constraints: table_constraints_aggregate
-      indexes: table_indexes_aggregate
-      triggers: table_triggers_aggregate
-
   - key: table_columns_aggregate
-    parent: table_subs_virtual
+    parent: tables_real
     label: Columns
     type: columns
     virtual: true
@@ -146,7 +120,7 @@ tree:
     icon: /icons/left_tree/column.svg
 
   - key: table_constraints_aggregate
-    parent: table_subs_virtual
+    parent: tables_real
     label: Constraints
     type: constraints
     virtual: true
@@ -160,7 +134,7 @@ tree:
     icon: /icons/left_tree/constraint.svg
 
   - key: table_indexes_aggregate
-    parent: table_subs_virtual
+    parent: tables_real
     label: Indexes
     type: indexes
     virtual: true
@@ -172,24 +146,9 @@ tree:
     type: index
     virtual: false
     icon: /icons/left_tree/index.svg
-
-  - key: table_triggers_aggregate
-    parent: table_subs_virtual
-    label: Triggers
-    type: triggers
-    virtual: true
-    icon: /icons/left_tree/triggers.svg
-    nextLevel: table_triggers_real
-
-  - key: table_triggers_real
-    parent: table_triggers_aggregate
-    type: trigger
-    virtual: false
-    icon: /icons/left_tree/trigger.svg
-
   # ======== 视图 ========
   - key: views_group
-    parent: schema_subs_virtual
+    parent: schemas_real
     label: Views
     type: views
     virtual: true
@@ -201,7 +160,6 @@ tree:
     type: view
     virtual: false
     icon: /icons/left_tree/view.svg
-    nextLevel: view_subs_virtual
     actions:
       menu:
         - { label: 查看定义, handler: viewDefinition, icon: 👁️ }
@@ -211,16 +169,8 @@ tree:
         - { label: 删除视图, handler: deleteView, icon: 🗑️, variant: danger }
         - { label: 属性, handler: showProperties, icon: ℹ️ }
 
-  - key: view_subs_virtual
-    parent: views_real
-    type: view_subs
-    virtual: true
-    icon: null
-    children:
-      columns: view_columns_aggregate
-
   - key: view_columns_aggregate
-    parent: view_subs_virtual
+    parent: views_real
     label: Columns
     type: columns
     virtual: true
@@ -235,7 +185,7 @@ tree:
 
   # ======== 物化视图 ========
   - key: matviews_group
-    parent: schema_subs_virtual
+    parent: schemas_real
     label: Materialized Views
     type: matviews
     virtual: true
@@ -247,7 +197,6 @@ tree:
     type: materialized_view
     virtual: false
     icon: /icons/left_tree/matview.svg
-    nextLevel: matview_subs_virtual
     actions:
       menu:
         - { label: 刷新物化视图, handler: refreshMaterializedView, icon: 🔄 }
@@ -255,17 +204,8 @@ tree:
         - { label: 删除物化视图, handler: deleteView, icon: 🗑️, variant: danger }
         - { label: 属性, handler: showProperties, icon: ℹ️ }
 
-  - key: matview_subs_virtual
-    parent: matviews_real
-    type: matview_subs
-    virtual: true
-    icon: null
-    children:
-      columns: matview_columns_aggregate
-      indexes: matview_indexes_aggregate
-
   - key: matview_columns_aggregate
-    parent: matview_subs_virtual
+    parent: matviews_real
     label: Columns
     type: columns
     virtual: true
@@ -279,7 +219,7 @@ tree:
     icon: /icons/left_tree/matview_column.svg
 
   - key: matview_indexes_aggregate
-    parent: matview_subs_virtual
+    parent: matviews_real
     label: Indexes
     type: indexes
     virtual: true
@@ -294,7 +234,7 @@ tree:
 
   # ======== 序列 ========
   - key: sequences_group
-    parent: schema_subs_virtual
+    parent: schemas_real
     label: Sequences
     type: sequences
     virtual: true
@@ -332,7 +272,7 @@ tree:
 
   # ======== 函数 ========
   - key: functions_group
-    parent: schema_subs_virtual
+    parent: schemas_real
     label: Functions
     type: functions
     virtual: true
@@ -393,7 +333,7 @@ tree:
 
   # ======== 存储过程 ========
   - key: procedures_group
-    parent: schema_subs_virtual
+    parent: schemas_real
     label: Procedures
     type: procedures
     virtual: true
