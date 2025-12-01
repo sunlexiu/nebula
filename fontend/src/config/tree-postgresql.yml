@@ -4,10 +4,14 @@ tree:
     type: roles
     virtual: true
     position: 1
-    icon: /icons/left_tree/roles.svg
+    icon: /icons/left_tree/roles_three.svg
     actions:
       menu:
-        - { label: 新建角色, handler: createRole, icon: ➕ }
+        - { label: 新建登录角色, handler: createLoginRole, icon: ➕ }
+        - { label: 新建组角色, handler: createGroupRole, icon: 🧩 }
+        - { type: separator }
+        - { label: 刷新, handler: refreshRoles, icon: 🔄 }
+
 
   - key: databases_aggregate
     label: Databases
@@ -15,7 +19,6 @@ tree:
     virtual: true
     position: 2
     icon: /icons/left_tree/databases.svg
-    nextLevel: dbs_real
     actions:
       primary: { handler: connectAndExpand, icon: ⚡, label: 连接 }
       menu:
@@ -87,14 +90,12 @@ tree:
     type: tables
     virtual: true
     icon: /icons/left_tree/tables.svg
-    nextLevel: tables_real
 
   - key: tables_real
     parent: tables_group
     type: table
     virtual: false
     icon: /icons/left_tree/table.svg
-    nextLevel: tables_real
     actions:
       menu:
         - { label: 预览数据, handler: previewTable, icon: 📊 }
@@ -111,7 +112,6 @@ tree:
     type: columns
     virtual: true
     icon: /icons/left_tree/columns.svg
-    nextLevel: table_columns_real
 
   - key: table_columns_real
     parent: table_columns_aggregate
@@ -125,7 +125,6 @@ tree:
     type: constraints
     virtual: true
     icon: /icons/left_tree/constraints.svg
-    nextLevel: table_constraints_real
 
   - key: table_constraints_real
     parent: table_constraints_aggregate
@@ -139,7 +138,6 @@ tree:
     type: indexes
     virtual: true
     icon: /icons/left_tree/indexes.svg
-    nextLevel: table_indexes_real
 
   - key: table_indexes_real
     parent: table_indexes_aggregate
@@ -153,7 +151,6 @@ tree:
     type: views
     virtual: true
     icon: /icons/left_tree/views.svg
-    nextLevel: views_real
 
   - key: views_real
     parent: views_group
@@ -175,7 +172,6 @@ tree:
     type: columns
     virtual: true
     icon: /icons/left_tree/view_columns.svg
-    nextLevel: view_columns_real
 
   - key: view_columns_real
     parent: view_columns_aggregate
@@ -190,7 +186,6 @@ tree:
     type: matviews
     virtual: true
     icon: /icons/left_tree/matviews.svg
-    nextLevel: matviews_real
 
   - key: matviews_real
     parent: matviews_group
@@ -210,7 +205,6 @@ tree:
     type: columns
     virtual: true
     icon: /icons/left_tree/matview_columns.svg
-    nextLevel: matview_columns_real
 
   - key: matview_columns_real
     parent: matview_columns_aggregate
@@ -224,7 +218,6 @@ tree:
     type: indexes
     virtual: true
     icon: /icons/left_tree/matview_indexes.svg
-    nextLevel: matview_indexes_real
 
   - key: matview_indexes_real
     parent: matview_indexes_aggregate
@@ -239,30 +232,19 @@ tree:
     type: sequences
     virtual: true
     icon: /icons/left_tree/sequences.svg
-    nextLevel: sequences_real
 
   - key: sequences_real
     parent: sequences_group
     type: sequence
     virtual: false
     icon: /icons/left_tree/sequence.svg
-    nextLevel: sequence_subs_virtual
-
-  - key: sequence_subs_virtual
-    parent: sequences_real
-    type: sequence_subs
-    virtual: true
-    icon: null
-    children:
-      properties: sequence_props_aggregate
 
   - key: sequence_props_aggregate
-    parent: sequence_subs_virtual
+    parent: sequences_real
     label: Properties
     type: properties
     virtual: true
     icon: /icons/left_tree/sequence_props.svg
-    nextLevel: sequence_props_real
 
   - key: sequence_props_real
     parent: sequence_props_aggregate
@@ -277,14 +259,12 @@ tree:
     type: functions
     virtual: true
     icon: /icons/left_tree/functions.svg
-    nextLevel: functions_real
 
   - key: functions_real
     parent: functions_group
     type: function
     virtual: false
     icon: /icons/left_tree/function.svg
-    nextLevel: function_subs_virtual
     actions:
       menu:
         - { label: 编辑函数, handler: editFunction, icon: ✏️ }
@@ -294,22 +274,12 @@ tree:
         - { label: 删除函数, handler: deleteFunction, icon: 🗑️, variant: danger }
         - { label: 属性, handler: showProperties, icon: ℹ️ }
 
-  - key: function_subs_virtual
-    parent: functions_real
-    type: function_subs
-    virtual: true
-    icon: null
-    children:
-      info: function_info_aggregate
-      definition: function_definition_aggregate
-
   - key: function_info_aggregate
-    parent: function_subs_virtual
+    parent: functions_real
     label: Info
     type: info
     virtual: true
     icon: /icons/left_tree/function_info.svg
-    nextLevel: function_info_real
 
   - key: function_info_real
     parent: function_info_aggregate
@@ -318,12 +288,11 @@ tree:
     icon: /icons/left_tree/property.svg
 
   - key: function_definition_aggregate
-    parent: function_subs_virtual
+    parent: functions_real
     label: Definition
     type: definition
     virtual: true
     icon: /icons/left_tree/function_definition.svg
-    nextLevel: function_definition_real
 
   - key: function_definition_real
     parent: function_definition_aggregate
@@ -338,14 +307,12 @@ tree:
     type: procedures
     virtual: true
     icon: /icons/left_tree/procedures.svg
-    nextLevel: procedures_real
 
   - key: procedures_real
     parent: procedures_group
     type: procedure
     virtual: false
     icon: /icons/left_tree/procedure.svg
-    nextLevel: procedure_subs_virtual
     actions:
       menu:
         - { label: 编辑过程, handler: editFunction, icon: ✏️ }
@@ -354,22 +321,12 @@ tree:
         - { label: 删除过程, handler: deleteFunction, icon: 🗑️, variant: danger }
         - { label: 属性, handler: showProperties, icon: ℹ️ }
 
-  - key: procedure_subs_virtual
-    parent: procedures_real
-    type: procedure_subs
-    virtual: true
-    icon: null
-    children:
-      info: procedure_info_aggregate
-      definition: procedure_definition_aggregate
-
   - key: procedure_info_aggregate
-    parent: procedure_subs_virtual
+    parent: procedures_real
     label: Info
     type: info
     virtual: true
     icon: /icons/left_tree/procedure_info.svg
-    nextLevel: procedure_info_real
 
   - key: procedure_info_real
     parent: procedure_info_aggregate
@@ -378,12 +335,11 @@ tree:
     icon: /icons/left_tree/property.svg
 
   - key: procedure_definition_aggregate
-    parent: procedure_subs_virtual
+    parent: procedures_real
     label: Definition
     type: definition
     virtual: true
     icon: /icons/left_tree/procedure_definition.svg
-    nextLevel: procedure_definition_real
 
   - key: procedure_definition_real
     parent: procedure_definition_aggregate
@@ -392,13 +348,70 @@ tree:
     icon: /icons/left_tree/procedure_definition.svg
 
   # ==================== 角色 ====================
-  - key: users_real
+  # 顶层聚合：Login / Group / System 三类
+  - key: login_roles_group
     parent: roles_aggregate
-    type: role
+    label: Login Roles
+    type: login_roles
+    virtual: true
+    icon: /icons/left_tree/roles.svg
+    actions:
+      menu:
+        - { label: 新建登录角色, handler: createLoginRole, icon: ➕ }
+        - { type: separator }
+        - { label: 刷新, handler: refreshLoginRoles, icon: 🔄 }
+
+  - key: login_roles_real
+    parent: login_roles_group
+    type: login_role           # 具体节点类型，方便前端区分
     virtual: false
-    icon: /icons/left_tree/role.svg
+    icon: /icons/left_tree/roles.svg
+    actions:
+      menu:
+        - { label: 修改密码, handler: changeRolePassword, icon: 🔑 }
+        - { label: 属性, handler: showRoleProperties, icon: ℹ️ }
+        - { type: separator }
+        - { label: 删除角色, handler: deleteRole, icon: 🗑️, variant: danger }
+
+  - key: group_roles_group
+    parent: roles_aggregate
+    label: Group Roles
+    type: group_roles
+    virtual: true
+    icon: /icons/left_tree/roles.svg
+    actions:
+      menu:
+        - { label: 新建组角色, handler: createGroupRole, icon: 🧩 }
+        - { type: separator }
+        - { label: 刷新, handler: refreshGroupRoles, icon: 🔄 }
+
+  - key: group_roles_real
+    parent: group_roles_group
+    type: group_role
+    virtual: false
+    icon: /icons/left_tree/roles.svg
     actions:
       menu:
         - { label: 属性, handler: showRoleProperties, icon: ℹ️ }
         - { type: separator }
         - { label: 删除角色, handler: deleteRole, icon: 🗑️, variant: danger }
+
+  - key: system_roles_group
+    parent: roles_aggregate
+    label: System Roles
+    type: system_roles
+    virtual: true
+    icon: /icons/left_tree/roles.svg
+    actions:
+      menu:
+        - { label: 刷新, handler: refreshSystemRoles, icon: 🔄 }
+
+  - key: system_roles_real
+    parent: system_roles_group
+    type: system_role
+    virtual: false
+    icon: /icons/left_tree/roles.svg
+    actions:
+      menu:
+        # 系统角色一般不允许删，只给“查看属性”
+        - { label: 属性, handler: showRoleProperties, icon: ℹ️ }

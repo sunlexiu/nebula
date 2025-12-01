@@ -30,10 +30,18 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
 			String[] pathSegments) {
 
 		// pathSegments[0] 默认是 database 名（调用方保证）
-		DbExecutor executor = connectionService.getExecutor(connId,
-				pathSegments.length > 0 ? pathSegments[0] : null);
+		DbExecutor executor = connectionService.getExecutor(
+				connId,
+				pathSegments.length > 0 ? pathSegments[0] : null
+		);
 
 		return switch (nodeType) {
+			// ======== 角色相关（实例级） ========
+			case LOGIN_ROLE -> listLoginRoles(connId, executor);
+			case GROUP_ROLE -> listGroupRoles(connId, executor);
+			case SYSTEM_ROLE -> listSystemRoles(connId, executor);
+
+			// ======== 数据库层级 ========
 			case DATABASE -> listDatabases(connId, executor);
 			case SCHEMA -> listSchemas(connId, executor, pathSegments);
 			case TABLE -> listTables(connId, executor, pathSegments);
@@ -48,6 +56,8 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
 			default -> List.of();
 		};
 	}
+
+	// ==================== 数据库 / Schema / 表 ====================
 
 	private List<Map<String, Object>> listDatabases(String connId, DbExecutor exec) {
 		String sql = """
@@ -188,12 +198,9 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
 		return rows;
 	}
 
-	// ==================== 新增：视图 / 物化视图 / 序列 ====================
+	// ==================== 视图 / 物化视图 / 序列 ====================
 
-	/**
-	 * 列出某个 schema 下的普通视图
-	 * pathSegments: [0]=database, [1]=schema
-	 */
+	/** 列出某个 schema 下的普通视图 */
 	private List<Map<String, Object>> listViews(String connId, DbExecutor exec, String[] segs) {
 		if (segs.length < 2) return List.of();
 		String database = segs[0];
@@ -215,10 +222,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
 		return rows;
 	}
 
-	/**
-	 * 列出某个 schema 下的物化视图
-	 * pathSegments: [0]=database, [1]=schema
-	 */
+	/** 列出某个 schema 下的物化视图 */
 	private List<Map<String, Object>> listMaterializedViews(String connId, DbExecutor exec, String[] segs) {
 		if (segs.length < 2) return List.of();
 		String database = segs[0];
@@ -240,10 +244,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
 		return rows;
 	}
 
-	/**
-	 * 列出某个 schema 下的序列
-	 * pathSegments: [0]=database, [1]=schema
-	 */
+	/** 列出某个 schema 下的序列 */
 	private List<Map<String, Object>> listSequences(String connId, DbExecutor exec, String[] segs) {
 		if (segs.length < 2) return List.of();
 		String database = segs[0];
@@ -265,12 +266,9 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
 		return rows;
 	}
 
-	// ==================== 新增：函数 / 存储过程 ====================
+	// ==================== 函数 / 存储过程 ====================
 
-	/**
-	 * 列出某个 schema 下的函数（prokind = 'f'）
-	 * pathSegments: [0]=database, [1]=schema
-	 */
+	/** 列出某个 schema 下的函数（prokind = 'f'） */
 	private List<Map<String, Object>> listFunctions(String connId, DbExecutor exec, String[] segs) {
 		if (segs.length < 2) return List.of();
 		String database = segs[0];
@@ -298,18 +296,13 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
 			String signature = funcName + "(" + (args == null ? "" : args) + ")";
 			r.put("id", connId + "::function/" + database + "/" + schema + "/" + signature);
 
-			// 展示时带上返回类型，类似 pgAdmin：
-			// func_name(arg1 type, arg2 type) → result_type
 			String display = signature + " → " + resultType;
 			r.put("name", display);
 		});
 		return rows;
 	}
 
-	/**
-	 * 列出某个 schema 下的存储过程（prokind = 'p'）
-	 * pathSegments: [0]=database, [1]=schema
-	 */
+	/** 列出某个 schema 下的存储过程（prokind = 'p'） */
 	private List<Map<String, Object>> listProcedures(String connId, DbExecutor exec, String[] segs) {
 		if (segs.length < 2) return List.of();
 		String database = segs[0];
@@ -335,6 +328,124 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
 			String signature = procName + "(" + (args == null ? "" : args) + ")";
 			r.put("id", connId + "::procedure/" + database + "/" + schema + "/" + signature);
 			r.put("name", signature);
+		});
+		return rows;
+	}
+
+	// ==================== 角色：Login / Group / System ====================
+
+	/**
+	 * Login Roles：可登录账号
+	 * 规则：rolcanlogin = true AND rolname NOT LIKE 'pg_%'
+	 */
+	private List<Map<String, Object>> listLoginRoles(String connId, DbExecutor exec) {
+		String sql = """
+                SELECT
+                    r.oid,
+                    r.rolname AS name,
+                    r.rolcanlogin,
+                    r.rolsuper,
+                    r.rolinherit,
+                    r.rolcreatedb,
+                    r.rolcreaterole,
+                    r.rolreplication,
+                    r.rolbypassrls,
+                    CASE
+                        WHEN r.rolvaliduntil IS NULL THEN 'infinity'
+                        ELSE to_char(r.rolvaliduntil, 'YYYY-MM-DD HH24:MI:SS')
+                    END AS valid_until,
+                    d.description AS comment
+                FROM pg_roles r
+                LEFT JOIN pg_shdescription d
+                  ON d.objoid = r.oid
+                 AND d.classoid = 'pg_authid'::regclass
+                WHERE r.rolcanlogin = true
+                  AND r.rolname NOT LIKE 'pg\\_%'
+                ORDER BY r.rolname
+                """;
+
+		List<Map<String, Object>> rows = exec.queryForList(sql);
+		rows.forEach(r -> {
+			String roleName = (String) r.get("name");
+			r.put("id", connId + "::role/login/" + roleName);
+			r.put("type", "login"); // 给前端一个类别标签，备用
+		});
+		return rows;
+	}
+
+	/**
+	 * Group Roles：权限组 / 角色组
+	 * 规则：rolcanlogin = false AND rolname NOT LIKE 'pg_%'
+	 */
+	private List<Map<String, Object>> listGroupRoles(String connId, DbExecutor exec) {
+		String sql = """
+                SELECT
+                    r.oid,
+                    r.rolname AS name,
+                    r.rolcanlogin,
+                    r.rolsuper,
+                    r.rolinherit,
+                    r.rolcreatedb,
+                    r.rolcreaterole,
+                    r.rolreplication,
+                    r.rolbypassrls,
+                    CASE
+                        WHEN r.rolvaliduntil IS NULL THEN 'infinity'
+                        ELSE to_char(r.rolvaliduntil, 'YYYY-MM-DD HH24:MI:SS')
+                    END AS valid_until,
+                    d.description AS comment
+                FROM pg_roles r
+                LEFT JOIN pg_shdescription d
+                  ON d.objoid = r.oid
+                 AND d.classoid = 'pg_authid'::regclass
+                WHERE r.rolcanlogin = false
+                  AND r.rolname NOT LIKE 'pg\\_%'
+                ORDER BY r.rolname
+                """;
+
+		List<Map<String, Object>> rows = exec.queryForList(sql);
+		rows.forEach(r -> {
+			String roleName = (String) r.get("name");
+			r.put("id", connId + "::role/group/" + roleName);
+			r.put("type", "group");
+		});
+		return rows;
+	}
+
+	/**
+	 * System Roles：系统内置角色
+	 * 规则：rolname LIKE 'pg_%'
+	 */
+	private List<Map<String, Object>> listSystemRoles(String connId, DbExecutor exec) {
+		String sql = """
+                SELECT
+                    r.oid,
+                    r.rolname AS name,
+                    r.rolcanlogin,
+                    r.rolsuper,
+                    r.rolinherit,
+                    r.rolcreatedb,
+                    r.rolcreaterole,
+                    r.rolreplication,
+                    r.rolbypassrls,
+                    CASE
+                        WHEN r.rolvaliduntil IS NULL THEN 'infinity'
+                        ELSE to_char(r.rolvaliduntil, 'YYYY-MM-DD HH24:MI:SS')
+                    END AS valid_until,
+                    d.description AS comment
+                FROM pg_roles r
+                LEFT JOIN pg_shdescription d
+                  ON d.objoid = r.oid
+                 AND d.classoid = 'pg_authid'::regclass
+                WHERE r.rolname LIKE 'pg\\_%'
+                ORDER BY r.rolname
+                """;
+
+		List<Map<String, Object>> rows = exec.queryForList(sql);
+		rows.forEach(r -> {
+			String roleName = (String) r.get("name");
+			r.put("id", connId + "::role/system/" + roleName);
+			r.put("type", "system");
 		});
 		return rows;
 	}
