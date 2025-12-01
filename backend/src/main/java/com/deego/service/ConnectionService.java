@@ -11,11 +11,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
+import org.springframework.util.StringUtils;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 public class ConnectionService {
@@ -86,6 +84,13 @@ public class ConnectionService {
 
 	public String testConnection(Connection conn) {
 		try {
+			if (!StringUtils.hasText(conn.getPassword()) && StringUtils.hasText(conn.getId())) {
+				Connection connection = connectionRepository.getReferenceById(conn.getId());
+				if (Objects.isNull(conn.getId())) {
+					throw new BizException("Connection failed");
+				}
+				conn.setPassword(connection.getPassword());
+			}
 			HikariDataSource ds = createTempDataSource(conn);
 			new JdbcTemplate(ds).queryForObject("SELECT 1", Integer.class);
 			ds.close();
