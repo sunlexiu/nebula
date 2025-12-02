@@ -91,20 +91,52 @@ export const connectDatabase = async (node: any) => {
   );
 };
 
-export const disconnectDatabase = (node: any) => {
+export const disconnectDatabase = async (node: any) => {
   const { updateTreePath } = useTreeStore.getState();
+
   if (!node.connected) {
     toast(`未连接: ${node.name}`);
     return;
   }
-  updateTreePath(node.id, (curr: any) => ({
-    ...curr,
-    connected: false,
-    status: 'disconnected',
-    children: [],
-    expanded: false,
-  }));
-  toast.success(`已断开: ${node.name}`);
+
+  return toast.promise(
+      (async () => {
+        const res = await fetch(
+            `/api/config/connections/${encodeURIComponent(node.id)}/disconnect`,
+            { method: 'POST' }
+        );
+
+        if (!res.ok) {
+          // 尝试从后端读取错误信息
+          try {
+            const errJson = await res.json();
+            throw new Error(errJson?.message || '断开连接失败');
+          } catch (error) {
+            if (error instanceof SyntaxError) {
+              console.warn('Failed to parse error JSON:', error);
+              throw new Error('断开连接失败');
+            }
+            throw error;
+          }
+        }
+
+        // 后端已关闭连接池，这里同步更新前端树节点状态
+        updateTreePath(node.id, (curr: any) => ({
+          ...curr,
+          connected: false,
+          status: 'disconnected',
+          children: [],
+          expanded: false,
+        }));
+
+        return `已断开: ${node.name}`;
+      })(),
+      {
+        loading: '断开中...',
+        success: (msg) => msg,
+        error: (e) => e.message || '断开连接失败',
+      }
+  );
 };
 
 export const refreshConnection = async (node: any, setExpandedKeys?: Function) => {

@@ -82,6 +82,12 @@ public class ConfigController {
 		return ResponseEntity.ok(connectionService.createConnection(conn));
 	}
 
+	@PostMapping("/connections/{id}/disconnect")
+	public ResponseEntity<String> disconnectConnection(@PathVariable String id) {
+		connectionService.disconnectConnection(id);
+		return ResponseEntity.ok("Disconnected");
+	}
+
 	@GetMapping("/connections")
 	public ResponseEntity<List<Connection>> getConnections() {
 		return ResponseEntity.ok(connectionService.getAllConnections());

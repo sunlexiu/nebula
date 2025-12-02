@@ -55,6 +55,27 @@ public class ConnectionService {
 		return saved;
 	}
 
+
+	/**
+	 * 主动断开某个连接的所有连接池：
+	 * 1. 关闭 ConnectionService 自己维护的 dataSources
+	 * 2. 通知 ConnectionManager 关闭该连接下所有数据库实例的池（connId@dbName）
+	 * 3. 更新连接状态为未连接
+	 */
+	public void disconnectConnection(String id) {
+		// 1) 关掉 ConnectionService 维护的 HikariDataSource
+		closeDataSource(id);
+
+		// 2) 关掉 ConnectionManager 中该连接下所有的池（可能已有多个 database）
+		connectionManager.closeAllForConnection(id);
+
+		// 3) 更新 connected 标记
+		getConnection(id).ifPresent(conn -> {
+			conn.setConnected(false);
+			connectionRepository.save(conn);
+		});
+	}
+
 	public Optional<Connection> getConnection(String id) {
 		return connectionRepository.findById(id);
 	}

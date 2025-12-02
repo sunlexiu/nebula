@@ -11,8 +11,8 @@ const defaultPort = (dbType) => ({
   ORACLE: "1521",
 }[dbType] || "");
 
-const rowStyle = { display: "flex", gap: 12, flexWrap: "wrap" };
-const colStyle = { flex: "1 1 240px", minWidth: 240 };
+const rowStyle: React.CSSProperties = { display: "flex", gap: 12, flexWrap: "wrap" };
+const colStyle: React.CSSProperties = { flex: "1 1 240px", minWidth: 240 };
 
 const statusBox = (ok) => ({
   marginTop: 12,
@@ -28,7 +28,7 @@ const statusBox = (ok) => ({
   gap: 8,
 });
 
-const footerStyle = {
+const footerStyle: React.CSSProperties = {
   position: "sticky",
   bottom: 0,
   background: "#fff",
@@ -57,7 +57,10 @@ const NewConnectionModal = ({
     savePassword: false,
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState(null); // { ok:boolean, msg:string }
+  const [connectionStatus, setConnectionStatus] = useState<{
+    ok: boolean | null;
+    msg: string;
+  } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -123,8 +126,8 @@ const NewConnectionModal = ({
       setConnectionStatus({
         ok: false,
         msg:
-          error?.message ||
-          "Connection failed. Check that the service is listening.",
+            (error instanceof Error ? error.message : String(error)) ||
+            "Connection failed. Check that the service is listening.",
       });
     } finally {
       setIsTesting(false);
@@ -181,12 +184,8 @@ const NewConnectionModal = ({
       >
         <div
           style={{
-            position: "sticky",
-            top: 0,
-            background: "#fff",
             paddingBottom: 10,
-            marginBottom: 8,
-            zIndex: 1,
+            marginBottom: 8
           }}
         >
           <h2 className="modal-title" style={{ marginBottom: 0 }}>
