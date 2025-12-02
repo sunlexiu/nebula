@@ -96,6 +96,7 @@ export const dynamicHandler: DynamicActionHandler = async (handler: string, node
             moduleActions = await import('./impl/connectionActions');
             break;
         case 'database':
+        case 'databases':
             moduleActions = await import('./impl/databaseActions');
         break;
       case 'schema':

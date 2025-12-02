@@ -21,7 +21,7 @@ public class CodeFileCollectorWithExclude {
 	));
 
 	public static void main(String[] args) {
-		String sourceFolder = "E:\\workspace\\deego\\nebula\\backend";  // 要扫描的源代码文件夹
+		String sourceFolder = "E:\\workspace\\deego\\nebula\\fontend";  // 要扫描的源代码文件夹
 		String outputFile = "all_codes.txt";  // 输出文件
 
 

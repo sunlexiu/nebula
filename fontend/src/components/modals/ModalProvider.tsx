@@ -5,6 +5,7 @@ import NewGroupModal from './NewGroupModal';
 import NewConnectionModal from './NewConnectionModal';
 import RenameFolderModal from './RenameFolderModal';
 import EditConnectionModal from './EditConnectionModal';
+import NewDatabaseModal from './NewDatabaseModal';
 import toast from 'react-hot-toast';
 
 interface ModalConfig {
@@ -50,6 +51,7 @@ export const ModalProvider = ({ children }: { children: React.ReactNode }) => {
                     {modals.newConnection && <NewConnectionModal {...modals.newConnection} onClose={() => closeModal('newConnection')} />}
                     {modals.renameFolder && <RenameFolderModal {...modals.renameFolder} onClose={() => closeModal('renameFolder')} />}
                     {modals.editConnection && <EditConnectionModal {...modals.editConnection} onClose={() => closeModal('editConnection')} />}
+                    {modals.newDatabase && <NewDatabaseModal {...modals.newDatabase} onClose={() => closeModal('newDatabase')}/>}
                 </>,
                 document.body
             )}

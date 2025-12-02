@@ -160,3 +160,17 @@
   cursor: not-allowed;
 }
 
+/* NewDatabaseModal tabs 可选增强 */
+.modal-content .tab-header {
+  display: flex;
+  margin-bottom: 12px;
+}
+
+.modal-content .tab-btn {
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  margin-right: 8px;
+}
