@@ -1,3 +1,4 @@
+// src/components/modals/ModalProvider.tsx
 import React, { createContext, useContext, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ConfirmModal from './ConfirmModal';
@@ -5,7 +6,7 @@ import NewGroupModal from './NewGroupModal';
 import NewConnectionModal from './NewConnectionModal';
 import RenameFolderModal from './RenameFolderModal';
 import EditConnectionModal from './EditConnectionModal';
-import NewDatabaseModal from './NewDatabaseModal';
+import DatabaseModal from './DatabaseModal'; // 修改导入
 import toast from 'react-hot-toast';
 
 interface ModalConfig {
@@ -51,7 +52,7 @@ export const ModalProvider = ({ children }: { children: React.ReactNode }) => {
                     {modals.newConnection && <NewConnectionModal {...modals.newConnection} onClose={() => closeModal('newConnection')} />}
                     {modals.renameFolder && <RenameFolderModal {...modals.renameFolder} onClose={() => closeModal('renameFolder')} />}
                     {modals.editConnection && <EditConnectionModal {...modals.editConnection} onClose={() => closeModal('editConnection')} />}
-                    {modals.newDatabase && <NewDatabaseModal {...modals.newDatabase} onClose={() => closeModal('newDatabase')}/>}
+                    {modals.database && <DatabaseModal {...modals.database} onClose={() => closeModal('database')} />} {/* 修改为database */}
                 </>,
                 document.body
             )}

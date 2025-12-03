@@ -1,0 +1,349 @@
+/* src/css/DatabaseModal.css */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 8px;
+    width: 800px;
+    max-width: 90%;
+    height: 600px;
+    max-height: 90vh;
+    box-shadow: var(--shadow-md);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modal-title {
+    margin: 0;
+    padding: 16px 20px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* 左侧导航栏 */
+.modal-sidebar {
+    width: 180px;
+    background: #f8f9fa;
+    border-right: 1px solid var(--border);
+    padding: 16px 0;
+    overflow-y: auto;
+}
+
+.nav-item {
+    padding: 10px 20px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #666;
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
+}
+
+.nav-item:hover {
+    background: #e9ecef;
+    color: #333;
+}
+
+.nav-item.active {
+    background: #e3f2fd;
+    color: var(--accent);
+    border-left-color: var(--accent);
+    font-weight: 500;
+}
+
+/* 右侧内容区 */
+.modal-main {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.form-section {
+    margin-bottom: 24px;
+}
+
+.form-section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 6px;
+}
+
+.form-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    color: #1a1a1a;
+    background: #fdfdfd;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.form-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(11, 105, 255, 0.1);
+}
+
+.form-input:disabled {
+    background: #f5f5f5;
+    color: #999;
+    cursor: not-allowed;
+}
+
+.form-row {
+    display: flex;
+    gap: 16px;
+}
+
+.form-col {
+    flex: 1;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+/* SQL预览区域 */
+.sql-preview {
+    background: #f8f9fa;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    font-family: monospace;
+    font-size: 12px;
+    color: #333;
+    white-space: pre-wrap;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+}
+
+/* 底部操作区 */
+.modal-footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.footer-left {
+    display: flex;
+    gap: 8px;
+}
+
+.footer-right {
+    display: flex;
+    gap: 8px;
+}
+
+/* 按钮样式复用 */
+.btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid var(--border);
+}
+
+.btn-secondary {
+    background: white;
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.btn-secondary:hover {
+    background: rgba(11, 105, 255, 0.1);
+}
+
+.btn-cancel {
+    background: white;
+    color: #333;
+}
+
+.btn-cancel:hover {
+    background: #f8f9fa;
+    border-color: #ccc;
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+.btn-primary:hover {
+    background: rgba(11, 105, 255, 0.9);
+}
+
+.btn-primary:disabled {
+    background: #ccc;
+    border-color: #ccc;
+    cursor: not-allowed;
+}
+
+/* 错误提示 */
+.error-message {
+    padding: 12px;
+    border-radius: 4px;
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+    font-size: 12px;
+    margin: 0 20px;
+}
+
+/* 表格样式 */
+.privileges-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.privileges-table th,
+.privileges-table td {
+    padding: 8px;
+    border: 1px solid #e0e0e0;
+    text-align: left;
+}
+
+.privileges-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+}
+
+.privileges-table input[type="checkbox"] {
+    margin: 0;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95%;
+        height: 80vh;
+        flex-direction: column;
+    }
+
+    .modal-body {
+        flex-direction: column;
+    }
+
+    .modal-sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 8px 0;
+        display: flex;
+        overflow-x: auto;
+    }
+
+    .nav-item {
+        white-space: nowrap;
+        padding: 8px 16px;
+        border-left: none;
+        border-bottom: 3px solid transparent;
+    }
+
+    .nav-item.active {
+        border-left: none;
+        border-bottom-color: var(--accent);
+    }
+}
+
+/* src/css/DatabaseModal.css 添加以下内容 */
+[data-theme="dark"] .modal-content {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .modal-title {
+    color: var(--text-primary);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .modal-sidebar {
+    background: var(--bg-tertiary);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .nav-item {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .nav-item.active {
+    background: rgba(77, 171, 247, 0.2);
+    color: var(--accent);
+}
+
+[data-theme="dark"] .form-group label {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .form-input {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .form-input:focus {
+    border-color: var(--accent);
+}
+
+[data-theme="dark"] .sql-preview {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .privileges-table th {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .privileges-table td {
+    border-color: var(--border);
+}

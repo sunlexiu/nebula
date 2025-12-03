@@ -1,7 +1,7 @@
 import React from 'react';
 import '../../css/ToolbarTop.css';
-import { useTabsStore } from '../../stores/useTabsStore';
-import { useTreeStore } from '../../stores/useTreeStore';
+import { useTabsStore } from '@/stores/useTabsStore.ts';
+import { useTreeStore } from '@/stores/useTreeStore.ts';
 import { openNewGroup, openNewConnection } from '../modals/modalActions'; // 导入 actions
 import { useModal } from '../modals/ModalProvider'; // 修复：导入 useModal Hook
 

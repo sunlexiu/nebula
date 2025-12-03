@@ -1,3 +1,4 @@
+// src/actions/dbActions.ts
 import toast from 'react-hot-toast';
 import { useTreeStore } from '../stores/useTreeStore';
 import { findConnectionId } from '../utils/treeUtils';
@@ -16,52 +17,52 @@ type Options = { setExpandedKeys?: Function; openModal?: Function };
 
 /* ========================= 通用模板工厂 ========================= */
 const createDeleteHandler = (objectType: string, title: string, successMsgTemplate: (name: string) => string): ActionHandler =>
-  async (node: any, openModal?: Function) => {
-    if (typeof openModal !== 'function') return;
-    openConfirm(
-      title,
-      `确定要删除${objectType} "${node.name}" 吗？此操作不可恢复。`,
-      async () => {
-        try {
-          const connectionId = findConnectionId(node.id);
-          const dbName = node.dbName || 'default';
-          const schemaName = node.schemaName || 'public';
-          const res = await fetch('/api/db/delete-object', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ connectionId, dbName, schemaName, objectName: node.name, objectType }),
-          });
-          if (!res.ok) throw new Error(`Failed to delete ${objectType}`);
-          useTreeStore.getState().deleteNode(node.id);
-          toast.success(successMsgTemplate(node.name));
-        } catch (e: any) {
-          console.error('Delete object error:', e);
-          toast.error('删除失败，请重试');
-        }
-      },
-      'danger',
-      openModal
-    );
-  };
+    async (node: any, openModal?: Function) => {
+        if (typeof openModal !== 'function') return;
+        openConfirm(
+            title,
+            `确定要删除${objectType} "${node.name}" 吗？此操作不可恢复。`,
+            async () => {
+                try {
+                    const connectionId = findConnectionId(node.id);
+                    const dbName = node.dbName || 'default';
+                    const schemaName = node.schemaName || 'public';
+                    const res = await fetch('/api/db/delete-object', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ connectionId, dbName, schemaName, objectName: node.name, objectType }),
+                    });
+                    if (!res.ok) throw new Error(`Failed to delete ${objectType}`);
+                    useTreeStore.getState().deleteNode(node.id);
+                    toast.success(successMsgTemplate(node.name));
+                } catch (e: any) {
+                    console.error('Delete object error:', e);
+                    toast.error('删除失败，请重试');
+                }
+            },
+            'danger',
+            openModal
+        );
+    };
 // 刷新模板：适用于 database/schema 等
 const createRefreshHandler = (successMsg: (name: string) => string): ActionHandler =>
-  async (node: any, setExpandedKeys?: Function) => {
-    if (!node.connected) return;
-    const { updateTreePath } = useTreeStore.getState();
-    const { loadNodeChildren } = await import('../utils/treeUtils');
-    const updated = await loadNodeChildren(node);
-    updateTreePath(node.id, () => ({ ...updated, expanded: true }));
-    toast.success(successMsg(node.name));
-    setExpandedKeys?.((prev: Map<string, boolean>) => new Map(prev).set(node.id, true));
-  };
+    async (node: any, setExpandedKeys?: Function) => {
+        if (!node.connected) return;
+        const { updateTreePath } = useTreeStore.getState();
+        const { loadNodeChildren } = await import('../utils/treeUtils');
+        const updated = await loadNodeChildren(node);
+        updateTreePath(node.id, () => ({ ...updated, expanded: true }));
+        toast.success(successMsg(node.name));
+        setExpandedKeys?.((prev: Map<string, boolean>) => new Map(prev).set(node.id, true));
+    };
 // 占位工厂：通用 toast 反馈（未来扩展）
 const createPlaceholderHandler = (msg: (name: string) => string) => (node: any) => toast(msg(node.name));
 // 通用属性查看（所有节点共享）
 export const showProperties = (node: any) => {
-  toast(
-    `节点属性:\nID: ${node.id}\n类型: ${node.type}\n名称: ${node.name}\n连接状态: ${node.connected ? '已连接' : '未连接'}`,
-    { duration: 4000 }
-  );
+    toast(
+        `节点属性:\nID: ${node.id}\n类型: ${node.type}\n名称: ${node.name}\n连接状态: ${node.connected ? '已连接' : '未连接'}`,
+        { duration: 4000 }
+    );
 };
 /* ========================= 动作分发器 ========================= */
 export const dynamicHandler: DynamicActionHandler = async (handler: string, node:any, options: any = {}) => {
@@ -98,10 +99,10 @@ export const dynamicHandler: DynamicActionHandler = async (handler: string, node
         case 'database':
         case 'databases':
             moduleActions = await import('./impl/databaseActions');
-        break;
-      case 'schema':
-        moduleActions = await import('./impl/schemaActions');
-        break;
+            break;
+        case 'schema':
+            moduleActions = await import('./impl/schemaActions');
+            break;
 //       case 'table':
 //         moduleActions = await import('./tableActions');
 //         break;
@@ -120,37 +121,37 @@ export const dynamicHandler: DynamicActionHandler = async (handler: string, node
 };
 
 export const actionHandlers: Record<string, StandardActionHandler> = {
-  defaultAction: (node: any, _openModal?: Function, setExpandedKeys?: Function) => {
-    if (node.type === 'connection') {
-      actionHandlers.connectAndExpand(node, undefined, setExpandedKeys);
-      return;
-    }
-    toast(`未知默认动作: ${node.name}`);
-  },
-  // 通用（引用模板） - 只剩这些通用部分
-  showProperties,
+    defaultAction: (node: any, _openModal?: Function, setExpandedKeys?: Function) => {
+        if (node.type === 'connection') {
+            actionHandlers.connectAndExpand(node, undefined, setExpandedKeys);
+            return;
+        }
+        toast(`未知默认动作: ${node.name}`);
+    },
+    // 通用（引用模板） - 只剩这些通用部分
+    showProperties,
 };
 /* ========================= 工具 + 重新导出 ========================= */
 export const getAllActions= async (nodeType: string, node?: any) => {
-  nodeType = nodeType?.toLowerCase();
-  const cfg = await getTreeConfig(node.dbType);
-  let actions = cfg?.tree?.find((item) => item.type === nodeType)?.actions?.menu;
-  if (!actions) {
-      actions = useTreeStore.getState().actionMap?.[nodeType] || [];
-  }
+    nodeType = nodeType?.toLowerCase();
+    const cfg = await getTreeConfig(node.dbType);
+    let actions = cfg?.tree?.find((item) => item.type === nodeType)?.actions?.menu;
+    if (!actions) {
+        actions = useTreeStore.getState().actionMap?.[nodeType] || [];
+    }
 
-  // 优先从 actionMap 读取
-  if (actions) {
-    actions = actions.filter((action) => {
-      if (action.condition) {
-        return action.condition(node);
-      }
-      return true;
-    });
-  }
-  return actions;
+    // 优先从 actionMap 读取
+    if (actions) {
+        actions = actions.filter((action) => {
+            if (action.condition) {
+                return action.condition(node);
+            }
+            return true;
+        });
+    }
+    return actions;
 };
-// 重新导出：统一入口
+
 export { refreshFolder, deleteFolder, openNewGroup, openRenameFolder } from './impl/folderActions';
 export { updateConnection, connectDatabase, disconnectDatabase, refreshConnection, deleteConnection } from './impl/connectionActions';
 export * from './impl/databaseActions';

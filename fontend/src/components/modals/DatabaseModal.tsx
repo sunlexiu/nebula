@@ -1,13 +1,15 @@
-// src/components/modals/NewDatabaseModal.tsx
+// src/components/modals/DatabaseModal.tsx
 import React, { useState, useEffect } from 'react';
-import '../../css/NewConnectionModal.css'; // 复用已有样式
+import '../../css/DatabaseModal.css';
 import toast from 'react-hot-toast';
 
-interface NewDatabaseModalProps {
+interface DatabaseModalProps {
     isOpen?: boolean;
     onClose: () => void;
     connectionId: string;
     dbType?: string;
+    mode: 'create' | 'edit';
+    databaseId?: string;
     defaultValues?: {
         name?: string;
         owner?: string;
@@ -19,34 +21,34 @@ interface NewDatabaseModalProps {
         allowConnections?: boolean;
         connectionLimit?: number;
         comment?: string;
+        rolePrivileges?: Array<{
+            role: string;
+            connect: boolean;
+            temp: boolean;
+            create: boolean;
+            grantOption: boolean;
+        }>;
     };
     onSubmit?: (values: any) => Promise<void>;
+    permissions?: {
+        name?: boolean;
+        owner?: boolean;
+        encoding?: boolean;
+        template?: boolean;
+        collation?: boolean;
+        ctype?: boolean;
+        tablespace?: boolean;
+        allowConnections?: boolean;
+        connectionLimit?: boolean;
+        comment?: boolean;
+        isTemplate?: boolean;
+        localeProvider?: boolean;
+        icuLocale?: boolean;
+        icuRules?: boolean;
+        extensions?: boolean;
+        rolePrivileges?: boolean;
+    };
 }
-
-const tabBtnStyle: React.CSSProperties = {
-    padding: '6px 12px',
-    borderRadius: 4,
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: 12,
-    marginRight: 8,
-    transition: 'all 0.2s ease',
-};
-
-const tabContainerStyle: React.CSSProperties = {
-    display: 'flex',
-    marginBottom: 12,
-    borderBottom: '1px solid #e0e0e0',
-};
-
-const rowStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: '12px',
-};
-
-const colStyle: React.CSSProperties = {
-    flex: 1,
-};
 
 const modalContentStyle: React.CSSProperties = {
     maxWidth: 800,
@@ -67,14 +69,17 @@ const tabContentStyle: React.CSSProperties = {
     minHeight: 0,
 };
 
-const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
-                                                               isOpen = false,
-                                                               onClose,
-                                                               connectionId,
-                                                               dbType,
-                                                               defaultValues,
-                                                               onSubmit,
-                                                           }) => {
+const DatabaseModal: React.FC<DatabaseModalProps> = ({
+                                                         isOpen = false,
+                                                         onClose,
+                                                         connectionId,
+                                                         dbType,
+                                                         mode = 'create',
+                                                         databaseId,
+                                                         defaultValues,
+                                                         onSubmit,
+                                                         permissions = {},
+                                                     }) => {
     const [activeTab, setActiveTab] = useState<'general' | 'definition' | 'storage' | 'security' | 'sql' | 'advanced'>('general');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -92,6 +97,29 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
         localeProviders: [],
     });
 
+    // 默认权限配置
+    const defaultPermissions = {
+        name: mode === 'create',
+        owner: true,
+        encoding: true,
+        template: true,
+        collation: true,
+        ctype: true,
+        tablespace: true,
+        allowConnections: true,
+        connectionLimit: true,
+        comment: true,
+        isTemplate: true,
+        localeProvider: true,
+        icuLocale: true,
+        icuRules: true,
+        extensions: true,
+        rolePrivileges: true,
+    };
+
+    // 合并权限配置
+    const fieldPermissions = { ...defaultPermissions, ...permissions };
+
     const [form, setForm] = useState({
         name: defaultValues?.name || '',
         owner: defaultValues?.owner || '',
@@ -103,12 +131,12 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
         allowConnections: defaultValues?.allowConnections ?? true,
         connectionLimit: defaultValues?.connectionLimit ?? -1,
         comment: defaultValues?.comment || '',
-        isTemplate: false,
+        isTemplate: defaultPermissions?.isTemplate || false,
         localeProvider: 'libc',
         icuLocale: '',
         icuRules: '',
         extensions: '',
-        rolePrivileges: [
+        rolePrivileges: defaultValues?.rolePrivileges || [
             { role: 'public', connect: true, temp: false, create: false, grantOption: false },
             { role: 'app_user', connect: true, temp: true, create: false, grantOption: false },
             { role: 'readonly', connect: true, temp: false, create: false, grantOption: false },
@@ -116,12 +144,15 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
         ],
     });
 
-    // 获取数据库选项
+    // 获取数据库选项和角色列表
     useEffect(() => {
         if (isOpen && connectionId) {
             fetchDbOptions();
+            if (mode === 'edit' && databaseId) {
+                fetchDatabaseData();
+            }
         }
-    }, [isOpen, connectionId]);
+    }, [isOpen, connectionId, mode, databaseId]);
 
     const fetchDbOptions = async () => {
         try {
@@ -149,6 +180,25 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
         }
     };
 
+    // 编辑模式下获取数据库现有数据
+    const fetchDatabaseData = async () => {
+        try {
+            const response = await fetch(`/api/db/database/${databaseId}`);
+            if (response.ok) {
+                const data = await response.json();
+                setForm(prev => ({
+                    ...prev,
+                    ...data,
+                    // 确保rolePrivileges有默认值
+                    rolePrivileges: data.rolePrivileges || prev.rolePrivileges,
+                }));
+            }
+        } catch (error) {
+            console.error('Failed to fetch database data:', error);
+            toast.error('获取数据库信息失败');
+        }
+    };
+
     // 生成SQL
     const generateSql = async () => {
         try {
@@ -157,6 +207,8 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     connectionId,
+                    mode,
+                    databaseId,
                     ...form,
                 }),
             });
@@ -203,7 +255,7 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
             icuLocale: '',
             icuRules: '',
             extensions: '',
-            rolePrivileges: [
+            rolePrivileges: defaultValues?.rolePrivileges || [
                 { role: 'public', connect: true, temp: false, create: false, grantOption: false },
                 { role: 'app_user', connect: true, temp: true, create: false, grantOption: false },
                 { role: 'readonly', connect: true, temp: false, create: false, grantOption: false },
@@ -229,11 +281,13 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                     name: form.name.trim(),
                     connectionId,
                     dbType,
+                    mode,
+                    databaseId,
                 });
             }
             onClose();
         } catch (err: any) {
-            setError(err?.message || '创建失败，请稍后重试');
+            setError(err?.message || (mode === 'create' ? '创建失败' : '修改失败') + '，请稍后重试');
         } finally {
             setSaving(false);
         }
@@ -247,13 +301,41 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
         e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
     ) => {
         const { name, value, type, checked } = e.target as any;
+        // 检查字段权限
+        if (mode === 'edit' && !fieldPermissions[name as keyof typeof fieldPermissions]) {
+            return;
+        }
         setForm((prev) => ({
             ...prev,
             [name]: type === 'checkbox' ? checked : value,
         }));
     };
 
-    const handleRolePrivilegeChange = (index: number, field: string, value: boolean) => {
+    // 新增权限行
+    const handleAddPrivilegeRow = () => {
+        setForm(prev => ({
+            ...prev,
+            rolePrivileges: [
+                ...prev.rolePrivileges,
+                { role: '', connect: false, temp: false, create: false, grantOption: false }
+            ]
+        }));
+    };
+
+    // 删除权限行
+    const handleDeletePrivilegeRow = (index: number) => {
+        setForm(prev => ({
+            ...prev,
+            rolePrivileges: prev.rolePrivileges.filter((_, i) => i !== index)
+        }));
+    };
+
+    // 更新权限行
+    const handleRolePrivilegeChange = (index: number, field: string, value: boolean | string) => {
+        // 检查权限
+        if (mode === 'edit' && !fieldPermissions.rolePrivileges) {
+            return;
+        }
         const updatedPrivileges = [...form.rolePrivileges];
         updatedPrivileges[index] = {
             ...updatedPrivileges[index],
@@ -266,15 +348,20 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
 
     if (!isOpen) return null;
 
+    // 动态标题和按钮文本
+    const modalTitle = mode === 'create' ? '新建数据库' : '修改数据库';
+    const submitButtonText = mode === 'create' ? '创建' : '保存';
+    const submitButtonLoadingText = mode === 'create' ? '创建中…' : '保存中…';
+
     return (
         <div className="modal-overlay">
             <div className="modal-content" style={modalContentStyle}>
                 <h3 className="modal-title" style={{ borderBottom: '1px solid #e0e0e0', paddingBottom: '12px', marginBottom: 0 }}>
-                    新建数据库
+                    {modalTitle}
                 </h3>
 
                 {/* Tab切换 */}
-                <div style={tabContainerStyle}>
+                <div style={{ display: 'flex', marginBottom: 12, borderBottom: '1px solid #e0e0e0' }}>
                     {[
                         { key: 'general', label: '常规' },
                         { key: 'definition', label: '定义' },
@@ -287,7 +374,13 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                             key={tab.key}
                             type="button"
                             style={{
-                                ...tabBtnStyle,
+                                padding: '6px 12px',
+                                borderRadius: 4,
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: 12,
+                                marginRight: 8,
+                                transition: 'all 0.2s ease',
                                 background: activeTab === tab.key ? '#0b69ff' : 'transparent',
                                 color: activeTab === tab.key ? '#fff' : '#666',
                                 borderBottom: activeTab === tab.key ? '2px solid #0b69ff' : 'none',
@@ -313,21 +406,28 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                                     type="text"
                                     value={form.name}
                                     onChange={handleChange}
-                                    className="modal-input"
+                                    className="form-input"
                                     placeholder="例如: app_db / reporting"
+                                    disabled={mode === 'edit' && !fieldPermissions.name}
                                     autoFocus
                                 />
+                                {mode === 'edit' && !fieldPermissions.name && (
+                                    <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                                        数据库名称不可修改
+                                    </div>
+                                )}
                             </div>
 
-                            <div style={rowStyle}>
-                                <div className="form-group" style={colStyle}>
+                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                                <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
                                     <label htmlFor="owner">所有者</label>
                                     <select
                                         id="owner"
                                         name="owner"
                                         value={form.owner}
                                         onChange={handleChange}
-                                        className="modal-input"
+                                        className="form-input"
+                                        disabled={mode === 'edit' && !fieldPermissions.owner}
                                     >
                                         {dbOptions.owners.map((owner: any) => (
                                             <option key={owner.value} value={owner.value}>
@@ -337,14 +437,15 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                                     </select>
                                 </div>
 
-                                <div className="form-group" style={colStyle}>
+                                <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
                                     <label htmlFor="template">模板库</label>
                                     <select
                                         id="template"
                                         name="template"
                                         value={form.template}
                                         onChange={handleChange}
-                                        className="modal-input"
+                                        className="form-input"
+                                        disabled={mode === 'edit' && !fieldPermissions.template}
                                     >
                                         {dbOptions.templates.map((template: any) => (
                                             <option key={template.value} value={template.value}>
@@ -362,9 +463,10 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                                     name="comment"
                                     value={form.comment}
                                     onChange={handleChange}
-                                    className="modal-input"
+                                    className="form-input"
                                     rows={2}
                                     placeholder="用于标记数据库用途，例如：BI 报表库 / 归档库"
+                                    disabled={mode === 'edit' && !fieldPermissions.comment}
                                 />
                             </div>
                         </>
@@ -373,15 +475,16 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                     {/* 定义 Tab */}
                     {activeTab === 'definition' && (
                         <>
-                            <div style={rowStyle}>
-                                <div className="form-group" style={colStyle}>
+                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                                <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
                                     <label htmlFor="encoding">字符集 / 编码</label>
                                     <select
                                         id="encoding"
                                         name="encoding"
                                         value={form.encoding}
                                         onChange={handleChange}
-                                        className="modal-input"
+                                        className="form-input"
+                                        disabled={mode === 'edit' && !fieldPermissions.encoding}
                                     >
                                         {dbOptions.encodings.map((encoding: any) => (
                                             <option key={encoding.value} value={encoding.value}>
@@ -391,14 +494,15 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                                     </select>
                                 </div>
 
-                                <div className="form-group" style={colStyle}>
+                                <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
                                     <label htmlFor="collation">排序规则</label>
                                     <select
                                         id="collation"
                                         name="collation"
                                         value={form.collation}
                                         onChange={handleChange}
-                                        className="modal-input"
+                                        className="form-input"
+                                        disabled={mode === 'edit' && !fieldPermissions.collation}
                                     >
                                         {dbOptions.collations.map((collation: any) => (
                                             <option key={collation.value} value={collation.value}>
@@ -409,15 +513,16 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                                 </div>
                             </div>
 
-                            <div style={rowStyle}>
-                                <div className="form-group" style={colStyle}>
+                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                                <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
                                     <label htmlFor="ctype">字符分类</label>
                                     <select
                                         id="ctype"
                                         name="ctype"
                                         value={form.ctype}
                                         onChange={handleChange}
-                                        className="modal-input"
+                                        className="form-input"
+                                        disabled={mode === 'edit' && !fieldPermissions.ctype}
                                     >
                                         {dbOptions.collations.map((collation: any) => (
                                             <option key={collation.value} value={collation.value}>
@@ -427,13 +532,14 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                                     </select>
                                 </div>
 
-                                <div className="form-group" style={colStyle}>
+                                <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
                                     <label className="checkbox-group">
                                         <input
                                             type="checkbox"
                                             name="allowConnections"
                                             checked={form.allowConnections}
                                             onChange={handleChange}
+                                            disabled={mode === 'edit' && !fieldPermissions.allowConnections}
                                         />
                                         <span style={{ marginLeft: 6 }}>允许连接到此数据库</span>
                                     </label>
@@ -447,6 +553,7 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                                         name="isTemplate"
                                         checked={form.isTemplate}
                                         onChange={handleChange}
+                                        disabled={mode === 'edit' && !fieldPermissions.isTemplate}
                                     />
                                     <span style={{ marginLeft: 6 }}>是否作为模板库</span>
                                 </label>
@@ -464,7 +571,8 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                                     name="tablespace"
                                     value={form.tablespace}
                                     onChange={handleChange}
-                                    className="modal-input"
+                                    className="form-input"
+                                    disabled={mode === 'edit' && !fieldPermissions.tablespace}
                                 >
                                     {dbOptions.tablespaces.map((tablespace: any) => (
                                         <option key={tablespace.value} value={tablespace.value}>
@@ -482,7 +590,8 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                                     type="number"
                                     value={form.connectionLimit}
                                     onChange={handleChange}
-                                    className="modal-input"
+                                    className="form-input"
+                                    disabled={mode === 'edit' && !fieldPermissions.connectionLimit}
                                 />
                                 <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
                                     -1 表示不限制（受全局配置控制）
@@ -494,30 +603,59 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                     {/* 安全 Tab */}
                     {activeTab === 'security' && (
                         <div>
-                            <div style={{ marginBottom: 12, fontSize: 14, fontWeight: 500 }}>
-                                角色授权（数据库级权限）
+                            <div style={{ marginBottom: 12, fontSize: 14, fontWeight: 500, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>角色授权（数据库级权限）</span>
+                                {mode === 'create' && fieldPermissions.rolePrivileges && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={handleAddPrivilegeRow}
+                                        style={{ padding: '4px 8px', fontSize: '12px' }}
+                                    >
+                                        + 新增权限
+                                    </button>
+                                )}
                             </div>
 
                             <div style={{ overflowX: 'auto' }}>
                                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                                     <thead>
                                     <tr style={{ borderBottom: '1px solid #e0e0e0' }}>
-                                        <th style={{ padding: '8px', textAlign: 'left' }}>角色</th>
-                                        <th style={{ padding: '8px', textAlign: 'center' }}>CONNECT</th>
-                                        <th style={{ padding: '8px', textAlign: 'center' }}>TEMP</th>
-                                        <th style={{ padding: '8px', textAlign: 'center' }}>CREATE</th>
-                                        <th style={{ padding: '8px', textAlign: 'center' }}>WITH GRANT</th>
+                                        <th style={{ padding: '8px', textAlign: 'left', minWidth: 120 }}>角色</th>
+                                        <th style={{ padding: '8px', textAlign: 'center', minWidth: 80 }}>CONNECT</th>
+                                        <th style={{ padding: '8px', textAlign: 'center', minWidth: 80 }}>TEMP</th>
+                                        <th style={{ padding: '8px', textAlign: 'center', minWidth: 80 }}>CREATE</th>
+                                        <th style={{ padding: '8px', textAlign: 'center', minWidth: 100 }}>WITH GRANT</th>
+                                        {mode === 'create' && fieldPermissions.rolePrivileges && (
+                                            <th style={{ padding: '8px', textAlign: 'center', minWidth: 60 }}>操作</th>
+                                        )}
                                     </tr>
                                     </thead>
                                     <tbody>
                                     {form.rolePrivileges.map((priv, index) => (
-                                        <tr key={priv.role} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                            <td style={{ padding: '8px' }}>{priv.role}</td>
+                                        <tr key={index} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                                            <td style={{ padding: '8px' }}>
+                                                <select
+                                                    value={priv.role}
+                                                    onChange={(e) => handleRolePrivilegeChange(index, 'role', e.target.value)}
+                                                    className="form-input"
+                                                    style={{ width: '100%', fontSize: 12 }}
+                                                    disabled={mode === 'edit' && !fieldPermissions.rolePrivileges}
+                                                >
+                                                    <option value="">选择角色</option>
+                                                    {dbOptions.roles.map((role: any) => (
+                                                        <option key={role.value} value={role.value}>
+                                                            {role.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </td>
                                             <td style={{ padding: '8px', textAlign: 'center' }}>
                                                 <input
                                                     type="checkbox"
                                                     checked={priv.connect}
                                                     onChange={(e) => handleRolePrivilegeChange(index, 'connect', e.target.checked)}
+                                                    disabled={mode === 'edit' && !fieldPermissions.rolePrivileges}
                                                 />
                                             </td>
                                             <td style={{ padding: '8px', textAlign: 'center' }}>
@@ -525,6 +663,7 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                                                     type="checkbox"
                                                     checked={priv.temp}
                                                     onChange={(e) => handleRolePrivilegeChange(index, 'temp', e.target.checked)}
+                                                    disabled={mode === 'edit' && !fieldPermissions.rolePrivileges}
                                                 />
                                             </td>
                                             <td style={{ padding: '8px', textAlign: 'center' }}>
@@ -532,6 +671,7 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                                                     type="checkbox"
                                                     checked={priv.create}
                                                     onChange={(e) => handleRolePrivilegeChange(index, 'create', e.target.checked)}
+                                                    disabled={mode === 'edit' && !fieldPermissions.rolePrivileges}
                                                 />
                                             </td>
                                             <td style={{ padding: '8px', textAlign: 'center' }}>
@@ -539,13 +679,31 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                                                     type="checkbox"
                                                     checked={priv.grantOption}
                                                     onChange={(e) => handleRolePrivilegeChange(index, 'grantOption', e.target.checked)}
+                                                    disabled={mode === 'edit' && !fieldPermissions.rolePrivileges}
                                                 />
                                             </td>
+                                            {mode === 'create' && fieldPermissions.rolePrivileges && (
+                                                <td style={{ padding: '8px', textAlign: 'center' }}>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-secondary"
+                                                        onClick={() => handleDeletePrivilegeRow(index)}
+                                                        style={{ padding: '2px 6px', fontSize: '10px' }}
+                                                    >
+                                                        删除
+                                                    </button>
+                                                </td>
+                                            )}
                                         </tr>
                                     ))}
                                     </tbody>
                                 </table>
                             </div>
+                            {form.rolePrivileges.length === 0 && (
+                                <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+                                    暂无权限配置，点击"新增权限"添加
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -585,7 +743,7 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                                 <textarea
                                     value={manualSql}
                                     onChange={(e) => setManualSql(e.target.value)}
-                                    className="modal-input"
+                                    className="form-input"
                                     rows={10}
                                     style={{ marginTop: 8, fontFamily: 'monospace', fontSize: 12 }}
                                 />
@@ -620,7 +778,8 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                                     name="localeProvider"
                                     value={form.localeProvider}
                                     onChange={handleChange}
-                                    className="modal-input"
+                                    className="form-input"
+                                    disabled={mode === 'edit' && !fieldPermissions.localeProvider}
                                 >
                                     {dbOptions.localeProviders.map((provider: any) => (
                                         <option key={provider.value} value={provider.value}>
@@ -640,8 +799,9 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                                             type="text"
                                             value={form.icuLocale}
                                             onChange={handleChange}
-                                            className="modal-input"
+                                            className="form-input"
                                             placeholder="例如: en-US"
+                                            disabled={mode === 'edit' && !fieldPermissions.icuLocale}
                                         />
                                     </div>
 
@@ -653,8 +813,9 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                                             type="text"
                                             value={form.icuRules}
                                             onChange={handleChange}
-                                            className="modal-input"
+                                            className="form-input"
                                             placeholder="例如: @strength=primary"
+                                            disabled={mode === 'edit' && !fieldPermissions.icuRules}
                                         />
                                     </div>
                                 </>
@@ -666,9 +827,10 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                                     name="extensions"
                                     value={form.extensions}
                                     onChange={handleChange}
-                                    className="modal-input"
+                                    className="form-input"
                                     rows={3}
                                     placeholder="max_locks_per_transaction = 128&#10;work_mem = 64MB"
+                                    disabled={mode === 'edit' && !fieldPermissions.extensions}
                                 />
                             </div>
                         </>
@@ -698,7 +860,7 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                     borderTop: '1px solid #e0e0e0',
                     gap: 8
                 }}>
-                    <div>
+                    <div style={{ display: 'flex', gap: 8 }}>
                         <button
                             type="button"
                             className="btn btn-cancel"
@@ -732,7 +894,7 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
                             disabled={!requiredOk || saving}
                             onClick={handleSubmit}
                         >
-                            {saving ? '创建中…' : '创建'}
+                            {saving ? submitButtonLoadingText : submitButtonText}
                         </button>
                     </div>
                 </div>
@@ -782,4 +944,4 @@ const NewDatabaseModal: React.FC<NewDatabaseModalProps> = ({
     );
 };
 
-export default NewDatabaseModal;
+export default DatabaseModal;

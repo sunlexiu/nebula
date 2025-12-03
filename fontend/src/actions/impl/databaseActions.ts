@@ -1,5 +1,4 @@
 // src/actions/impl/databaseActions.ts
-
 import toast from 'react-hot-toast';
 import { useTreeStore } from '@/stores/useTreeStore';
 import { findConnectionId } from '@/utils/treeUtils';
@@ -17,7 +16,7 @@ export const refreshDatabase = async (node: any, setExpandedKeys?: Function) => 
 };
 
 /**
- * 在 Databases 聚合节点或某个 Database 节点上，打开“新建数据库”弹窗
+ * 打开"新建数据库"弹窗
  */
 export const createNewDatabase = async (node: any, openModal?: Function) => {
   if (typeof openModal !== 'function') {
@@ -25,17 +24,18 @@ export const createNewDatabase = async (node: any, openModal?: Function) => {
     return;
   }
 
-  // 对于聚合节点（type=databases），需要往上找连接；database 节点同理
   const connectionId = findConnectionId(node.id);
   const dbType = node.dbType || node.extra?.dbType;
 
-  openModal('newDatabase', {
+  // 使用新的通用数据库Modal
+  const { openDatabaseModal } = await import('@/components/modals/modalActions');
+  openDatabaseModal({
+    mode: 'create',
     connectionId,
     dbType,
-    // 默认值可以传给 Modal
     defaultValues: {
       name: '',
-      owner: '',          // 留空表示当前登录用户
+      owner: '',
       encoding: dbType === 'postgresql' ? 'UTF8' : '',
       template: dbType === 'postgresql' ? 'template1' : '',
       collation: '',
@@ -45,46 +45,80 @@ export const createNewDatabase = async (node: any, openModal?: Function) => {
       connectionLimit: -1,
       comment: '',
     },
-    /**
-     * 真正提交时的处理逻辑
-     */
-    onSubmit: async (formValues: any) => {
-      try {
-        const payload = {
-          connectionId,
-          dbType,
-          ...formValues,
-        };
-
-        const res = await fetch('/api/db/create-database', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-
-        if (!res.ok) {
-          let msg = '创建数据库失败';
-          try {
-            const err = await res.json();
-            msg = err?.message || msg;
-          } catch {
-            // ignore
-          }
-          throw new Error(msg);
-        }
-
-        toast.success(`数据库 "${formValues.name}" 已创建`);
-
-        // 刷新当前连接节点或 Databases 节点
-        const { refreshTree } = useTreeStore.getState();
-        await refreshTree();
-      } catch (e: any) {
-        console.error('createNewDatabase error:', e);
-        toast.error(e?.message || '创建数据库失败');
-        throw e; // 让 Modal 能感知失败，不自动关闭
-      }
+    permissions: {
+      // 新建模式下所有字段都可编辑
+      name: true,
+      owner: true,
+      encoding: true,
+      template: true,
+      collation: true,
+      ctype: true,
+      tablespace: true,
+      allowConnections: true,
+      connectionLimit: true,
+      comment: true,
+      isTemplate: true,
+      localeProvider: true,
+      icuLocale: true,
+      icuRules: true,
+      extensions: true,
+      rolePrivileges: true,
     },
-  });
+  }, openModal);
+};
+
+/**
+ * 打开"修改数据库"弹窗
+ */
+export const editDatabase = async (node: any, openModal?: Function) => {
+  if (typeof openModal !== 'function') {
+    toast.error('模态打开失败');
+    return;
+  }
+
+  const connectionId = findConnectionId(node.id);
+  const dbType = node.dbType || node.extra?.dbType;
+
+  // 使用新的通用数据库Modal
+  const { openDatabaseModal } = await import('@/components/modals/modalActions');
+  openDatabaseModal({
+    mode: 'edit',
+    connectionId,
+    dbType,
+    databaseId: node.name, // 假设数据库名称作为ID
+    defaultValues: {
+      name: node.name,
+      owner: node.owner || '',
+      encoding: node.encoding || '',
+      template: node.template || '',
+      collation: node.collation || '',
+      ctype: node.ctype || '',
+      tablespace: node.tablespace || '',
+      allowConnections: node.allowConnections ?? true,
+      connectionLimit: node.connectionLimit ?? -1,
+      comment: node.comment || '',
+      isTemplate: node.isTemplate || false,
+    },
+    permissions: {
+      // 编辑模式下，数据库名称不可修改，其他字段可编辑
+      name: false, // 数据库名称不可修改
+      owner: true,
+      encoding: true,
+      template: false, // 模板库通常不建议修改
+      collation: true,
+      ctype: true,
+      tablespace: true,
+      allowConnections: true,
+      connectionLimit: true,
+      comment: true,
+      isTemplate: false, // 模板库状态不建议修改
+      localeProvider: true,
+      icuLocale: true,
+      icuRules: true,
+      extensions: true,
+      rolePrivileges: true,
+    },
+  }, openModal);
 };
 
 export const deleteDatabase = async (node: any, openModal?: Function) => {

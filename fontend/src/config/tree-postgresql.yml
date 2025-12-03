@@ -39,6 +39,7 @@ tree:
         - { label: 新建Schema, handler: createNewSchema, icon: 📁 }
         - { label: 导出结构, handler: exportDatabase, icon: 📤 }
         - { type: separator }
+        - { label: 修改数据库, handler: editDatabase, icon: ✏️ }
         - { label: 删除数据库, handler: deleteDatabase, icon: 🗑️, variant: danger }
         - { label: 属性, handler: showProperties, icon: ℹ️ }
 
