@@ -4,6 +4,7 @@ import com.deego.metadata.DatabaseNodeType;
 import com.deego.metadata.MetadataProvider;
 import com.deego.metadata.MetadataProviderFactory;
 import com.deego.model.Connection;
+import com.deego.model.pgsql.Option;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
@@ -30,5 +31,11 @@ public class MetaService {
 				StringUtils.trimLeadingCharacter(StringUtils.trimTrailingCharacter(fullPath, '/'), '/');
 		String[] segments = fullPath.split("/");
 		return provider.listChildren(connId, conn, nodeType, segments);
+	}
+
+	public Option options(String connId) {
+		Connection conn = connectionService.getConnection(connId).orElseThrow(() -> new IllegalArgumentException("Connection not found: " + connId));
+		MetadataProvider provider = factory.getProvider(conn.getDbType());
+		return provider.getOptions(conn);
 	}
 }

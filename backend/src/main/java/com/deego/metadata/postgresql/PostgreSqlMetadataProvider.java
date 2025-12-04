@@ -5,12 +5,18 @@ import com.deego.exec.DbExecutor;
 import com.deego.metadata.DatabaseNodeType;
 import com.deego.metadata.MetadataProvider;
 import com.deego.model.Connection;
+import com.deego.model.pgsql.Option;
+import com.deego.model.pgsql.PgOption;
 import com.deego.service.ConnectionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 public class PostgreSqlMetadataProvider implements MetadataProvider {
@@ -56,6 +62,55 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
 			default -> List.of();
 		};
 	}
+
+	@Override
+	public PgOption getOptions(Connection connection) {
+		PgOption options = new PgOption();
+		DbExecutor executor = connectionService.getExecutor(connection.getId());
+		try {
+			// 获取所有编码
+			List<Map<String, Object>> encodingResults = executor.queryForList(
+					"SELECT pg_encoding_to_char(encoding) as encoding FROM pg_database GROUP BY encoding"
+			);
+			List<String> encodings = encodingResults.stream()
+													.map(map -> (String) map.get("encoding"))
+													.collect(Collectors.toList());
+			options.setEncodings(encodings);
+
+			// 获取所有模板数据库
+			List<Map<String, Object>> templateResults = executor.queryForList(
+					"SELECT datname FROM pg_database WHERE datistemplate = true"
+			);
+			List<String> templates = templateResults.stream()
+													.map(map -> (String) map.get("datname"))
+													.collect(Collectors.toList());
+			options.setTemplates(templates);
+
+			// 获取所有表空间
+			List<Map<String, Object>> tablespaceResults = executor.queryForList(
+					"SELECT spcname FROM pg_tablespace"
+			);
+			List<String> tablespaces = tablespaceResults.stream()
+														.map(map -> (String) map.get("spcname"))
+														.collect(Collectors.toList());
+			options.setTablespaces(tablespaces);
+
+			// 获取所有角色
+			List<Map<String, Object>> roleResults = executor.queryForList(
+					"SELECT rolname FROM pg_roles"
+			);
+			List<String> roles = roleResults.stream()
+											.map(map -> (String) map.get("rolname"))
+											.collect(Collectors.toList());
+			options.setRoles(roles);
+
+		} catch (Exception e) {
+			throw new RuntimeException("Failed to get PostgreSQL options", e);
+		}
+		return options;
+	}
+
+
 
 	// ==================== 数据库 / Schema / 表 ====================
 

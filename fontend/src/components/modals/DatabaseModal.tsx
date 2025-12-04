@@ -87,6 +87,8 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
     const [allowManualSql, setAllowManualSql] = useState(false);
     const [manualSql, setManualSql] = useState('');
     const [generatedSql, setGeneratedSql] = useState('');
+    const [ownerSearchTerm, setOwnerSearchTerm] = useState('');
+    const [loadingOptions, setLoadingOptions] = useState<Set<string>>(new Set());
     const [dbOptions, setDbOptions] = useState<any>({
         encodings: [],
         collations: [],
@@ -147,36 +149,73 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
     // 获取数据库选项和角色列表
     useEffect(() => {
         if (isOpen && connectionId) {
-            fetchDbOptions();
+            // 初始只加载 roles 和 templates
+            fetchDbOptions(['roles', 'templates']);
             if (mode === 'edit' && databaseId) {
                 fetchDatabaseData();
             }
         }
     }, [isOpen, connectionId, mode, databaseId]);
 
-    const fetchDbOptions = async () => {
-        try {
-            const response = await fetch(`/api/db/options/${connectionId}`);
-            if (response.ok) {
-                const options = await response.json();
-                setDbOptions(options);
+    // Tab 切换时加载对应的选项
+    useEffect(() => {
+        if (!isOpen) return;
 
-                // 设置默认值
-                if (!form.encoding && options.encodings.length > 0) {
+        switch (activeTab) {
+            case 'definition':
+                fetchDbOptions(['encodings', 'collations']);
+                break;
+            case 'storage':
+                fetchDbOptions(['tablespaces']);
+                break;
+            case 'advanced':
+                fetchDbOptions(['localeProviders']);
+                break;
+        }
+    }, [activeTab, isOpen]);
+
+    const fetchDbOptions = async (types: string[] = []) => {
+        try {
+            // 避免重复请求
+            const typesToFetch = types.filter(type =>
+                !dbOptions[type] || dbOptions[type].length === 0
+            );
+
+            if (typesToFetch.length === 0) return;
+
+            setLoadingOptions(prev => new Set([...prev, ...typesToFetch]));
+
+            const response = await fetch(
+                `/api/meta/db/options/${connectionId}?types=${typesToFetch.join(',')}`
+            );
+
+            if (response.ok) {
+                const body = await response.json();
+                const options = body?.data;
+                setDbOptions(prev => ({ ...prev, ...options }));
+
+                // 设置默认值（仅当首次加载时）
+                if (types.includes('encodings') && !form.encoding && options.encodings?.length > 0) {
                     setForm(prev => ({ ...prev, encoding: options.encodings[0].value }));
                 }
-                if (!form.template && options.templates.length > 0) {
+                if (types.includes('templates') && !form.template && options.templates?.length > 0) {
                     setForm(prev => ({ ...prev, template: options.templates[0].value }));
                 }
-                if (!form.tablespace && options.tablespaces.length > 0) {
+                if (types.includes('tablespaces') && !form.tablespace && options.tablespaces?.length > 0) {
                     setForm(prev => ({ ...prev, tablespace: options.tablespaces[0].value }));
                 }
-                if (!form.owner && options.owners.length > 0) {
-                    setForm(prev => ({ ...prev, owner: options.owners[0].value }));
+                if (types.includes('roles') && !form.owner && options.roles?.length > 0) {
+                    setForm(prev => ({ ...prev, owner: options.roles[0].value }));
                 }
             }
         } catch (error) {
             console.error('Failed to fetch database options:', error);
+        } finally {
+            setLoadingOptions(prev => {
+                const newSet = new Set(prev);
+                types.forEach(type => newSet.delete(type));
+                return newSet;
+            });
         }
     };
 
@@ -241,7 +280,7 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
     const handleReset = () => {
         setForm({
             name: defaultValues?.name || '',
-            owner: dbOptions.owners.length > 0 ? dbOptions.owners[0].value : '',
+            owner: dbOptions.roles.length > 0 ? dbOptions.roles[0].value : '',
             encoding: dbOptions.encodings.length > 0 ? dbOptions.encodings[0].value : '',
             template: dbOptions.templates.length > 0 ? dbOptions.templates[0].value : '',
             collation: dbOptions.collations.length > 0 ? dbOptions.collations[0].value : '',
@@ -421,20 +460,80 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                                 <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
                                     <label htmlFor="owner">所有者</label>
-                                    <select
-                                        id="owner"
-                                        name="owner"
-                                        value={form.owner}
-                                        onChange={handleChange}
-                                        className="form-input"
-                                        disabled={mode === 'edit' && !fieldPermissions.owner}
-                                    >
-                                        {dbOptions.owners.map((owner: any) => (
-                                            <option key={owner.value} value={owner.value}>
-                                                {owner.label}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <div style={{ position: 'relative' }}>
+                                        <input
+                                            type="text"
+                                            value={ownerSearchTerm || form.owner}
+                                            onChange={(e) => setOwnerSearchTerm(e.target.value)}
+                                            onFocus={() => setOwnerSearchTerm('')}
+                                            onBlur={() => {
+                                                // 延迟关闭，以便点击选项
+                                                setTimeout(() => setOwnerSearchTerm(''), 200);
+                                            }}
+                                            className="form-input"
+                                            placeholder="搜索或选择所有者"
+                                            disabled={mode === 'edit' && !fieldPermissions.owner}
+                                        />
+                                        {ownerSearchTerm !== '' && (
+                                            <div style={{
+                                                position: 'absolute',
+                                                top: '100%',
+                                                left: 0,
+                                                right: 0,
+                                                border: '1px solid #ccc',
+                                                backgroundColor: '#fff',
+                                                maxHeight: '200px',
+                                                overflowY: 'auto',
+                                                zIndex: 1000,
+                                                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                                            }}>
+                                                {dbOptions.roles
+                                                    .filter(role =>
+                                                        role.label.toLowerCase().includes(ownerSearchTerm.toLowerCase())
+                                                    )
+                                                    .map(role => (
+                                                        <div
+                                                            key={role.value}
+                                                            onClick={() => {
+                                                                setForm(prev => ({ ...prev, owner: role.value }));
+                                                                setOwnerSearchTerm('');
+                                                            }}
+                                                            style={{
+                                                                padding: '8px 12px',
+                                                                cursor: 'pointer',
+                                                                borderBottom: '1px solid #f0f0f0'
+                                                            }}
+                                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fff'}
+                                                        >
+                                                            {role.label}
+                                                        </div>
+                                                    ))}
+                                                {dbOptions.roles.filter(role =>
+                                                    role.label.toLowerCase().includes(ownerSearchTerm.toLowerCase())
+                                                ).length === 0 && (
+                                                    <div style={{ padding: '8px 12px', color: '#999' }}>
+                                                        没有匹配的角色
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                        {loadingOptions.has('roles') && (
+                                            <div style={{
+                                                position: 'absolute',
+                                                top: '100%',
+                                                left: 0,
+                                                right: 0,
+                                                padding: '8px',
+                                                textAlign: 'center',
+                                                color: '#666',
+                                                border: '1px solid #e0e0e0',
+                                                borderTop: 'none'
+                                            }}>
+                                                加载中...
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
@@ -447,11 +546,15 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                         className="form-input"
                                         disabled={mode === 'edit' && !fieldPermissions.template}
                                     >
-                                        {dbOptions.templates.map((template: any) => (
-                                            <option key={template.value} value={template.value}>
-                                                {template.label}
-                                            </option>
-                                        ))}
+                                        {loadingOptions.has('templates') ? (
+                                            <option>加载中...</option>
+                                        ) : (
+                                            dbOptions.templates.map((template: any) => (
+                                                <option key={template.value} value={template.value}>
+                                                    {template.label}
+                                                </option>
+                                            ))
+                                        )}
                                     </select>
                                 </div>
                             </div>
@@ -486,11 +589,15 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                         className="form-input"
                                         disabled={mode === 'edit' && !fieldPermissions.encoding}
                                     >
-                                        {dbOptions.encodings.map((encoding: any) => (
-                                            <option key={encoding.value} value={encoding.value}>
-                                                {encoding.label}
-                                            </option>
-                                        ))}
+                                        {loadingOptions.has('encodings') ? (
+                                            <option>加载中...</option>
+                                        ) : (
+                                            dbOptions.encodings.map((encoding: any) => (
+                                                <option key={encoding.value} value={encoding.value}>
+                                                    {encoding.label}
+                                                </option>
+                                            ))
+                                        )}
                                     </select>
                                 </div>
 
@@ -504,11 +611,15 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                         className="form-input"
                                         disabled={mode === 'edit' && !fieldPermissions.collation}
                                     >
-                                        {dbOptions.collations.map((collation: any) => (
-                                            <option key={collation.value} value={collation.value}>
-                                                {collation.label}
-                                            </option>
-                                        ))}
+                                        {loadingOptions.has('collations') ? (
+                                            <option>加载中...</option>
+                                        ) : (
+                                            dbOptions.collations.map((collation: any) => (
+                                                <option key={collation.value} value={collation.value}>
+                                                    {collation.label}
+                                                </option>
+                                            ))
+                                        )}
                                     </select>
                                 </div>
                             </div>
@@ -524,11 +635,15 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                         className="form-input"
                                         disabled={mode === 'edit' && !fieldPermissions.ctype}
                                     >
-                                        {dbOptions.collations.map((collation: any) => (
-                                            <option key={collation.value} value={collation.value}>
-                                                {collation.label}
-                                            </option>
-                                        ))}
+                                        {loadingOptions.has('collations') ? (
+                                            <option>加载中...</option>
+                                        ) : (
+                                            dbOptions.collations.map((collation: any) => (
+                                                <option key={collation.value} value={collation.value}>
+                                                    {collation.label}
+                                                </option>
+                                            ))
+                                        )}
                                     </select>
                                 </div>
 
@@ -574,11 +689,15 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                     className="form-input"
                                     disabled={mode === 'edit' && !fieldPermissions.tablespace}
                                 >
-                                    {dbOptions.tablespaces.map((tablespace: any) => (
-                                        <option key={tablespace.value} value={tablespace.value}>
-                                            {tablespace.label}
-                                        </option>
-                                    ))}
+                                    {loadingOptions.has('tablespaces') ? (
+                                        <option>加载中...</option>
+                                    ) : (
+                                        dbOptions.tablespaces.map((tablespace: any) => (
+                                            <option key={tablespace.value} value={tablespace.value}>
+                                                {tablespace.label}
+                                            </option>
+                                        ))
+                                    )}
                                 </select>
                             </div>
 
@@ -781,11 +900,15 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                     className="form-input"
                                     disabled={mode === 'edit' && !fieldPermissions.localeProvider}
                                 >
-                                    {dbOptions.localeProviders.map((provider: any) => (
-                                        <option key={provider.value} value={provider.value}>
-                                            {provider.label}
-                                        </option>
-                                    ))}
+                                    {loadingOptions.has('localeProviders') ? (
+                                        <option>加载中...</option>
+                                    ) : (
+                                        dbOptions.localeProviders.map((provider: any) => (
+                                            <option key={provider.value} value={provider.value}>
+                                                {provider.label}
+                                            </option>
+                                        ))
+                                    )}
                                 </select>
                             </div>
 

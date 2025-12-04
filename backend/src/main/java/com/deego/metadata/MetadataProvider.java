@@ -2,6 +2,8 @@ package com.deego.metadata;
 
 import com.deego.enums.DatabaseType;
 import com.deego.model.Connection;
+import com.deego.model.pgsql.Option;
+import com.deego.model.pgsql.PgOption;
 
 import java.util.List;
 import java.util.Map;
@@ -28,4 +30,9 @@ public interface MetadataProvider {
 	 * @return 子节点列表
 	 */
 	List<Map<String, Object>> listChildren(String connId, Connection connection, DatabaseNodeType nodeType, String[] pathSegments);
+
+	/**
+	 * 获取数据库选项
+	 */
+	Option getOptions(Connection connection);
 }

@@ -2,6 +2,7 @@ package com.deego.controller;
 
 import com.deego.common.ApiResponse;
 import com.deego.metadata.DatabaseNodeType;
+import com.deego.model.pgsql.Option;
 import com.deego.service.MetaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -30,5 +31,10 @@ public class MetaController {
 			@PathVariable(required = false) String path) {
 		DatabaseNodeType nodeType = DatabaseNodeType.valueOf(type.toUpperCase());
 		return ApiResponse.ok(metaService.listChildren(connId, nodeType, path));
+	}
+
+	@GetMapping("/db/options/{connId}")
+	public ApiResponse<Option> options(@PathVariable String connId) {
+		return ApiResponse.ok(metaService.options(connId));
 	}
 }
