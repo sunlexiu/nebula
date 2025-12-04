@@ -547,7 +547,7 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                         disabled={mode === 'edit' && !fieldPermissions.template}
                                     >
                                         {loadingOptions.has('templates') ? (
-                                            <option>加载中...</option>
+                                            <option key="loading-templates" disabled>加载中...</option>  // 添加 key
                                         ) : (
                                             dbOptions.templates.map((template: any) => (
                                                 <option key={template.value} value={template.value}>
