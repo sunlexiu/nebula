@@ -99,6 +99,9 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
         localeProviders: [],
     });
 
+    // CTYPE 是否跟随 Collation
+    const [ctypeFollowCollation, setCtypeFollowCollation] = useState(true);
+
     // 默认权限配置
     const defaultPermissions = {
         name: mode === 'create',
@@ -138,13 +141,13 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
         icuLocale: '',
         icuRules: '',
         extensions: '',
-        rolePrivileges: defaultValues?.rolePrivileges || [
-            { role: 'public', connect: true, temp: false, create: false, grantOption: false },
-            { role: 'app_user', connect: true, temp: true, create: false, grantOption: false },
-            { role: 'readonly', connect: true, temp: false, create: false, grantOption: false },
-            { role: 'dba', connect: true, temp: true, create: true, grantOption: true },
-        ],
+        rolePrivileges: defaultValues?.rolePrivileges || [],
     });
+
+    // 当前是否使用 template0
+    const isTemplate0 = form.template === 'template0';
+    // 是否从模板继承 locale/encoding（模板非 template0 时）
+    const inheritsLocaleFromTemplate = !!form.template && !isTemplate0;
 
     // 获取数据库选项和角色列表
     useEffect(() => {
@@ -153,6 +156,9 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
             fetchDbOptions(['roles', 'templates']);
             if (mode === 'edit' && databaseId) {
                 fetchDatabaseData();
+            } else {
+                // 新建时，默认 ctype 跟随 collation
+                setCtypeFollowCollation(true);
             }
         }
     }, [isOpen, connectionId, mode, databaseId]);
@@ -174,9 +180,13 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
         }
     }, [activeTab, isOpen]);
 
+    const normalizeArray = (arr: any[] | undefined) =>
+        (arr || []).map((item: any) =>
+            typeof item === 'string' ? { value: item, label: item } : item
+        );
+
     const fetchDbOptions = async (types: string[] = []) => {
         try {
-            // 避免重复请求
             const typesToFetch = types.filter(type =>
                 !dbOptions[type] || dbOptions[type].length === 0
             );
@@ -191,21 +201,45 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
 
             if (response.ok) {
                 const body = await response.json();
-                const options = body?.data;
-                setDbOptions(prev => ({ ...prev, ...options }));
+                const options = body?.data || {};
+
+                const normalizedOptions: any = {
+                    encodings: normalizeArray(options.encodings),
+                    templates: normalizeArray(options.templates),
+                    tablespaces: normalizeArray(options.tablespaces),
+                    roles: normalizeArray(options.roles),
+                    collations: normalizeArray(options.collations),
+                    localeProviders: normalizeArray(options.localeProviders),
+                    owners: normalizeArray(options.owners),
+                };
+
+                setDbOptions(prev => ({ ...prev, ...normalizedOptions }));
 
                 // 设置默认值（仅当首次加载时）
-                if (types.includes('encodings') && !form.encoding && options.encodings?.length > 0) {
-                    setForm(prev => ({ ...prev, encoding: options.encodings[0].value }));
+                if (types.includes('encodings') && !form.encoding && normalizedOptions.encodings?.length > 0) {
+                    setForm(prev => ({ ...prev, encoding: normalizedOptions.encodings[0].value }));
                 }
-                if (types.includes('templates') && !form.template && options.templates?.length > 0) {
-                    setForm(prev => ({ ...prev, template: options.templates[0].value }));
+                if (types.includes('templates') && !form.template && normalizedOptions.templates?.length > 0) {
+                    setForm(prev => ({ ...prev, template: normalizedOptions.templates[0].value }));
                 }
-                if (types.includes('tablespaces') && !form.tablespace && options.tablespaces?.length > 0) {
-                    setForm(prev => ({ ...prev, tablespace: options.tablespaces[0].value }));
+                if (types.includes('tablespaces') && !form.tablespace && normalizedOptions.tablespaces?.length > 0) {
+                    setForm(prev => ({ ...prev, tablespace: normalizedOptions.tablespaces[0].value }));
                 }
-                if (types.includes('roles') && !form.owner && options.roles?.length > 0) {
-                    setForm(prev => ({ ...prev, owner: options.roles[0].value }));
+                if (types.includes('roles') && !form.owner && normalizedOptions.roles?.length > 0) {
+                    setForm(prev => ({ ...prev, owner: normalizedOptions.roles[0].value }));
+                }
+                if (types.includes('collations') && !form.collation && normalizedOptions.collations?.length > 0) {
+                    setForm(prev => {
+                        const first = normalizedOptions.collations[0].value;
+                        return {
+                            ...prev,
+                            collation: first,
+                            ctype: prev.ctype || first,
+                        };
+                    });
+                }
+                if (types.includes('localeProviders') && !form.localeProvider && normalizedOptions.localeProviders?.length > 0) {
+                    setForm(prev => ({ ...prev, localeProvider: normalizedOptions.localeProviders[0].value }));
                 }
             }
         } catch (error) {
@@ -228,9 +262,9 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                 setForm(prev => ({
                     ...prev,
                     ...data,
-                    // 确保rolePrivileges有默认值
                     rolePrivileges: data.rolePrivileges || prev.rolePrivileges,
                 }));
+                setCtypeFollowCollation(!data.ctype || data.ctype === data.collation);
             }
         } catch (error) {
             console.error('Failed to fetch database data:', error);
@@ -290,7 +324,7 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
             connectionLimit: -1,
             comment: '',
             isTemplate: false,
-            localeProvider: 'libc',
+            localeProvider: dbOptions.localeProviders.length > 0 ? dbOptions.localeProviders[0].value : 'libc',
             icuLocale: '',
             icuRules: '',
             extensions: '',
@@ -301,6 +335,7 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                 { role: 'dba', connect: true, temp: true, create: true, grantOption: true },
             ],
         });
+        setCtypeFollowCollation(true);
         setError(null);
         setGeneratedSql('');
     };
@@ -344,7 +379,41 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
         if (mode === 'edit' && !fieldPermissions[name as keyof typeof fieldPermissions]) {
             return;
         }
-        setForm((prev) => ({
+
+        // 特殊处理：模板切换时，如果从 template0 切到其它模板，需要提示继承行为
+        if (name === 'template') {
+            const newTemplate = value;
+            setForm(prev => {
+                const next = {
+                    ...prev,
+                    template: newTemplate,
+                };
+                return next;
+            });
+            return;
+        }
+
+        if (name === 'collation') {
+            const newCollation = value;
+            setForm(prev => ({
+                ...prev,
+                collation: newCollation,
+                ctype: ctypeFollowCollation ? newCollation : prev.ctype,
+            }));
+            return;
+        }
+
+        if (name === 'ctype') {
+            // 只有在“自定义模式”下才允许改 ctype
+            if (ctypeFollowCollation) return;
+            setForm(prev => ({
+                ...prev,
+                ctype: value,
+            }));
+            return;
+        }
+
+        setForm(prev => ({
             ...prev,
             [name]: type === 'checkbox' ? checked : value,
         }));
@@ -391,6 +460,16 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
     const modalTitle = mode === 'create' ? '新建数据库' : '修改数据库';
     const submitButtonText = mode === 'create' ? '创建' : '保存';
     const submitButtonLoadingText = mode === 'create' ? '创建中…' : '保存中…';
+
+    // 定义 Tab 中字段是否禁用（模板继承 + 权限）
+    const encodingDisabled =
+        (mode === 'edit' && !fieldPermissions.encoding) || inheritsLocaleFromTemplate;
+    const collationDisabled =
+        (mode === 'edit' && !fieldPermissions.collation) || inheritsLocaleFromTemplate;
+    const ctypeDisabledBase =
+        (mode === 'edit' && !fieldPermissions.ctype) || inheritsLocaleFromTemplate;
+    const localeProviderDisabled =
+        (mode === 'edit' && !fieldPermissions.localeProvider) || inheritsLocaleFromTemplate;
 
     return (
         <div className="modal-overlay">
@@ -467,7 +546,6 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                             onChange={(e) => setOwnerSearchTerm(e.target.value)}
                                             onFocus={() => setOwnerSearchTerm('')}
                                             onBlur={() => {
-                                                // 延迟关闭，以便点击选项
                                                 setTimeout(() => setOwnerSearchTerm(''), 200);
                                             }}
                                             className="form-input"
@@ -488,10 +566,10 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                                 boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
                                             }}>
                                                 {dbOptions.roles
-                                                    .filter(role =>
+                                                    .filter((role: any) =>
                                                         role.label.toLowerCase().includes(ownerSearchTerm.toLowerCase())
                                                     )
-                                                    .map(role => (
+                                                    .map((role: any) => (
                                                         <div
                                                             key={role.value}
                                                             onClick={() => {
@@ -509,7 +587,7 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                                             {role.label}
                                                         </div>
                                                     ))}
-                                                {dbOptions.roles.filter(role =>
+                                                {dbOptions.roles.filter((role: any) =>
                                                     role.label.toLowerCase().includes(ownerSearchTerm.toLowerCase())
                                                 ).length === 0 && (
                                                     <div style={{ padding: '8px 12px', color: '#999' }}>
@@ -547,7 +625,7 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                         disabled={mode === 'edit' && !fieldPermissions.template}
                                     >
                                         {loadingOptions.has('templates') ? (
-                                            <option key="loading-templates" disabled>加载中...</option>  // 添加 key
+                                            <option key="loading-templates" disabled>加载中...</option>
                                         ) : (
                                             dbOptions.templates.map((template: any) => (
                                                 <option key={template.value} value={template.value}>
@@ -556,6 +634,11 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                             ))
                                         )}
                                     </select>
+                                    {inheritsLocaleFromTemplate && (
+                                        <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                                            编码和区域设置将从模板库 "{form.template}" 继承
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -587,7 +670,7 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                         value={form.encoding}
                                         onChange={handleChange}
                                         className="form-input"
-                                        disabled={mode === 'edit' && !fieldPermissions.encoding}
+                                        disabled={encodingDisabled}
                                     >
                                         {loadingOptions.has('encodings') ? (
                                             <option>加载中...</option>
@@ -599,6 +682,11 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                             ))
                                         )}
                                     </select>
+                                    {inheritsLocaleFromTemplate && (
+                                        <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                                            已从模板库 "{form.template}" 继承编码
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
@@ -609,42 +697,88 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                         value={form.collation}
                                         onChange={handleChange}
                                         className="form-input"
-                                        disabled={mode === 'edit' && !fieldPermissions.collation}
+                                        disabled={collationDisabled}
                                     >
                                         {loadingOptions.has('collations') ? (
                                             <option>加载中...</option>
                                         ) : (
-                                            dbOptions.collations.map((collation: any) => (
+                                            dbOptions.collations?.map((collation: any) => (
                                                 <option key={collation.value} value={collation.value}>
                                                     {collation.label}
                                                 </option>
                                             ))
                                         )}
                                     </select>
+                                    {inheritsLocaleFromTemplate && (
+                                        <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                                            已从模板库 "{form.template}" 继承排序规则
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
                             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                                 <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
-                                    <label htmlFor="ctype">字符分类</label>
+                                    <label>字符分类（LC_CTYPE）</label>
+                                    <div style={{ fontSize: 12, marginBottom: 4 }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <input
+                                                type="radio"
+                                                name="ctypeMode"
+                                                checked={ctypeFollowCollation}
+                                                onChange={() => {
+                                                    if (ctypeDisabledBase) return;
+                                                    setCtypeFollowCollation(true);
+                                                    setForm(prev => ({
+                                                        ...prev,
+                                                        ctype: prev.collation,
+                                                    }));
+                                                }}
+                                                disabled={ctypeDisabledBase}
+                                            />
+                                            <span>跟随排序规则（推荐）</span>
+                                        </label>
+                                        <div style={{ marginLeft: 22, color: '#888' }}>
+                                            当前使用：{form.collation || '未选择'}
+                                        </div>
+
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                                            <input
+                                                type="radio"
+                                                name="ctypeMode"
+                                                checked={!ctypeFollowCollation}
+                                                onChange={() => {
+                                                    if (ctypeDisabledBase) return;
+                                                    setCtypeFollowCollation(false);
+                                                }}
+                                                disabled={ctypeDisabledBase}
+                                            />
+                                            <span>自定义字符分类</span>
+                                        </label>
+                                    </div>
                                     <select
                                         id="ctype"
                                         name="ctype"
                                         value={form.ctype}
                                         onChange={handleChange}
                                         className="form-input"
-                                        disabled={mode === 'edit' && !fieldPermissions.ctype}
+                                        disabled={ctypeDisabledBase || ctypeFollowCollation}
                                     >
                                         {loadingOptions.has('collations') ? (
                                             <option>加载中...</option>
                                         ) : (
-                                            dbOptions.collations.map((collation: any) => (
+                                            dbOptions.collations?.map((collation: any) => (
                                                 <option key={collation.value} value={collation.value}>
                                                     {collation.label}
                                                 </option>
                                             ))
                                         )}
                                     </select>
+                                    {inheritsLocaleFromTemplate && (
+                                        <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                                            已从模板库 "{form.template}" 继承字符分类
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
@@ -898,7 +1032,7 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                     value={form.localeProvider}
                                     onChange={handleChange}
                                     className="form-input"
-                                    disabled={mode === 'edit' && !fieldPermissions.localeProvider}
+                                    disabled={localeProviderDisabled}
                                 >
                                     {loadingOptions.has('localeProviders') ? (
                                         <option>加载中...</option>
@@ -910,9 +1044,14 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                         ))
                                     )}
                                 </select>
+                                {inheritsLocaleFromTemplate && (
+                                    <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                                        Locale Provider 也将从模板库 "{form.template}" 继承
+                                    </div>
+                                )}
                             </div>
 
-                            {form.localeProvider === 'icu' && (
+                            {form.localeProvider === 'icu' && !inheritsLocaleFromTemplate && (
                                 <>
                                     <div className="form-group">
                                         <label htmlFor="icuLocale">ICU Locale</label>

@@ -19,4 +19,8 @@ public class PgOption implements Option {
 	private List<String> tablespaces;
 
 	private List<String> roles;
+
+	private List<String> collations;
+
+	private List<String> localeProviders;
 }

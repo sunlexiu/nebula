@@ -70,7 +70,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
 		try {
 			// 获取所有编码
 			List<Map<String, Object>> encodingResults = executor.queryForList(
-					"SELECT pg_encoding_to_char(encoding) as encoding FROM pg_database GROUP BY encoding"
+					"SELECT DISTINCT pg_encoding_to_char(conforencoding) AS encoding\n" + "FROM pg_conversion\n" + "ORDER BY encoding;\n"
 			);
 			List<String> encodings = encodingResults.stream()
 													.map(map -> (String) map.get("encoding"))
