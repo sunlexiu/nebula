@@ -5,17 +5,12 @@ import com.deego.exec.DbExecutor;
 import com.deego.metadata.DatabaseNodeType;
 import com.deego.metadata.MetadataProvider;
 import com.deego.model.Connection;
-import com.deego.model.pgsql.Option;
 import com.deego.model.pgsql.PgOption;
 import com.deego.service.ConnectionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Component
@@ -68,41 +63,47 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
 		PgOption options = new PgOption();
 		DbExecutor executor = connectionService.getExecutor(connection.getId());
 		try {
-			// 获取所有编码
-			List<Map<String, Object>> encodingResults = executor.queryForList(
-					"SELECT DISTINCT pg_encoding_to_char(conforencoding) AS encoding\n" + "FROM pg_conversion\n" + "ORDER BY encoding;\n"
-			);
-			List<String> encodings = encodingResults.stream()
-													.map(map -> (String) map.get("encoding"))
-													.collect(Collectors.toList());
+			// ============= 1. 编码（列出 PG 支持的编码，而不是仅当前库用到的） =============
+			List<String> encodings = executor.queryForList("SELECT DISTINCT pg_encoding_to_char(conforencoding)" +
+					" AS encoding FROM pg_conversion ORDER BY encoding", String.class);
 			options.setEncodings(encodings);
 
-			// 获取所有模板数据库
-			List<Map<String, Object>> templateResults = executor.queryForList(
-					"SELECT datname FROM pg_database WHERE datistemplate = true"
-			);
-			List<String> templates = templateResults.stream()
-													.map(map -> (String) map.get("datname"))
-													.collect(Collectors.toList());
+			// ============= 2. 模板库（template0 / template1 等） =============
+			List<Map<String, Object>> templateResults =
+					executor.queryMapForList("SELECT datname FROM pg_database WHERE datistemplate = true ORDER BY datname");
+			List<String> templates = templateResults.stream().map(map -> (String)map.get("datname")).filter(Objects::nonNull).collect(Collectors.toList());
 			options.setTemplates(templates);
 
-			// 获取所有表空间
-			List<Map<String, Object>> tablespaceResults = executor.queryForList(
-					"SELECT spcname FROM pg_tablespace"
-			);
-			List<String> tablespaces = tablespaceResults.stream()
-														.map(map -> (String) map.get("spcname"))
-														.collect(Collectors.toList());
+			// ============= 3. 表空间 =============
+			List<Map<String, Object>> tablespaceResults = executor.queryMapForList("SELECT spcname FROM pg_tablespace ORDER BY spcname");
+			List<String> tablespaces = tablespaceResults.stream().map(map -> (String)map.get("spcname")).filter(Objects::nonNull).collect(Collectors.toList());
 			options.setTablespaces(tablespaces);
 
-			// 获取所有角色
-			List<Map<String, Object>> roleResults = executor.queryForList(
-					"SELECT rolname FROM pg_roles"
-			);
-			List<String> roles = roleResults.stream()
-											.map(map -> (String) map.get("rolname"))
-											.collect(Collectors.toList());
+			// ============= 4. 角色 =============
+			List<Map<String, Object>> roleResults = executor.queryMapForList("SELECT rolname FROM pg_roles ORDER BY rolname");
+			List<String> roles = roleResults.stream().map(map -> (String)map.get("rolname")).filter(Objects::nonNull).collect(Collectors.toList());
 			options.setRoles(roles);
+
+			// ============= 5. 排序规则（collations） =============
+			// 这里先简单按 UTF8 过滤；如果以后支持多编码，可以把 encoding 作为参数传进来
+			List<Map<String, Object>> collationResults = executor.queryMapForList(
+					"SELECT collname, collprovider " + "FROM pg_collation "
+							+ "WHERE collencoding IN (-1, pg_char_to_encoding('UTF8')) " + "ORDER BY collname");
+			List<String> collations = collationResults.stream().map(map -> (String)map.get("collname")).filter(Objects::nonNull).collect(Collectors.toList());
+			options.setCollations(collations);
+
+			// ============= 6. Locale Provider（libc / icu） =============
+			List<String> localeProviders = collationResults.stream().map(map -> (String)map.get("collprovider")).filter(Objects::nonNull).distinct().map(p -> {
+				switch (p) {
+					case "i":
+						return "icu";
+					case "c":
+						return "libc";
+					default:
+						return p;
+				}
+			}).collect(Collectors.toList());
+			options.setLocaleProviders(localeProviders);
 
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to get PostgreSQL options", e);
@@ -111,9 +112,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
 	}
 
 
-
 	// ==================== 数据库 / Schema / 表 ====================
-
 	private List<Map<String, Object>> listDatabases(String connId, DbExecutor exec) {
 		String sql = """
                 SELECT datname AS name
@@ -121,7 +120,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
                 WHERE datistemplate = false AND datallowconn = true
                 ORDER BY datname
                 """;
-		List<Map<String, Object>> rows = exec.queryForList(sql);
+		List<Map<String, Object>> rows = exec.queryMapForList(sql);
 		rows.forEach(r -> {
 			String db = (String) r.get("name");
 			r.put("id", connId + "::database/" + db + "/");
@@ -140,7 +139,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
                 WHERE nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
                 ORDER BY nspname
                 """;
-		List<Map<String, Object>> rows = exec.queryForList(sql);
+		List<Map<String, Object>> rows = exec.queryMapForList(sql);
 		rows.forEach(r -> {
 			String schema = (String) r.get("name");
 			r.put("id", connId + "::schema/" + database + "/" + schema + "/");
@@ -160,7 +159,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
                 WHERE schemaname = ? AND tablename NOT LIKE 'pg_%'
                 ORDER BY tablename
                 """;
-		List<Map<String, Object>> rows = exec.queryForList(sql, schema);
+		List<Map<String, Object>> rows = exec.queryMapForList(sql, schema);
 		rows.forEach(r -> {
 			String table = (String) r.get("name");
 			r.put("id", connId + "::table/" + database + "/" + schema + "/" + table + "/");
@@ -181,7 +180,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
                 WHERE table_schema = ? AND table_name = ?
                 ORDER BY ordinal_position
                 """;
-		List<Map<String, Object>> rows = exec.queryForList(sql, schema, table);
+		List<Map<String, Object>> rows = exec.queryMapForList(sql, schema, table);
 		rows.forEach(r -> {
 			String col = (String) r.get("name");
 			r.put("id", connId + "::column/" + database + "/" + schema + "/" + table + "/" + col);
@@ -218,7 +217,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
                 ORDER BY con.conname
                 """;
 
-		List<Map<String, Object>> rows = exec.queryForList(sql, schema, table);
+		List<Map<String, Object>> rows = exec.queryMapForList(sql, schema, table);
 		rows.forEach(r -> {
 			String constraintName = (String) r.get("name");
 			String constraintType = (String) r.get("constraint_type");
@@ -244,7 +243,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
                 ORDER BY indexname
                 """;
 
-		List<Map<String, Object>> rows = exec.queryForList(sql, schema, table);
+		List<Map<String, Object>> rows = exec.queryMapForList(sql, schema, table);
 		rows.forEach(r -> {
 			String indexName = (String) r.get("name");
 			r.put("id", connId + "::index/" + database + "/" + schema + "/" + table + "/" + indexName);
@@ -268,7 +267,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
                 ORDER BY viewname
                 """;
 
-		List<Map<String, Object>> rows = exec.queryForList(sql, schema);
+		List<Map<String, Object>> rows = exec.queryMapForList(sql, schema);
 		rows.forEach(r -> {
 			String view = (String) r.get("name");
 			r.put("id", connId + "::view/" + database + "/" + schema + "/" + view + "/");
@@ -290,7 +289,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
                 ORDER BY matviewname
                 """;
 
-		List<Map<String, Object>> rows = exec.queryForList(sql, schema);
+		List<Map<String, Object>> rows = exec.queryMapForList(sql, schema);
 		rows.forEach(r -> {
 			String mv = (String) r.get("name");
 			r.put("id", connId + "::matview/" + database + "/" + schema + "/" + mv + "/");
@@ -312,7 +311,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
                 ORDER BY sequence_name
                 """;
 
-		List<Map<String, Object>> rows = exec.queryForList(sql, schema);
+		List<Map<String, Object>> rows = exec.queryMapForList(sql, schema);
 		rows.forEach(r -> {
 			String seq = (String) r.get("name");
 			r.put("id", connId + "::sequence/" + database + "/" + schema + "/" + seq + "/");
@@ -342,7 +341,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
                 ORDER BY p.proname, args
                 """;
 
-		List<Map<String, Object>> rows = exec.queryForList(sql, schema);
+		List<Map<String, Object>> rows = exec.queryMapForList(sql, schema);
 		rows.forEach(r -> {
 			String funcName = (String) r.get("name");
 			String args = (String) r.get("args");          // 可能为空字符串
@@ -375,7 +374,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
                 ORDER BY p.proname, args
                 """;
 
-		List<Map<String, Object>> rows = exec.queryForList(sql, schema);
+		List<Map<String, Object>> rows = exec.queryMapForList(sql, schema);
 		rows.forEach(r -> {
 			String procName = (String) r.get("name");
 			String args = (String) r.get("args");
@@ -419,7 +418,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
                 ORDER BY r.rolname
                 """;
 
-		List<Map<String, Object>> rows = exec.queryForList(sql);
+		List<Map<String, Object>> rows = exec.queryMapForList(sql);
 		rows.forEach(r -> {
 			String roleName = (String) r.get("name");
 			r.put("id", connId + "::role/login/" + roleName);
@@ -458,7 +457,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
                 ORDER BY r.rolname
                 """;
 
-		List<Map<String, Object>> rows = exec.queryForList(sql);
+		List<Map<String, Object>> rows = exec.queryMapForList(sql);
 		rows.forEach(r -> {
 			String roleName = (String) r.get("name");
 			r.put("id", connId + "::role/group/" + roleName);
@@ -496,7 +495,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
                 ORDER BY r.rolname
                 """;
 
-		List<Map<String, Object>> rows = exec.queryForList(sql);
+		List<Map<String, Object>> rows = exec.queryMapForList(sql);
 		rows.forEach(r -> {
 			String roleName = (String) r.get("name");
 			r.put("id", connId + "::role/system/" + roleName);

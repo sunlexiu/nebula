@@ -15,12 +15,17 @@ public class JdbcExecutor implements DbExecutor {
     public JdbcTemplate jdbc() { return jdbc; }
 
     @Override
-    public List<Map<String, Object>> queryForList(String sql) {
+    public List<Map<String, Object>> queryMapForList(String sql) {
         return jdbc.queryForList(sql);
     }
 
     @Override
-    public List<Map<String, Object>> queryForList(String sql, Object... params) {
+    public <T> List<T> queryForList(String templateOrSql, Class<T> clazz, Object... params) {
+        return jdbc.queryForList(templateOrSql, clazz, params);
+    }
+
+    @Override
+    public List<Map<String, Object>> queryMapForList(String sql, Object... params) {
         return jdbc.queryForList(sql, params);
     }
 

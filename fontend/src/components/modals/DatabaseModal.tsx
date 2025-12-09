@@ -169,13 +169,14 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
 
         switch (activeTab) {
             case 'definition':
-                fetchDbOptions(['encodings', 'collations']);
+                // 在定义 Tab 中加载编码、排序规则和 Locale Provider
+                fetchDbOptions(['encodings', 'collations', 'localeProviders']);
                 break;
             case 'storage':
                 fetchDbOptions(['tablespaces']);
                 break;
             case 'advanced':
-                fetchDbOptions(['localeProviders']);
+                // 高级 Tab 目前不再主动加载新的选项
                 break;
         }
     }, [activeTab, isOpen]);
@@ -690,6 +691,35 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                 </div>
 
                                 <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
+                                    <label htmlFor="localeProvider">Locale Provider</label>
+                                    <select
+                                        id="localeProvider"
+                                        name="localeProvider"
+                                        value={form.localeProvider}
+                                        onChange={handleChange}
+                                        className="form-input"
+                                        disabled={localeProviderDisabled}
+                                    >
+                                        {loadingOptions.has('localeProviders') ? (
+                                            <option>加载中...</option>
+                                        ) : (
+                                            dbOptions.localeProviders.map((provider: any) => (
+                                                <option key={provider.value} value={provider.value}>
+                                                    {provider.label}
+                                                </option>
+                                            ))
+                                        )}
+                                    </select>
+                                    {inheritsLocaleFromTemplate && (
+                                        <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                                            Locale Provider 也将从模板库 "{form.template}" 继承
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                                <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
                                     <label htmlFor="collation">排序规则</label>
                                     <select
                                         id="collation"
@@ -715,9 +745,7 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                         </div>
                                     )}
                                 </div>
-                            </div>
 
-                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                                 <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
                                     <label>字符分类（LC_CTYPE）</label>
                                     <div style={{ fontSize: 12, marginBottom: 4 }}>
@@ -780,7 +808,9 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                         </div>
                                     )}
                                 </div>
+                            </div>
 
+                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: 8 }}>
                                 <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
                                     <label className="checkbox-group">
                                         <input
@@ -1024,33 +1054,6 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                     {/* 高级 Tab */}
                     {activeTab === 'advanced' && (
                         <>
-                            <div className="form-group">
-                                <label htmlFor="localeProvider">Locale Provider</label>
-                                <select
-                                    id="localeProvider"
-                                    name="localeProvider"
-                                    value={form.localeProvider}
-                                    onChange={handleChange}
-                                    className="form-input"
-                                    disabled={localeProviderDisabled}
-                                >
-                                    {loadingOptions.has('localeProviders') ? (
-                                        <option>加载中...</option>
-                                    ) : (
-                                        dbOptions.localeProviders.map((provider: any) => (
-                                            <option key={provider.value} value={provider.value}>
-                                                {provider.label}
-                                            </option>
-                                        ))
-                                    )}
-                                </select>
-                                {inheritsLocaleFromTemplate && (
-                                    <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
-                                        Locale Provider 也将从模板库 "{form.template}" 继承
-                                    </div>
-                                )}
-                            </div>
-
                             {form.localeProvider === 'icu' && !inheritsLocaleFromTemplate && (
                                 <>
                                     <div className="form-group">
