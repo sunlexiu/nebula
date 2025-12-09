@@ -394,6 +394,29 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
             return;
         }
 
+        // 特殊处理：Locale Provider 切换
+        if (name === 'localeProvider') {
+            const newProvider = value;
+            setForm(prev => {
+                const next = {
+                    ...prev,
+                    localeProvider: newProvider,
+                };
+                // 切到 libc 时，默认让 ctype 跟随当前 collation
+                if (newProvider === 'libc') {
+                    return {
+                        ...next,
+                        ctype: prev.collation || prev.ctype,
+                    };
+                }
+                // 切到 icu 时，ctype 在 UI 上会禁用，这里只留当前值即可
+                return next;
+            });
+            // provider 换了，重置为“跟随排序规则”模式更安全
+            setCtypeFollowCollation(true);
+            return;
+        }
+
         if (name === 'collation') {
             const newCollation = value;
             setForm(prev => ({
@@ -461,14 +484,20 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
     const modalTitle = mode === 'create' ? '新建数据库' : '修改数据库';
     const submitButtonText = mode === 'create' ? '创建' : '保存';
     const submitButtonLoadingText = mode === 'create' ? '创建中…' : '保存中…';
+    // 当前是否使用 libc provider
+    const isLibcProvider = form.localeProvider === 'libc';
 
-    // 定义 Tab 中字段是否禁用（模板继承 + 权限）
+    // 定义 Tab 中字段是否禁用（模板继承 + 权限 + provider）
     const encodingDisabled =
         (mode === 'edit' && !fieldPermissions.encoding) || inheritsLocaleFromTemplate;
     const collationDisabled =
-        (mode === 'edit' && !fieldPermissions.collation) || inheritsLocaleFromTemplate;
+        (mode === 'edit' && !fieldPermissions.collation) ||
+        inheritsLocaleFromTemplate ||
+        !isLibcProvider;      // 非 libc 时禁用 Collation
     const ctypeDisabledBase =
-        (mode === 'edit' && !fieldPermissions.ctype) || inheritsLocaleFromTemplate;
+        (mode === 'edit' && !fieldPermissions.ctype) ||
+        inheritsLocaleFromTemplate ||
+        !isLibcProvider;      // 非 libc 时禁用 CTYPE 基础开关
     const localeProviderDisabled =
         (mode === 'edit' && !fieldPermissions.localeProvider) || inheritsLocaleFromTemplate;
 
@@ -690,7 +719,7 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                     )}
                                 </div>
 
-                                <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
+                                <div className="form-group" style={{flex: 1, minWidth: 240}}>
                                     <label htmlFor="localeProvider">Locale Provider</label>
                                     <select
                                         id="localeProvider"
@@ -711,14 +740,17 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                         )}
                                     </select>
                                     {inheritsLocaleFromTemplate && (
-                                        <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                                        <div style={{fontSize: 11, color: '#888', marginTop: 4}}>
                                             Locale Provider 也将从模板库 "{form.template}" 继承
                                         </div>
                                     )}
+                                    <div style={{fontSize: 11, color: '#888', marginTop: 4}}>
+                                        使用 libc 时通过排序规则/字符分类控制本地化，使用 ICU 时通过 ICU Locale/Rules 控制。
+                                    </div>
                                 </div>
                             </div>
 
-                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                            <div style={{display: 'flex', gap: '12px', flexWrap: 'wrap'}}>
                                 <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
                                     <label htmlFor="collation">排序规则</label>
                                     <select
@@ -742,6 +774,11 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                     {inheritsLocaleFromTemplate && (
                                         <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
                                             已从模板库 "{form.template}" 继承排序规则
+                                        </div>
+                                    )}
+                                    {!inheritsLocaleFromTemplate && !isLibcProvider && (
+                                        <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                                            当前 Locale Provider 为 ICU，排序规则由 ICU Locale 决定，此处不可单独修改。
                                         </div>
                                     )}
                                 </div>
@@ -805,6 +842,11 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                     {inheritsLocaleFromTemplate && (
                                         <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
                                             已从模板库 "{form.template}" 继承字符分类
+                                        </div>
+                                    )}
+                                    {!inheritsLocaleFromTemplate && !isLibcProvider && (
+                                        <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                                            当前 Locale Provider 为 ICU，字符分类由 ICU Locale 决定，此处不可单独修改。
                                         </div>
                                     )}
                                 </div>
