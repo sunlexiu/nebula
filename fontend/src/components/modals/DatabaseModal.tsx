@@ -1,7 +1,7 @@
-// src/components/modals/DatabaseModal.tsx
 import React, { useState, useEffect } from 'react';
 import '../../css/DatabaseModal.css';
 import toast from 'react-hot-toast';
+import RoleSearchSelect from './RoleSearchSelect';
 
 interface DatabaseModalProps {
     isOpen?: boolean;
@@ -80,21 +80,22 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                                          onSubmit,
                                                          permissions = {},
                                                      }) => {
-    const [activeTab, setActiveTab] = useState<'general' | 'definition' | 'storage' | 'security' | 'sql' | 'advanced'>('general');
+    const [activeTab, setActiveTab] = useState<
+        'general' | 'definition' | 'storage' | 'security' | 'sql' | 'advanced'
+    >('general');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showSqlPreview, setShowSqlPreview] = useState(false);
     const [allowManualSql, setAllowManualSql] = useState(false);
     const [manualSql, setManualSql] = useState('');
     const [generatedSql, setGeneratedSql] = useState('');
-    const [ownerSearchTerm, setOwnerSearchTerm] = useState('');
     const [loadingOptions, setLoadingOptions] = useState<Set<string>>(new Set());
     const [dbOptions, setDbOptions] = useState<any>({
         encodings: [],
         collations: [],
         templates: [],
         tablespaces: [],
-        roles: [],
+        roles: [],         // 保留字段结构，但不再主动加载
         owners: [],
         localeProviders: [],
     });
@@ -149,11 +150,11 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
     // 是否从模板继承 locale/encoding（模板非 template0 时）
     const inheritsLocaleFromTemplate = !!form.template && !isTemplate0;
 
-    // 获取数据库选项和角色列表
+    // 获取数据库选项和模板等（不再一次性拉取 roles）
     useEffect(() => {
         if (isOpen && connectionId) {
-            // 初始只加载 roles 和 templates
-            fetchDbOptions(['roles', 'templates']);
+            // 初始只加载 templates
+            fetchDbOptions(['templates']);
             if (mode === 'edit' && databaseId) {
                 fetchDatabaseData();
             } else {
@@ -188,13 +189,13 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
 
     const fetchDbOptions = async (types: string[] = []) => {
         try {
-            const typesToFetch = types.filter(type =>
-                !dbOptions[type] || dbOptions[type].length === 0
+            const typesToFetch = types.filter(
+                (type) => !dbOptions[type] || dbOptions[type].length === 0
             );
 
             if (typesToFetch.length === 0) return;
 
-            setLoadingOptions(prev => new Set([...prev, ...typesToFetch]));
+            setLoadingOptions((prev) => new Set([...prev, ...typesToFetch]));
 
             const response = await fetch(
                 `/api/meta/db/options/${connectionId}?types=${typesToFetch.join(',')}`
@@ -214,23 +215,46 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                     owners: normalizeArray(options.owners),
                 };
 
-                setDbOptions(prev => ({ ...prev, ...normalizedOptions }));
+                setDbOptions((prev: any) => ({ ...prev, ...normalizedOptions }));
 
                 // 设置默认值（仅当首次加载时）
-                if (types.includes('encodings') && !form.encoding && normalizedOptions.encodings?.length > 0) {
-                    setForm(prev => ({ ...prev, encoding: normalizedOptions.encodings[0].value }));
+                if (
+                    types.includes('encodings') &&
+                    !form.encoding &&
+                    normalizedOptions.encodings?.length > 0
+                ) {
+                    setForm((prev) => ({
+                        ...prev,
+                        encoding: normalizedOptions.encodings[0].value,
+                    }));
                 }
-                if (types.includes('templates') && !form.template && normalizedOptions.templates?.length > 0) {
-                    setForm(prev => ({ ...prev, template: normalizedOptions.templates[0].value }));
+                if (
+                    types.includes('templates') &&
+                    !form.template &&
+                    normalizedOptions.templates?.length > 0
+                ) {
+                    setForm((prev) => ({
+                        ...prev,
+                        template: normalizedOptions.templates[0].value,
+                    }));
                 }
-                if (types.includes('tablespaces') && !form.tablespace && normalizedOptions.tablespaces?.length > 0) {
-                    setForm(prev => ({ ...prev, tablespace: normalizedOptions.tablespaces[0].value }));
+                if (
+                    types.includes('tablespaces') &&
+                    !form.tablespace &&
+                    normalizedOptions.tablespaces?.length > 0
+                ) {
+                    setForm((prev) => ({
+                        ...prev,
+                        tablespace: normalizedOptions.tablespaces[0].value,
+                    }));
                 }
-                if (types.includes('roles') && !form.owner && normalizedOptions.roles?.length > 0) {
-                    setForm(prev => ({ ...prev, owner: normalizedOptions.roles[0].value }));
-                }
-                if (types.includes('collations') && !form.collation && normalizedOptions.collations?.length > 0) {
-                    setForm(prev => {
+                // roles 不再用于设置默认 owner（owner 改为远程搜索）
+                if (
+                    types.includes('collations') &&
+                    !form.collation &&
+                    normalizedOptions.collations?.length > 0
+                ) {
+                    setForm((prev) => {
                         const first = normalizedOptions.collations[0].value;
                         return {
                             ...prev,
@@ -239,16 +263,23 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                         };
                     });
                 }
-                if (types.includes('localeProviders') && !form.localeProvider && normalizedOptions.localeProviders?.length > 0) {
-                    setForm(prev => ({ ...prev, localeProvider: normalizedOptions.localeProviders[0].value }));
+                if (
+                    types.includes('localeProviders') &&
+                    !form.localeProvider &&
+                    normalizedOptions.localeProviders?.length > 0
+                ) {
+                    setForm((prev) => ({
+                        ...prev,
+                        localeProvider: normalizedOptions.localeProviders[0].value,
+                    }));
                 }
             }
         } catch (error) {
             console.error('Failed to fetch database options:', error);
         } finally {
-            setLoadingOptions(prev => {
+            setLoadingOptions((prev) => {
                 const newSet = new Set(prev);
-                types.forEach(type => newSet.delete(type));
+                types.forEach((type) => newSet.delete(type));
                 return newSet;
             });
         }
@@ -260,7 +291,7 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
             const response = await fetch(`/api/db/database/${databaseId}`);
             if (response.ok) {
                 const data = await response.json();
-                setForm(prev => ({
+                setForm((prev) => ({
                     ...prev,
                     ...data,
                     rolePrivileges: data.rolePrivileges || prev.rolePrivileges,
@@ -315,26 +346,69 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
     const handleReset = () => {
         setForm({
             name: defaultValues?.name || '',
-            owner: dbOptions.roles.length > 0 ? dbOptions.roles[0].value : '',
-            encoding: dbOptions.encodings.length > 0 ? dbOptions.encodings[0].value : '',
-            template: dbOptions.templates.length > 0 ? dbOptions.templates[0].value : '',
-            collation: dbOptions.collations.length > 0 ? dbOptions.collations[0].value : '',
-            ctype: dbOptions.collations.length > 0 ? dbOptions.collations[0].value : '',
-            tablespace: dbOptions.tablespaces.length > 0 ? dbOptions.tablespaces[0].value : '',
+            owner: defaultValues?.owner || '',
+            encoding:
+                dbOptions.encodings.length > 0
+                    ? dbOptions.encodings[0].value
+                    : '',
+            template:
+                dbOptions.templates.length > 0
+                    ? dbOptions.templates[0].value
+                    : '',
+            collation:
+                dbOptions.collations.length > 0
+                    ? dbOptions.collations[0].value
+                    : '',
+            ctype:
+                dbOptions.collations.length > 0
+                    ? dbOptions.collations[0].value
+                    : '',
+            tablespace:
+                dbOptions.tablespaces.length > 0
+                    ? dbOptions.tablespaces[0].value
+                    : '',
             allowConnections: true,
             connectionLimit: -1,
             comment: '',
             isTemplate: false,
-            localeProvider: dbOptions.localeProviders.length > 0 ? dbOptions.localeProviders[0].value : 'libc',
+            localeProvider:
+                dbOptions.localeProviders.length > 0
+                    ? dbOptions.localeProviders[0].value
+                    : 'libc',
             icuLocale: '',
             icuRules: '',
             extensions: '',
-            rolePrivileges: defaultValues?.rolePrivileges || [
-                { role: 'public', connect: true, temp: false, create: false, grantOption: false },
-                { role: 'app_user', connect: true, temp: true, create: false, grantOption: false },
-                { role: 'readonly', connect: true, temp: false, create: false, grantOption: false },
-                { role: 'dba', connect: true, temp: true, create: true, grantOption: true },
-            ],
+            rolePrivileges:
+                defaultValues?.rolePrivileges || [
+                    {
+                        role: 'public',
+                        connect: true,
+                        temp: false,
+                        create: false,
+                        grantOption: false,
+                    },
+                    {
+                        role: 'app_user',
+                        connect: true,
+                        temp: true,
+                        create: false,
+                        grantOption: false,
+                    },
+                    {
+                        role: 'readonly',
+                        connect: true,
+                        temp: false,
+                        create: false,
+                        grantOption: false,
+                    },
+                    {
+                        role: 'dba',
+                        connect: true,
+                        temp: true,
+                        create: true,
+                        grantOption: true,
+                    },
+                ],
         });
         setCtypeFollowCollation(true);
         setError(null);
@@ -362,7 +436,10 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
             }
             onClose();
         } catch (err: any) {
-            setError(err?.message || (mode === 'create' ? '创建失败' : '修改失败') + '，请稍后重试');
+            setError(
+                err?.message ||
+                (mode === 'create' ? '创建失败' : '修改失败') + '，请稍后重试'
+            );
         } finally {
             setSaving(false);
         }
@@ -373,7 +450,10 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
     };
 
     const handleChange = (
-        e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+        e:
+            | React.ChangeEvent<HTMLInputElement>
+            | React.ChangeEvent<HTMLSelectElement>
+            | React.ChangeEvent<HTMLTextAreaElement>
     ) => {
         const { name, value, type, checked } = e.target as any;
         // 检查字段权限
@@ -381,45 +461,39 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
             return;
         }
 
-        // 特殊处理：模板切换时，如果从 template0 切到其它模板，需要提示继承行为
+        // 特殊处理：模板切换时
         if (name === 'template') {
             const newTemplate = value;
-            setForm(prev => {
-                const next = {
-                    ...prev,
-                    template: newTemplate,
-                };
-                return next;
-            });
+            setForm((prev) => ({
+                ...prev,
+                template: newTemplate,
+            }));
             return;
         }
 
         // 特殊处理：Locale Provider 切换
         if (name === 'localeProvider') {
             const newProvider = value;
-            setForm(prev => {
+            setForm((prev) => {
                 const next = {
                     ...prev,
                     localeProvider: newProvider,
                 };
-                // 切到 libc 时，默认让 ctype 跟随当前 collation
                 if (newProvider === 'libc') {
                     return {
                         ...next,
                         ctype: prev.collation || prev.ctype,
                     };
                 }
-                // 切到 icu 时，ctype 在 UI 上会禁用，这里只留当前值即可
                 return next;
             });
-            // provider 换了，重置为“跟随排序规则”模式更安全
             setCtypeFollowCollation(true);
             return;
         }
 
         if (name === 'collation') {
             const newCollation = value;
-            setForm(prev => ({
+            setForm((prev) => ({
                 ...prev,
                 collation: newCollation,
                 ctype: ctypeFollowCollation ? newCollation : prev.ctype,
@@ -428,16 +502,15 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
         }
 
         if (name === 'ctype') {
-            // 只有在“自定义模式”下才允许改 ctype
             if (ctypeFollowCollation) return;
-            setForm(prev => ({
+            setForm((prev) => ({
                 ...prev,
                 ctype: value,
             }));
             return;
         }
 
-        setForm(prev => ({
+        setForm((prev) => ({
             ...prev,
             [name]: type === 'checkbox' ? checked : value,
         }));
@@ -445,26 +518,29 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
 
     // 新增权限行
     const handleAddPrivilegeRow = () => {
-        setForm(prev => ({
+        setForm((prev) => ({
             ...prev,
             rolePrivileges: [
                 ...prev.rolePrivileges,
-                { role: '', connect: false, temp: false, create: false, grantOption: false }
-            ]
+                { role: '', connect: false, temp: false, create: false, grantOption: false },
+            ],
         }));
     };
 
     // 删除权限行
     const handleDeletePrivilegeRow = (index: number) => {
-        setForm(prev => ({
+        setForm((prev) => ({
             ...prev,
-            rolePrivileges: prev.rolePrivileges.filter((_, i) => i !== index)
+            rolePrivileges: prev.rolePrivileges.filter((_, i) => i !== index),
         }));
     };
 
     // 更新权限行
-    const handleRolePrivilegeChange = (index: number, field: string, value: boolean | string) => {
-        // 检查权限
+    const handleRolePrivilegeChange = (
+        index: number,
+        field: string,
+        value: boolean | string
+    ) => {
         if (mode === 'edit' && !fieldPermissions.rolePrivileges) {
             return;
         }
@@ -473,43 +549,53 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
             ...updatedPrivileges[index],
             [field]: value,
         };
-        setForm(prev => ({ ...prev, rolePrivileges: updatedPrivileges }));
+        setForm((prev) => ({ ...prev, rolePrivileges: updatedPrivileges }));
     };
 
     const requiredOk = !!form.name.trim();
 
     if (!isOpen) return null;
 
-    // 动态标题和按钮文本
     const modalTitle = mode === 'create' ? '新建数据库' : '修改数据库';
     const submitButtonText = mode === 'create' ? '创建' : '保存';
     const submitButtonLoadingText = mode === 'create' ? '创建中…' : '保存中…';
-    // 当前是否使用 libc provider
     const isLibcProvider = form.localeProvider === 'libc';
 
-    // 定义 Tab 中字段是否禁用（模板继承 + 权限 + provider）
     const encodingDisabled =
         (mode === 'edit' && !fieldPermissions.encoding) || inheritsLocaleFromTemplate;
     const collationDisabled =
         (mode === 'edit' && !fieldPermissions.collation) ||
         inheritsLocaleFromTemplate ||
-        !isLibcProvider;      // 非 libc 时禁用 Collation
+        !isLibcProvider;
     const ctypeDisabledBase =
         (mode === 'edit' && !fieldPermissions.ctype) ||
         inheritsLocaleFromTemplate ||
-        !isLibcProvider;      // 非 libc 时禁用 CTYPE 基础开关
+        !isLibcProvider;
     const localeProviderDisabled =
         (mode === 'edit' && !fieldPermissions.localeProvider) || inheritsLocaleFromTemplate;
 
     return (
         <div className="modal-overlay">
             <div className="modal-content" style={modalContentStyle}>
-                <h3 className="modal-title" style={{ borderBottom: '1px solid #e0e0e0', paddingBottom: '12px', marginBottom: 0 }}>
+                <h3
+                    className="modal-title"
+                    style={{
+                        borderBottom: '1px solid #e0e0e0',
+                        paddingBottom: '12px',
+                        marginBottom: 0,
+                    }}
+                >
                     {modalTitle}
                 </h3>
 
                 {/* Tab切换 */}
-                <div style={{ display: 'flex', marginBottom: 12, borderBottom: '1px solid #e0e0e0' }}>
+                <div
+                    style={{
+                        display: 'flex',
+                        marginBottom: 12,
+                        borderBottom: '1px solid #e0e0e0',
+                    }}
+                >
                     {[
                         { key: 'general', label: '常规' },
                         { key: 'definition', label: '定义' },
@@ -517,7 +603,7 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                         { key: 'security', label: '安全' },
                         { key: 'sql', label: 'SQL定义' },
                         { key: 'advanced', label: '高级' },
-                    ].map(tab => (
+                    ].map((tab) => (
                         <button
                             key={tab.key}
                             type="button"
@@ -529,19 +615,25 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                 fontSize: 12,
                                 marginRight: 8,
                                 transition: 'all 0.2s ease',
-                                background: activeTab === tab.key ? '#0b69ff' : 'transparent',
+                                background:
+                                    activeTab === tab.key ? '#0b69ff' : 'transparent',
                                 color: activeTab === tab.key ? '#fff' : '#666',
-                                borderBottom: activeTab === tab.key ? '2px solid #0b69ff' : 'none',
+                                borderBottom:
+                                    activeTab === tab.key
+                                        ? '2px solid #0b69ff'
+                                        : 'none',
                                 marginBottom: activeTab === tab.key ? '-1px' : '0',
                             }}
-                            onClick={() => setActiveTab(tab.key as any)}
+                            onClick={() =>
+                                setActiveTab(tab.key as any)
+                            }
                         >
                             {tab.label}
                         </button>
                     ))}
                 </div>
 
-                {/* Tab内容 - 固定高度容器 */}
+                {/* Tab内容 */}
                 <div style={tabContentStyle}>
                     {/* 常规 Tab */}
                     {activeTab === 'general' && (
@@ -560,91 +652,51 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                     autoFocus
                                 />
                                 {mode === 'edit' && !fieldPermissions.name && (
-                                    <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                                    <div
+                                        style={{
+                                            fontSize: 11,
+                                            color: '#888',
+                                            marginTop: 4,
+                                        }}
+                                    >
                                         数据库名称不可修改
                                     </div>
                                 )}
                             </div>
 
-                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                                <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    gap: '12px',
+                                    flexWrap: 'wrap',
+                                }}
+                            >
+                                <div
+                                    className="form-group"
+                                    style={{ flex: 1, minWidth: 240 }}
+                                >
                                     <label htmlFor="owner">所有者</label>
-                                    <div style={{ position: 'relative' }}>
-                                        <input
-                                            type="text"
-                                            value={ownerSearchTerm || form.owner}
-                                            onChange={(e) => setOwnerSearchTerm(e.target.value)}
-                                            onFocus={() => setOwnerSearchTerm('')}
-                                            onBlur={() => {
-                                                setTimeout(() => setOwnerSearchTerm(''), 200);
-                                            }}
-                                            className="form-input"
-                                            placeholder="搜索或选择所有者"
-                                            disabled={mode === 'edit' && !fieldPermissions.owner}
-                                        />
-                                        {ownerSearchTerm !== '' && (
-                                            <div style={{
-                                                position: 'absolute',
-                                                top: '100%',
-                                                left: 0,
-                                                right: 0,
-                                                border: '1px solid #ccc',
-                                                backgroundColor: '#fff',
-                                                maxHeight: '200px',
-                                                overflowY: 'auto',
-                                                zIndex: 1000,
-                                                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-                                            }}>
-                                                {dbOptions.roles
-                                                    .filter((role: any) =>
-                                                        role.label.toLowerCase().includes(ownerSearchTerm.toLowerCase())
-                                                    )
-                                                    .map((role: any) => (
-                                                        <div
-                                                            key={role.value}
-                                                            onClick={() => {
-                                                                setForm(prev => ({ ...prev, owner: role.value }));
-                                                                setOwnerSearchTerm('');
-                                                            }}
-                                                            style={{
-                                                                padding: '8px 12px',
-                                                                cursor: 'pointer',
-                                                                borderBottom: '1px solid #f0f0f0'
-                                                            }}
-                                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
-                                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fff'}
-                                                        >
-                                                            {role.label}
-                                                        </div>
-                                                    ))}
-                                                {dbOptions.roles.filter((role: any) =>
-                                                    role.label.toLowerCase().includes(ownerSearchTerm.toLowerCase())
-                                                ).length === 0 && (
-                                                    <div style={{ padding: '8px 12px', color: '#999' }}>
-                                                        没有匹配的角色
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                        {loadingOptions.has('roles') && (
-                                            <div style={{
-                                                position: 'absolute',
-                                                top: '100%',
-                                                left: 0,
-                                                right: 0,
-                                                padding: '8px',
-                                                textAlign: 'center',
-                                                color: '#666',
-                                                border: '1px solid #e0e0e0',
-                                                borderTop: 'none'
-                                            }}>
-                                                加载中...
-                                            </div>
-                                        )}
-                                    </div>
+                                    <RoleSearchSelect
+                                        connectionId={connectionId}
+                                        value={form.owner}
+                                        onChange={(val) =>
+                                            setForm((prev) => ({
+                                                ...prev,
+                                                owner: val,
+                                            }))
+                                        }
+                                        disabled={
+                                            mode === 'edit' &&
+                                            !fieldPermissions.owner
+                                        }
+                                        placeholder="搜索或选择所有者"
+                                    />
                                 </div>
 
-                                <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
+                                <div
+                                    className="form-group"
+                                    style={{ flex: 1, minWidth: 240 }}
+                                >
                                     <label htmlFor="template">模板库</label>
                                     <select
                                         id="template"
@@ -652,21 +704,36 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                         value={form.template}
                                         onChange={handleChange}
                                         className="form-input"
-                                        disabled={mode === 'edit' && !fieldPermissions.template}
+                                        disabled={
+                                            mode === 'edit' &&
+                                            !fieldPermissions.template
+                                        }
                                     >
                                         {loadingOptions.has('templates') ? (
-                                            <option key="loading-templates" disabled>加载中...</option>
+                                            <option key="loading-templates" disabled>
+                                                加载中...
+                                            </option>
                                         ) : (
                                             dbOptions.templates.map((template: any) => (
-                                                <option key={template.value} value={template.value}>
+                                                <option
+                                                    key={template.value}
+                                                    value={template.value}
+                                                >
                                                     {template.label}
                                                 </option>
                                             ))
                                         )}
                                     </select>
                                     {inheritsLocaleFromTemplate && (
-                                        <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
-                                            编码和区域设置将从模板库 "{form.template}" 继承
+                                        <div
+                                            style={{
+                                                fontSize: 11,
+                                                color: '#888',
+                                                marginTop: 4,
+                                            }}
+                                        >
+                                            编码和区域设置将从模板库 "
+                                            {form.template}" 继承
                                         </div>
                                     )}
                                 </div>
@@ -682,7 +749,9 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                     className="form-input"
                                     rows={2}
                                     placeholder="用于标记数据库用途，例如：BI 报表库 / 归档库"
-                                    disabled={mode === 'edit' && !fieldPermissions.comment}
+                                    disabled={
+                                        mode === 'edit' && !fieldPermissions.comment
+                                    }
                                 />
                             </div>
                         </>
@@ -691,8 +760,17 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                     {/* 定义 Tab */}
                     {activeTab === 'definition' && (
                         <>
-                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                                <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    gap: '12px',
+                                    flexWrap: 'wrap',
+                                }}
+                            >
+                                <div
+                                    className="form-group"
+                                    style={{ flex: 1, minWidth: 240 }}
+                                >
                                     <label htmlFor="encoding">字符集 / 编码</label>
                                     <select
                                         id="encoding"
@@ -705,22 +783,38 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                         {loadingOptions.has('encodings') ? (
                                             <option>加载中...</option>
                                         ) : (
-                                            dbOptions.encodings.map((encoding: any) => (
-                                                <option key={encoding.value} value={encoding.value}>
-                                                    {encoding.label}
-                                                </option>
-                                            ))
+                                            dbOptions.encodings.map(
+                                                (encoding: any) => (
+                                                    <option
+                                                        key={encoding.value}
+                                                        value={encoding.value}
+                                                    >
+                                                        {encoding.label}
+                                                    </option>
+                                                )
+                                            )
                                         )}
                                     </select>
                                     {inheritsLocaleFromTemplate && (
-                                        <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                                        <div
+                                            style={{
+                                                fontSize: 11,
+                                                color: '#888',
+                                                marginTop: 4,
+                                            }}
+                                        >
                                             已从模板库 "{form.template}" 继承编码
                                         </div>
                                     )}
                                 </div>
 
-                                <div className="form-group" style={{flex: 1, minWidth: 240}}>
-                                    <label htmlFor="localeProvider">Locale Provider</label>
+                                <div
+                                    className="form-group"
+                                    style={{ flex: 1, minWidth: 240 }}
+                                >
+                                    <label htmlFor="localeProvider">
+                                        Locale Provider
+                                    </label>
                                     <select
                                         id="localeProvider"
                                         name="localeProvider"
@@ -732,26 +826,54 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                         {loadingOptions.has('localeProviders') ? (
                                             <option>加载中...</option>
                                         ) : (
-                                            dbOptions.localeProviders.map((provider: any) => (
-                                                <option key={provider.value} value={provider.value}>
-                                                    {provider.label}
-                                                </option>
-                                            ))
+                                            dbOptions.localeProviders.map(
+                                                (provider: any) => (
+                                                    <option
+                                                        key={provider.value}
+                                                        value={provider.value}
+                                                    >
+                                                        {provider.label}
+                                                    </option>
+                                                )
+                                            )
                                         )}
                                     </select>
                                     {inheritsLocaleFromTemplate && (
-                                        <div style={{fontSize: 11, color: '#888', marginTop: 4}}>
-                                            Locale Provider 也将从模板库 "{form.template}" 继承
+                                        <div
+                                            style={{
+                                                fontSize: 11,
+                                                color: '#888',
+                                                marginTop: 4,
+                                            }}
+                                        >
+                                            Locale Provider 也将从模板库 "
+                                            {form.template}" 继承
                                         </div>
                                     )}
-                                    <div style={{fontSize: 11, color: '#888', marginTop: 4}}>
-                                        使用 libc 时通过排序规则/字符分类控制本地化，使用 ICU 时通过 ICU Locale/Rules 控制。
+                                    <div
+                                        style={{
+                                            fontSize: 11,
+                                            color: '#888',
+                                            marginTop: 4,
+                                        }}
+                                    >
+                                        使用 libc 时通过排序规则/字符分类控制本地化，使用
+                                        ICU 时通过 ICU Locale/Rules 控制。
                                     </div>
                                 </div>
                             </div>
 
-                            <div style={{display: 'flex', gap: '12px', flexWrap: 'wrap'}}>
-                                <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    gap: '12px',
+                                    flexWrap: 'wrap',
+                                }}
+                            >
+                                <div
+                                    className="form-group"
+                                    style={{ flex: 1, minWidth: 240 }}
+                                >
                                     <label htmlFor="collation">排序规则</label>
                                     <select
                                         id="collation"
@@ -764,29 +886,62 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                         {loadingOptions.has('collations') ? (
                                             <option>加载中...</option>
                                         ) : (
-                                            dbOptions.collations?.map((collation: any) => (
-                                                <option key={collation.value} value={collation.value}>
-                                                    {collation.label}
-                                                </option>
-                                            ))
+                                            dbOptions.collations?.map(
+                                                (collation: any) => (
+                                                    <option
+                                                        key={collation.value}
+                                                        value={collation.value}
+                                                    >
+                                                        {collation.label}
+                                                    </option>
+                                                )
+                                            )
                                         )}
                                     </select>
                                     {inheritsLocaleFromTemplate && (
-                                        <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                                        <div
+                                            style={{
+                                                fontSize: 11,
+                                                color: '#888',
+                                                marginTop: 4,
+                                            }}
+                                        >
                                             已从模板库 "{form.template}" 继承排序规则
                                         </div>
                                     )}
-                                    {!inheritsLocaleFromTemplate && !isLibcProvider && (
-                                        <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
-                                            当前 Locale Provider 为 ICU，排序规则由 ICU Locale 决定，此处不可单独修改。
-                                        </div>
-                                    )}
+                                    {!inheritsLocaleFromTemplate &&
+                                        !isLibcProvider && (
+                                            <div
+                                                style={{
+                                                    fontSize: 11,
+                                                    color: '#888',
+                                                    marginTop: 4,
+                                                }}
+                                            >
+                                                当前 Locale Provider 为 ICU，排序规则由
+                                                ICU Locale 决定，此处不可单独修改。
+                                            </div>
+                                        )}
                                 </div>
 
-                                <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
+                                <div
+                                    className="form-group"
+                                    style={{ flex: 1, minWidth: 240 }}
+                                >
                                     <label>字符分类（LC_CTYPE）</label>
-                                    <div style={{ fontSize: 12, marginBottom: 4 }}>
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <div
+                                        style={{
+                                            fontSize: 12,
+                                            marginBottom: 4,
+                                        }}
+                                    >
+                                        <label
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 6,
+                                            }}
+                                        >
                                             <input
                                                 type="radio"
                                                 name="ctypeMode"
@@ -794,7 +949,7 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                                 onChange={() => {
                                                     if (ctypeDisabledBase) return;
                                                     setCtypeFollowCollation(true);
-                                                    setForm(prev => ({
+                                                    setForm((prev) => ({
                                                         ...prev,
                                                         ctype: prev.collation,
                                                     }));
@@ -803,11 +958,24 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                             />
                                             <span>跟随排序规则（推荐）</span>
                                         </label>
-                                        <div style={{ marginLeft: 22, color: '#888' }}>
-                                            当前使用：{form.collation || '未选择'}
+                                        <div
+                                            style={{
+                                                marginLeft: 22,
+                                                color: '#888',
+                                            }}
+                                        >
+                                            当前使用：
+                                            {form.collation || '未选择'}
                                         </div>
 
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                                        <label
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 6,
+                                                marginTop: 6,
+                                            }}
+                                        >
                                             <input
                                                 type="radio"
                                                 name="ctypeMode"
@@ -827,42 +995,78 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                         value={form.ctype}
                                         onChange={handleChange}
                                         className="form-input"
-                                        disabled={ctypeDisabledBase || ctypeFollowCollation}
+                                        disabled={
+                                            ctypeDisabledBase || ctypeFollowCollation
+                                        }
                                     >
                                         {loadingOptions.has('collations') ? (
                                             <option>加载中...</option>
                                         ) : (
-                                            dbOptions.collations?.map((collation: any) => (
-                                                <option key={collation.value} value={collation.value}>
-                                                    {collation.label}
-                                                </option>
-                                            ))
+                                            dbOptions.collations?.map(
+                                                (collation: any) => (
+                                                    <option
+                                                        key={collation.value}
+                                                        value={collation.value}
+                                                    >
+                                                        {collation.label}
+                                                    </option>
+                                                )
+                                            )
                                         )}
                                     </select>
                                     {inheritsLocaleFromTemplate && (
-                                        <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                                        <div
+                                            style={{
+                                                fontSize: 11,
+                                                color: '#888',
+                                                marginTop: 4,
+                                            }}
+                                        >
                                             已从模板库 "{form.template}" 继承字符分类
                                         </div>
                                     )}
-                                    {!inheritsLocaleFromTemplate && !isLibcProvider && (
-                                        <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
-                                            当前 Locale Provider 为 ICU，字符分类由 ICU Locale 决定，此处不可单独修改。
-                                        </div>
-                                    )}
+                                    {!inheritsLocaleFromTemplate &&
+                                        !isLibcProvider && (
+                                            <div
+                                                style={{
+                                                    fontSize: 11,
+                                                    color: '#888',
+                                                    marginTop: 4,
+                                                }}
+                                            >
+                                                当前 Locale Provider 为 ICU，字符分类由
+                                                ICU Locale 决定，此处不可单独修改。
+                                            </div>
+                                        )}
                                 </div>
                             </div>
 
-                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: 8 }}>
-                                <div className="form-group" style={{ flex: 1, minWidth: 240 }}>
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    gap: '12px',
+                                    flexWrap: 'wrap',
+                                    marginTop: 8,
+                                }}
+                            >
+                                <div
+                                    className="form-group"
+                                    style={{ flex: 1, minWidth: 240 }}
+                                >
                                     <label className="checkbox-group">
                                         <input
                                             type="checkbox"
                                             name="allowConnections"
                                             checked={form.allowConnections}
                                             onChange={handleChange}
-                                            disabled={mode === 'edit' && !fieldPermissions.allowConnections}
+                                            disabled={
+                                                mode === 'edit' &&
+                                                !fieldPermissions.allowConnections
+                                            }
                                         />
-                                        <span style={{ marginLeft: 6 }}>允许连接到此数据库</span>
+                                        <span style={{ marginLeft: 6 }}>
+                                            允许连接到此数据库
+                                        </span>
                                     </label>
                                 </div>
                             </div>
@@ -874,9 +1078,14 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                         name="isTemplate"
                                         checked={form.isTemplate}
                                         onChange={handleChange}
-                                        disabled={mode === 'edit' && !fieldPermissions.isTemplate}
+                                        disabled={
+                                            mode === 'edit' &&
+                                            !fieldPermissions.isTemplate
+                                        }
                                     />
-                                    <span style={{ marginLeft: 6 }}>是否作为模板库</span>
+                                    <span style={{ marginLeft: 6 }}>
+                                        是否作为模板库
+                                    </span>
                                 </label>
                             </div>
                         </>
@@ -893,22 +1102,32 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                     value={form.tablespace}
                                     onChange={handleChange}
                                     className="form-input"
-                                    disabled={mode === 'edit' && !fieldPermissions.tablespace}
+                                    disabled={
+                                        mode === 'edit' &&
+                                        !fieldPermissions.tablespace
+                                    }
                                 >
                                     {loadingOptions.has('tablespaces') ? (
                                         <option>加载中...</option>
                                     ) : (
-                                        dbOptions.tablespaces.map((tablespace: any) => (
-                                            <option key={tablespace.value} value={tablespace.value}>
-                                                {tablespace.label}
-                                            </option>
-                                        ))
+                                        dbOptions.tablespaces.map(
+                                            (tablespace: any) => (
+                                                <option
+                                                    key={tablespace.value}
+                                                    value={tablespace.value}
+                                                >
+                                                    {tablespace.label}
+                                                </option>
+                                            )
+                                        )
                                     )}
                                 </select>
                             </div>
 
                             <div className="form-group">
-                                <label htmlFor="connectionLimit">最大连接数</label>
+                                <label htmlFor="connectionLimit">
+                                    最大连接数
+                                </label>
                                 <input
                                     id="connectionLimit"
                                     name="connectionLimit"
@@ -916,9 +1135,18 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                     value={form.connectionLimit}
                                     onChange={handleChange}
                                     className="form-input"
-                                    disabled={mode === 'edit' && !fieldPermissions.connectionLimit}
+                                    disabled={
+                                        mode === 'edit' &&
+                                        !fieldPermissions.connectionLimit
+                                    }
                                 />
-                                <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                                <div
+                                    style={{
+                                        fontSize: 11,
+                                        color: '#888',
+                                        marginTop: 4,
+                                    }}
+                                >
                                     -1 表示不限制（受全局配置控制）
                                 </div>
                             </div>
@@ -928,104 +1156,270 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                     {/* 安全 Tab */}
                     {activeTab === 'security' && (
                         <div>
-                            <div style={{ marginBottom: 12, fontSize: 14, fontWeight: 500, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div
+                                style={{
+                                    marginBottom: 12,
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                }}
+                            >
                                 <span>角色授权（数据库级权限）</span>
-                                {mode === 'create' && fieldPermissions.rolePrivileges && (
-                                    <button
-                                        type="button"
-                                        className="btn btn-secondary"
-                                        onClick={handleAddPrivilegeRow}
-                                        style={{ padding: '4px 8px', fontSize: '12px' }}
-                                    >
-                                        + 新增权限
-                                    </button>
-                                )}
+                                {mode === 'create' &&
+                                    fieldPermissions.rolePrivileges && (
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary"
+                                            onClick={handleAddPrivilegeRow}
+                                            style={{
+                                                padding: '4px 8px',
+                                                fontSize: '12px',
+                                            }}
+                                        >
+                                            + 新增权限
+                                        </button>
+                                    )}
                             </div>
 
                             <div style={{ overflowX: 'auto' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                                <table
+                                    style={{
+                                        width: '100%',
+                                        borderCollapse: 'collapse',
+                                        fontSize: 12,
+                                    }}
+                                >
                                     <thead>
-                                    <tr style={{ borderBottom: '1px solid #e0e0e0' }}>
-                                        <th style={{ padding: '8px', textAlign: 'left', minWidth: 120 }}>角色</th>
-                                        <th style={{ padding: '8px', textAlign: 'center', minWidth: 80 }}>CONNECT</th>
-                                        <th style={{ padding: '8px', textAlign: 'center', minWidth: 80 }}>TEMP</th>
-                                        <th style={{ padding: '8px', textAlign: 'center', minWidth: 80 }}>CREATE</th>
-                                        <th style={{ padding: '8px', textAlign: 'center', minWidth: 100 }}>WITH GRANT</th>
-                                        {mode === 'create' && fieldPermissions.rolePrivileges && (
-                                            <th style={{ padding: '8px', textAlign: 'center', minWidth: 60 }}>操作</th>
-                                        )}
+                                    <tr
+                                        style={{
+                                            borderBottom: '1px solid #e0e0e0',
+                                        }}
+                                    >
+                                        <th
+                                            style={{
+                                                padding: '8px',
+                                                textAlign: 'left',
+                                                minWidth: 160,
+                                            }}
+                                        >
+                                            角色
+                                        </th>
+                                        <th
+                                            style={{
+                                                padding: '8px',
+                                                textAlign: 'center',
+                                                minWidth: 80,
+                                            }}
+                                        >
+                                            CONNECT
+                                        </th>
+                                        <th
+                                            style={{
+                                                padding: '8px',
+                                                textAlign: 'center',
+                                                minWidth: 80,
+                                            }}
+                                        >
+                                            TEMP
+                                        </th>
+                                        <th
+                                            style={{
+                                                padding: '8px',
+                                                textAlign: 'center',
+                                                minWidth: 80,
+                                            }}
+                                        >
+                                            CREATE
+                                        </th>
+                                        <th
+                                            style={{
+                                                padding: '8px',
+                                                textAlign: 'center',
+                                                minWidth: 100,
+                                            }}
+                                        >
+                                            WITH GRANT
+                                        </th>
+                                        {mode === 'create' &&
+                                            fieldPermissions.rolePrivileges && (
+                                                <th
+                                                    style={{
+                                                        padding: '8px',
+                                                        textAlign: 'center',
+                                                        minWidth: 60,
+                                                    }}
+                                                >
+                                                    操作
+                                                </th>
+                                            )}
                                     </tr>
                                     </thead>
                                     <tbody>
                                     {form.rolePrivileges.map((priv, index) => (
-                                        <tr key={index} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                            <td style={{ padding: '8px' }}>
-                                                <select
+                                        <tr
+                                            key={index}
+                                            style={{
+                                                borderBottom:
+                                                    '1px solid #f0f0f0',
+                                            }}
+                                        >
+                                            <td
+                                                style={{
+                                                    padding: '8px',
+                                                    minWidth: 160,
+                                                }}
+                                            >
+                                                <RoleSearchSelect
+                                                    connectionId={connectionId}
                                                     value={priv.role}
-                                                    onChange={(e) => handleRolePrivilegeChange(index, 'role', e.target.value)}
-                                                    className="form-input"
-                                                    style={{ width: '100%', fontSize: 12 }}
-                                                    disabled={mode === 'edit' && !fieldPermissions.rolePrivileges}
-                                                >
-                                                    <option value="">选择角色</option>
-                                                    {dbOptions.roles.map((role: any) => (
-                                                        <option key={role.value} value={role.value}>
-                                                            {role.label}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                                    onChange={(val) =>
+                                                        handleRolePrivilegeChange(
+                                                            index,
+                                                            'role',
+                                                            val
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        mode === 'edit' &&
+                                                        !fieldPermissions.rolePrivileges
+                                                    }
+                                                    placeholder="搜索角色"
+                                                />
                                             </td>
-                                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                                            <td
+                                                style={{
+                                                    padding: '8px',
+                                                    textAlign: 'center',
+                                                }}
+                                            >
                                                 <input
                                                     type="checkbox"
                                                     checked={priv.connect}
-                                                    onChange={(e) => handleRolePrivilegeChange(index, 'connect', e.target.checked)}
-                                                    disabled={mode === 'edit' && !fieldPermissions.rolePrivileges}
+                                                    onChange={(e) =>
+                                                        handleRolePrivilegeChange(
+                                                            index,
+                                                            'connect',
+                                                            e.target.checked
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        mode === 'edit' &&
+                                                        !fieldPermissions
+                                                            .rolePrivileges
+                                                    }
                                                 />
                                             </td>
-                                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                                            <td
+                                                style={{
+                                                    padding: '8px',
+                                                    textAlign: 'center',
+                                                }}
+                                            >
                                                 <input
                                                     type="checkbox"
                                                     checked={priv.temp}
-                                                    onChange={(e) => handleRolePrivilegeChange(index, 'temp', e.target.checked)}
-                                                    disabled={mode === 'edit' && !fieldPermissions.rolePrivileges}
+                                                    onChange={(e) =>
+                                                        handleRolePrivilegeChange(
+                                                            index,
+                                                            'temp',
+                                                            e.target.checked
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        mode === 'edit' &&
+                                                        !fieldPermissions
+                                                            .rolePrivileges
+                                                    }
                                                 />
                                             </td>
-                                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                                            <td
+                                                style={{
+                                                    padding: '8px',
+                                                    textAlign: 'center',
+                                                }}
+                                            >
                                                 <input
                                                     type="checkbox"
                                                     checked={priv.create}
-                                                    onChange={(e) => handleRolePrivilegeChange(index, 'create', e.target.checked)}
-                                                    disabled={mode === 'edit' && !fieldPermissions.rolePrivileges}
+                                                    onChange={(e) =>
+                                                        handleRolePrivilegeChange(
+                                                            index,
+                                                            'create',
+                                                            e.target.checked
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        mode === 'edit' &&
+                                                        !fieldPermissions
+                                                            .rolePrivileges
+                                                    }
                                                 />
                                             </td>
-                                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                                            <td
+                                                style={{
+                                                    padding: '8px',
+                                                    textAlign: 'center',
+                                                }}
+                                            >
                                                 <input
                                                     type="checkbox"
                                                     checked={priv.grantOption}
-                                                    onChange={(e) => handleRolePrivilegeChange(index, 'grantOption', e.target.checked)}
-                                                    disabled={mode === 'edit' && !fieldPermissions.rolePrivileges}
+                                                    onChange={(e) =>
+                                                        handleRolePrivilegeChange(
+                                                            index,
+                                                            'grantOption',
+                                                            e.target.checked
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        mode === 'edit' &&
+                                                        !fieldPermissions
+                                                            .rolePrivileges
+                                                    }
                                                 />
                                             </td>
-                                            {mode === 'create' && fieldPermissions.rolePrivileges && (
-                                                <td style={{ padding: '8px', textAlign: 'center' }}>
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-secondary"
-                                                        onClick={() => handleDeletePrivilegeRow(index)}
-                                                        style={{ padding: '2px 6px', fontSize: '10px' }}
+                                            {mode === 'create' &&
+                                                fieldPermissions.rolePrivileges && (
+                                                    <td
+                                                        style={{
+                                                            padding: '8px',
+                                                            textAlign: 'center',
+                                                        }}
                                                     >
-                                                        删除
-                                                    </button>
-                                                </td>
-                                            )}
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-secondary"
+                                                            onClick={() =>
+                                                                handleDeletePrivilegeRow(
+                                                                    index
+                                                                )
+                                                            }
+                                                            style={{
+                                                                padding:
+                                                                    '2px 6px',
+                                                                fontSize:
+                                                                    '10px',
+                                                            }}
+                                                        >
+                                                            删除
+                                                        </button>
+                                                    </td>
+                                                )}
                                         </tr>
                                     ))}
                                     </tbody>
                                 </table>
                             </div>
                             {form.rolePrivileges.length === 0 && (
-                                <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+                                <div
+                                    style={{
+                                        textAlign: 'center',
+                                        padding: '20px',
+                                        color: '#999',
+                                    }}
+                                >
                                     暂无权限配置，点击"新增权限"添加
                                 </div>
                             )}
@@ -1035,21 +1429,29 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                     {/* SQL定义 Tab */}
                     {activeTab === 'sql' && (
                         <div>
-                            <div style={{ marginBottom: 12, fontSize: 14, fontWeight: 500 }}>
+                            <div
+                                style={{
+                                    marginBottom: 12,
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                }}
+                            >
                                 根据当前配置自动生成 SQL：
                             </div>
 
-                            <div style={{
-                                border: '1px solid #e0e0e0',
-                                borderRadius: 4,
-                                padding: 12,
-                                backgroundColor: '#f8f9fa',
-                                fontFamily: 'monospace',
-                                fontSize: 12,
-                                whiteSpace: 'pre-wrap',
-                                maxHeight: '300px',
-                                overflowY: 'auto'
-                            }}>
+                            <div
+                                style={{
+                                    border: '1px solid #e0e0e0',
+                                    borderRadius: 4,
+                                    padding: 12,
+                                    backgroundColor: '#f8f9fa',
+                                    fontFamily: 'monospace',
+                                    fontSize: 12,
+                                    whiteSpace: 'pre-wrap',
+                                    maxHeight: '300px',
+                                    overflowY: 'auto',
+                                }}
+                            >
                                 {generatedSql || '点击"重新生成"按钮生成SQL'}
                             </div>
 
@@ -1058,23 +1460,39 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                                     <input
                                         type="checkbox"
                                         checked={allowManualSql}
-                                        onChange={(e) => setAllowManualSql(e.target.checked)}
+                                        onChange={(e) =>
+                                            setAllowManualSql(e.target.checked)
+                                        }
                                     />
-                                    <span style={{ marginLeft: 6 }}>允许手动编辑 SQL（高级）</span>
+                                    <span style={{ marginLeft: 6 }}>
+                                        允许手动编辑 SQL（高级）
+                                    </span>
                                 </label>
                             </div>
 
                             {allowManualSql && (
                                 <textarea
                                     value={manualSql}
-                                    onChange={(e) => setManualSql(e.target.value)}
+                                    onChange={(e) =>
+                                        setManualSql(e.target.value)
+                                    }
                                     className="form-input"
                                     rows={10}
-                                    style={{ marginTop: 8, fontFamily: 'monospace', fontSize: 12 }}
+                                    style={{
+                                        marginTop: 8,
+                                        fontFamily: 'monospace',
+                                        fontSize: 12,
+                                    }}
                                 />
                             )}
 
-                            <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                            <div
+                                style={{
+                                    marginTop: 12,
+                                    display: 'flex',
+                                    gap: 8,
+                                }}
+                            >
                                 <button
                                     type="button"
                                     className="btn btn-secondary"
@@ -1096,48 +1514,66 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                     {/* 高级 Tab */}
                     {activeTab === 'advanced' && (
                         <>
-                            {form.localeProvider === 'icu' && !inheritsLocaleFromTemplate && (
-                                <>
-                                    <div className="form-group">
-                                        <label htmlFor="icuLocale">ICU Locale</label>
-                                        <input
-                                            id="icuLocale"
-                                            name="icuLocale"
-                                            type="text"
-                                            value={form.icuLocale}
-                                            onChange={handleChange}
-                                            className="form-input"
-                                            placeholder="例如: en-US"
-                                            disabled={mode === 'edit' && !fieldPermissions.icuLocale}
-                                        />
-                                    </div>
+                            {form.localeProvider === 'icu' &&
+                                !inheritsLocaleFromTemplate && (
+                                    <>
+                                        <div className="form-group">
+                                            <label htmlFor="icuLocale">
+                                                ICU Locale
+                                            </label>
+                                            <input
+                                                id="icuLocale"
+                                                name="icuLocale"
+                                                type="text"
+                                                value={form.icuLocale}
+                                                onChange={handleChange}
+                                                className="form-input"
+                                                placeholder="例如: en-US"
+                                                disabled={
+                                                    mode === 'edit' &&
+                                                    !fieldPermissions.icuLocale
+                                                }
+                                            />
+                                        </div>
 
-                                    <div className="form-group">
-                                        <label htmlFor="icuRules">ICU Rules</label>
-                                        <input
-                                            id="icuRules"
-                                            name="icuRules"
-                                            type="text"
-                                            value={form.icuRules}
-                                            onChange={handleChange}
-                                            className="form-input"
-                                            placeholder="例如: @strength=primary"
-                                            disabled={mode === 'edit' && !fieldPermissions.icuRules}
-                                        />
-                                    </div>
-                                </>
-                            )}
+                                        <div className="form-group">
+                                            <label htmlFor="icuRules">
+                                                ICU Rules
+                                            </label>
+                                            <input
+                                                id="icuRules"
+                                                name="icuRules"
+                                                type="text"
+                                                value={form.icuRules}
+                                                onChange={handleChange}
+                                                className="form-input"
+                                                placeholder="例如: @strength=primary"
+                                                disabled={
+                                                    mode === 'edit' &&
+                                                    !fieldPermissions.icuRules
+                                                }
+                                            />
+                                        </div>
+                                    </>
+                                )}
 
                             <div className="form-group">
-                                <label>数据库级参数扩展（key=value，自定义）</label>
+                                <label>
+                                    数据库级参数扩展（key=value，自定义）
+                                </label>
                                 <textarea
                                     name="extensions"
                                     value={form.extensions}
                                     onChange={handleChange}
                                     className="form-input"
                                     rows={3}
-                                    placeholder="max_locks_per_transaction = 128&#10;work_mem = 64MB"
-                                    disabled={mode === 'edit' && !fieldPermissions.extensions}
+                                    placeholder={
+                                        'max_locks_per_transaction = 128\nwork_mem = 64MB'
+                                    }
+                                    disabled={
+                                        mode === 'edit' &&
+                                        !fieldPermissions.extensions
+                                    }
                                 />
                             </div>
                         </>
@@ -1152,7 +1588,7 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                             background: 'rgba(220, 53, 69, 0.1)',
                             color: '#dc3545',
                             fontSize: 12,
-                            margin: '0 16px'
+                            margin: '0 16px',
                         }}
                     >
                         {error}
@@ -1160,13 +1596,15 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
                 )}
 
                 {/* 底部操作区 */}
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    padding: '16px',
-                    borderTop: '1px solid #e0e0e0',
-                    gap: 8
-                }}>
+                <div
+                    style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        padding: '16px',
+                        borderTop: '1px solid #e0e0e0',
+                        gap: 8,
+                    }}
+                >
                     <div style={{ display: 'flex', gap: 8 }}>
                         <button
                             type="button"
@@ -1210,25 +1648,36 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
             {/* SQL预览弹窗 */}
             {showSqlPreview && (
                 <div className="modal-overlay">
-                    <div className="modal-content" style={{ maxWidth: 700, width: '90%' }}>
+                    <div
+                        className="modal-content"
+                        style={{ maxWidth: 700, width: '90%' }}
+                    >
                         <h3 className="modal-title">SQL 预览</h3>
 
-                        <div style={{
-                            border: '1px solid #e0e0e0',
-                            borderRadius: 4,
-                            padding: 12,
-                            backgroundColor: '#f8f9fa',
-                            fontFamily: 'monospace',
-                            fontSize: 12,
-                            whiteSpace: 'pre-wrap',
-                            maxHeight: '400px',
-                            overflowY: 'auto',
-                            marginBottom: 12
-                        }}>
+                        <div
+                            style={{
+                                border: '1px solid #e0e0e0',
+                                borderRadius: 4,
+                                padding: 12,
+                                backgroundColor: '#f8f9fa',
+                                fontFamily: 'monospace',
+                                fontSize: 12,
+                                whiteSpace: 'pre-wrap',
+                                maxHeight: '400px',
+                                overflowY: 'auto',
+                                marginBottom: 12,
+                            }}
+                        >
                             {manualSql || generatedSql}
                         </div>
 
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                        <div
+                            style={{
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                                gap: 8,
+                            }}
+                        >
                             <button
                                 type="button"
                                 className="btn btn-secondary"
