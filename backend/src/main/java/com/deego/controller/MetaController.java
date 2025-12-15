@@ -2,8 +2,11 @@ package com.deego.controller;
 
 import com.deego.common.ApiResponse;
 import com.deego.metadata.DatabaseNodeType;
+import com.deego.model.param.OptionParam;
 import com.deego.model.pgsql.Option;
 import com.deego.service.MetaService;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,8 +36,8 @@ public class MetaController {
 		return ApiResponse.ok(metaService.listChildren(connId, nodeType, path));
 	}
 
-	@GetMapping("/db/options/{connId}")
-	public ApiResponse<Option> options(@PathVariable String connId) {
-		return ApiResponse.ok(metaService.options(connId));
+	@PostMapping("/db/options/{connId}")
+	public ApiResponse<Option> options(@PathVariable String connId, @RequestBody OptionParam param) {
+        return ApiResponse.ok(metaService.options(connId, param));
 	}
 }

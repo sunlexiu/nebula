@@ -2,6 +2,7 @@ package com.deego.metadata;
 
 import com.deego.enums.DatabaseType;
 import com.deego.model.Connection;
+import com.deego.model.param.OptionParam;
 import com.deego.model.pgsql.Option;
 import com.deego.model.pgsql.PgOption;
 
@@ -34,5 +35,5 @@ public interface MetadataProvider {
 	/**
 	 * 获取数据库选项
 	 */
-	Option getOptions(Connection connection);
+	Option getOptions(Connection connection, OptionParam param);
 }

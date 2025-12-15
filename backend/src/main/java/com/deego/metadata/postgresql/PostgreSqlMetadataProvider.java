@@ -5,7 +5,9 @@ import com.deego.exec.DbExecutor;
 import com.deego.metadata.DatabaseNodeType;
 import com.deego.metadata.MetadataProvider;
 import com.deego.model.Connection;
+import com.deego.model.param.OptionParam;
 import com.deego.model.pgsql.PgOption;
+import com.deego.model.pgsql.PgOptionTypeEnum;
 import com.deego.service.ConnectionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -59,52 +61,61 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
 	}
 
 	@Override
-	public PgOption getOptions(Connection connection) {
+	public PgOption getOptions(Connection connection, OptionParam param) {
 		PgOption options = new PgOption();
 		DbExecutor executor = connectionService.getExecutor(connection.getId());
 		try {
-			// ============= 1. 编码（列出 PG 支持的编码，而不是仅当前库用到的） =============
-			List<String> encodings = executor.queryForList("SELECT DISTINCT pg_encoding_to_char(conforencoding)" +
-					" AS encoding FROM pg_conversion ORDER BY encoding", String.class);
-			options.setEncodings(encodings);
+			if (param.getTypes().contains(PgOptionTypeEnum.ENCODINGS)) {
+				// ============= 1. 编码（列出 PG 支持的编码，而不是仅当前库用到的） =============
+				List<String> encodings = executor.queryForList("SELECT DISTINCT pg_encoding_to_char(conforencoding)" +
+						" AS encoding FROM pg_conversion ORDER BY encoding", String.class);
+				options.setEncodings(encodings);
+			}
 
-			// ============= 2. 模板库（template0 / template1 等） =============
-			List<Map<String, Object>> templateResults =
-					executor.queryMapForList("SELECT datname FROM pg_database WHERE datistemplate = true ORDER BY datname");
-			List<String> templates = templateResults.stream().map(map -> (String)map.get("datname")).filter(Objects::nonNull).collect(Collectors.toList());
-			options.setTemplates(templates);
+			if (param.getTypes().contains(PgOptionTypeEnum.TEMPLATES)) {
+				// ============= 2. 模板库（template0 / template1 等） =============
+				List<Map<String, Object>> templateResults =
+						executor.queryMapForList("SELECT datname FROM pg_database WHERE datistemplate = true ORDER BY datname");
+				List<String> templates = templateResults.stream().map(map -> (String)map.get("datname")).filter(Objects::nonNull).collect(Collectors.toList());
+				options.setTemplates(templates);
+			}
 
-			// ============= 3. 表空间 =============
-			List<Map<String, Object>> tablespaceResults = executor.queryMapForList("SELECT spcname FROM pg_tablespace ORDER BY spcname");
-			List<String> tablespaces = tablespaceResults.stream().map(map -> (String)map.get("spcname")).filter(Objects::nonNull).collect(Collectors.toList());
-			options.setTablespaces(tablespaces);
+			if (param.getTypes().contains(PgOptionTypeEnum.TABLE_NAMESPACES)) {
+				// ============= 3. 表空间 =============
+				List<Map<String, Object>> tablespaceResults = executor.queryMapForList("SELECT spcname FROM pg_tablespace ORDER BY spcname");
+				List<String> tablespaces = tablespaceResults.stream().map(map -> (String)map.get("spcname")).filter(Objects::nonNull).collect(Collectors.toList());
+				options.setTablespaces(tablespaces);
+			}
 
-			// ============= 4. 角色 =============
-			List<Map<String, Object>> roleResults = executor.queryMapForList("SELECT rolname FROM pg_roles ORDER BY rolname");
-			List<String> roles = roleResults.stream().map(map -> (String)map.get("rolname")).filter(Objects::nonNull).collect(Collectors.toList());
-			options.setRoles(roles);
+			if (param.getTypes().contains(PgOptionTypeEnum.ROLES)) {
+				// ============= 4. 角色 =============
+				List<Map<String, Object>> roleResults = executor.queryMapForList("SELECT rolname FROM pg_roles ORDER BY rolname limit 20");
+				List<String> roles = roleResults.stream().map(map -> (String)map.get("rolname")).filter(Objects::nonNull).collect(Collectors.toList());
+				options.setRoles(roles);
+			}
 
-			// ============= 5. 排序规则（collations） =============
-			// 这里先简单按 UTF8 过滤；如果以后支持多编码，可以把 encoding 作为参数传进来
-			List<Map<String, Object>> collationResults = executor.queryMapForList(
-					"SELECT collname, collprovider " + "FROM pg_collation "
-							+ "WHERE collencoding IN (-1, pg_char_to_encoding('UTF8')) " + "ORDER BY collname");
-			List<String> collations = collationResults.stream().map(map -> (String)map.get("collname")).filter(Objects::nonNull).collect(Collectors.toList());
-			options.setCollations(collations);
+			if (param.getTypes().contains(PgOptionTypeEnum.COLLATIONS)) {
+				// ============= 5. 排序规则（collations） =============
+				// 这里先简单按 UTF8 过滤；如果以后支持多编码，可以把 encoding 作为参数传进来
+				List<Map<String, Object>> collationResults = executor.queryMapForList(
+						"SELECT collname, collprovider " + "FROM pg_collation "
+								+ "WHERE collencoding IN (-1, pg_char_to_encoding('UTF8')) " + "ORDER BY collname");
+				List<String> collations = collationResults.stream().map(map -> (String)map.get("collname")).filter(Objects::nonNull).collect(Collectors.toList());
+				options.setCollations(collations);
 
-			// ============= 6. Locale Provider（libc / icu） =============
-			List<String> localeProviders = collationResults.stream().map(map -> (String)map.get("collprovider")).filter(Objects::nonNull).distinct().map(p -> {
-				switch (p) {
-					case "i":
-						return "icu";
-					case "c":
-						return "libc";
-					default:
-						return p;
-				}
-			}).collect(Collectors.toList());
-			options.setLocaleProviders(localeProviders);
-
+				// ============= 6. Locale Provider（libc / icu） =============
+				List<String> localeProviders = collationResults.stream().map(map -> (String)map.get("collprovider")).filter(Objects::nonNull).distinct().map(p -> {
+					switch (p) {
+						case "i":
+							return "icu";
+						case "c":
+							return "libc";
+						default:
+							return p;
+					}
+				}).collect(Collectors.toList());
+				options.setLocaleProviders(localeProviders);
+			}
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to get PostgreSQL options", e);
 		}

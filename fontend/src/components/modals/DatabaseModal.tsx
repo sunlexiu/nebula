@@ -154,7 +154,7 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
     useEffect(() => {
         if (isOpen && connectionId) {
             // 初始只加载 templates
-            fetchDbOptions(['templates']);
+            fetchDbOptions(['TEMPLATES']);
             if (mode === 'edit' && databaseId) {
                 fetchDatabaseData();
             } else {
@@ -171,10 +171,10 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
         switch (activeTab) {
             case 'definition':
                 // 在定义 Tab 中加载编码、排序规则和 Locale Provider
-                fetchDbOptions(['encodings', 'collations', 'localeProviders']);
+                fetchDbOptions(['ENCODINGS','COLLATIONS','LOCALE_PROVIDERS']);
                 break;
             case 'storage':
-                fetchDbOptions(['tablespaces']);
+                fetchDbOptions(['TABLESPACES']);
                 break;
             case 'advanced':
                 // 高级 Tab 目前不再主动加载新的选项
@@ -198,7 +198,14 @@ const DatabaseModal: React.FC<DatabaseModalProps> = ({
             setLoadingOptions((prev) => new Set([...prev, ...typesToFetch]));
 
             const response = await fetch(
-                `/api/meta/db/options/${connectionId}?types=${typesToFetch.join(',')}`
+                `/api/meta/db/options/${connectionId}`,
+                {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({
+                            types: typesToFetch
+                         })
+                    }
             );
 
             if (response.ok) {
