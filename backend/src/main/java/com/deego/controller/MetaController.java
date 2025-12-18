@@ -40,4 +40,9 @@ public class MetaController {
 	public ApiResponse<Option> options(@PathVariable String connId, @RequestBody OptionParam param) {
         return ApiResponse.ok(metaService.options(connId, param));
 	}
+
+	@PostMapping("/db/options/{connId}")
+	public ApiResponse<String> generateSql(@PathVariable String connId, @RequestBody Map<String, Object> param) {
+        return ApiResponse.ok("");
+	}
 }

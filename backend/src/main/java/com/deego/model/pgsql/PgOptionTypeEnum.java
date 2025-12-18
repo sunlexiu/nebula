@@ -1,7 +1,5 @@
 package com.deego.model.pgsql;
 
-import org.hibernate.sql.ast.tree.expression.Collation;
-
 /**
  * @author sunlexiu
  */
@@ -11,10 +9,12 @@ public enum PgOptionTypeEnum {
 
 	TEMPLATES,
 
-	TABLE_NAMESPACES,
+	TABLESPACES,
 
 	ROLES,
 
-	COLLATIONS
+	COLLATIONS,
+
+	LOCALE_PROVIDERS
 
 }

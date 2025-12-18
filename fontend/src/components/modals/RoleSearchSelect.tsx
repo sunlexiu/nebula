@@ -78,14 +78,12 @@ const RoleSearchSelect: React.FC<RoleSearchSelectProps> = ({
             try {
                 setLoading(true);
                 const resp = await fetch(
-                    `/api/meta/db/roles/search?connectionId=${encodeURIComponent(
-                        connectionId
-                    )}&q=${encodeURIComponent(query)}&limit=20`,
-                    { signal: controller.signal }
+                    `/api/meta/db/options/${encodeURIComponent(connectionId)}`,
+                    { method: 'POST', headers:{'Content-type':'application/json'}, body: JSON.stringify({ roleFilter: query, types: ['ROLES'] }) }
                 );
                 if (resp.ok) {
                     const body = await resp.json();
-                    const data: RoleOption[] = (body?.data || []).map((item: any) =>
+                    const data: RoleOption[] = (body?.data?.roles || []).map((item: any) =>
                         typeof item === 'string'
                             ? { value: item, label: item }
                             : item

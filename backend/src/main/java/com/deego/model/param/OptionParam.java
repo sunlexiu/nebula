@@ -14,5 +14,5 @@ import java.util.Set;
 @Setter
 public class OptionParam {
 	private Set<PgOptionTypeEnum> types;
-	private String param1;
+	private String roleFilter;
 }

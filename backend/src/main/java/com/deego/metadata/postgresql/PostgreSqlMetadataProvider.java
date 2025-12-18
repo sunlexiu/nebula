@@ -11,6 +11,7 @@ import com.deego.model.pgsql.PgOptionTypeEnum;
 import com.deego.service.ConnectionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -80,7 +81,7 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
 				options.setTemplates(templates);
 			}
 
-			if (param.getTypes().contains(PgOptionTypeEnum.TABLE_NAMESPACES)) {
+			if (param.getTypes().contains(PgOptionTypeEnum.TABLESPACES)) {
 				// ============= 3. 表空间 =============
 				List<Map<String, Object>> tablespaceResults = executor.queryMapForList("SELECT spcname FROM pg_tablespace ORDER BY spcname");
 				List<String> tablespaces = tablespaceResults.stream().map(map -> (String)map.get("spcname")).filter(Objects::nonNull).collect(Collectors.toList());
@@ -89,7 +90,10 @@ public class PostgreSqlMetadataProvider implements MetadataProvider {
 
 			if (param.getTypes().contains(PgOptionTypeEnum.ROLES)) {
 				// ============= 4. 角色 =============
-				List<Map<String, Object>> roleResults = executor.queryMapForList("SELECT rolname FROM pg_roles ORDER BY rolname limit 20");
+				String roleSqlFormat = "SELECT rolname FROM pg_roles ORDER BY rolname limit 20";
+				String roleSqlFormatWithFilter = "SELECT rolname FROM pg_roles where rolname like concat('%%', '%s', '%%') ORDER BY rolname limit 20";
+				String realSql = StringUtils.hasText(param.getRoleFilter()) ? String.format(roleSqlFormatWithFilter, param.getRoleFilter()) : roleSqlFormat;
+				List<Map<String, Object>> roleResults = executor.queryMapForList(realSql);
 				List<String> roles = roleResults.stream().map(map -> (String)map.get("rolname")).filter(Objects::nonNull).collect(Collectors.toList());
 				options.setRoles(roles);
 			}
